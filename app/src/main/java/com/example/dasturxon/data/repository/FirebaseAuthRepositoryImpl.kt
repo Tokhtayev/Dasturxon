@@ -357,7 +357,13 @@ class FirebaseAuthRepositoryImpl @Inject constructor(
             auth.sendPasswordResetEmail(email).await()
             AppResult.Success(Unit)
         } catch (e: Exception) {
-            AppResult.Error(Exception(mapAuthError(e)))
+            val errorCode = (e as? FirebaseAuthException)?.errorCode
+            if (errorCode == "ERROR_USER_NOT_FOUND") {
+                // Prevent email enumeration: return success even if user not found
+                AppResult.Success(Unit)
+            } else {
+                AppResult.Error(Exception(mapAuthError(e)))
+            }
         }
     }
 
@@ -376,7 +382,7 @@ class FirebaseAuthRepositoryImpl @Inject constructor(
         )
     }
 
-    private fun mapAuthError(error: Exception): String {
+    internal fun mapAuthError(error: Exception): String {
         if (error.message.orEmpty().contains("CONFIGURATION_NOT_FOUND")) {
             return "Firebase Console'da Authentication bo'limida kirish usullarini yoqing."
         }
