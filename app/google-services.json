@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "437798898747",
+    "project_id": "dasturxon-27a6e",
+    "storage_bucket": "dasturxon-27a6e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:437798898747:android:f64702f40a42bc8e36201e",
+        "android_client_info": {
+          "package_name": "com.example.dasturxon"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1ThhzGaxiaQU0TgW7I1oWb7-gfDVEJTU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getUserData().role == 'admin';
+    }
+
+    // ------------------------------------------------------------------------
+    // User Profiles Collection: /users/{userId}
+    // ------------------------------------------------------------------------
+    match /users/{userId} {
+      // Allow user to read their own profile, or admins to read all profiles
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+
+      // Create profile: User can only create their own document, role must be 'customer' or 'owner'
+      allow create: if isOwner(userId)
+        && request.resource.data.role in ['customer', 'owner']
+        && request.resource.data.email is string
+        && request.resource.data.fullName is string;
+
+      // Update profile: User can update fields, but CANNOT alter their role
+      allow update: if isOwner(userId)
+        && request.resource.data.role == resource.data.role;
+
+      // Deletion allowed by owner or admin
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // ------------------------------------------------------------------------
+    // Username Registry Collection: /usernames/{normalizedNickname}
+    // ------------------------------------------------------------------------
+    match /usernames/{normalizedNickname} {
+      // Publicly readable for nickname availability checks
+      allow read: if isSignedIn();
+
+      // Creation only allowed if the UID matches request.auth.uid and document does not exist yet
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && !exists(/databases/$(database)/documents/usernames/$(normalizedNickname));
+
+      // Usernames are immutable once registered
+      allow update, delete: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Businesses Collection: /businesses/{businessId}
+    // ------------------------------------------------------------------------
+    match /businesses/{businessId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // ------------------------------------------------------------------------
+    // Products Collection: /products/{productId}
+    // ------------------------------------------------------------------------
+    match /products/{productId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // ------------------------------------------------------------------------
+    // Orders Collection: /orders/{orderId}
+    // ------------------------------------------------------------------------
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.businessId in getUserData().businessIds ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && request.resource.data.customerId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.customerId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+  }
+}

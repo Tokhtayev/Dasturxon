@@ -1,0 +1,273 @@
+package com.example.dasturxon.ui.home
+
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import com.example.dasturxon.data.model.CustomerOrder
+import com.example.dasturxon.data.model.Product
+import com.google.firebase.Timestamp
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+
+@Composable
+internal fun PlaceOrderDialog(
+    product: Product,
+    isSubmitting: Boolean,
+    submitError: String?,
+    onDismiss: () -> Unit,
+    onSubmit: (quantity: Long, pickupTime: Timestamp) -> Unit
+) {
+    val context = LocalContext.current
+    var quantity by remember(product.id) { mutableStateOf("1") }
+    var pickupMillis by remember(product.id) {
+        mutableStateOf(System.currentTimeMillis() + 60 * 60 * 1000L)
+    }
+    val pickupLabel = remember(pickupMillis) {
+        SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(pickupMillis))
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Buyurtma: ${product.name}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val discounted = if (product.discountPercent > 0L && (product.discountEndsAt == null || product.discountEndsAt.toDate().after(Date()))) {
+                    product.price - product.price * product.discountPercent / 100L
+                } else product.price
+                Text("Narx: ${"%,d".format(discounted).replace(',', ' ')} so'm × ${quantity.toLongOrNull() ?: 0L}")
+                if (product.stock != null) Text("Mavjud zaxira: ${product.stock}")
+                submitError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                OutlinedTextField(
+                    value = quantity,
+                    onValueChange = { quantity = it.filter(Char::isDigit).take(4) },
+                    label = { Text("Soni") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    enabled = !isSubmitting
+                )
+                OutlinedButton(
+                    onClick = {
+                        val current = Calendar.getInstance().apply { timeInMillis = pickupMillis }
+                        DatePickerDialog(
+                            context,
+                            { _, year, month, day ->
+                                current.set(year, month, day)
+                                TimePickerDialog(
+                                    context,
+                                    { _, hour, minute ->
+                                        current.set(Calendar.HOUR_OF_DAY, hour)
+                                        current.set(Calendar.MINUTE, minute)
+                                        current.set(Calendar.SECOND, 0)
+                                        pickupMillis = current.timeInMillis
+                                    },
+                                    current.get(Calendar.HOUR_OF_DAY),
+                                    current.get(Calendar.MINUTE),
+                                    true
+                                ).show()
+                            },
+                            current.get(Calendar.YEAR),
+                            current.get(Calendar.MONTH),
+                            current.get(Calendar.DAY_OF_MONTH)
+                        ).show()
+                    }
+                ) { Text("Olib ketish: $pickupLabel") }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    quantity.toLongOrNull()?.takeIf { it > 0 }?.let {
+                        onSubmit(it, Timestamp(Date(pickupMillis)))
+                    }
+                },
+                enabled = !isSubmitting
+                    && (quantity.toLongOrNull() ?: 0L) > 0L
+                    && pickupMillis > System.currentTimeMillis()
+                    && (product.stock == null || (quantity.toLongOrNull() ?: Long.MAX_VALUE) <= product.stock)
+            ) {
+                if (isSubmitting) CircularProgressIndicator()
+                else Text("Tasdiqlash")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !isSubmitting) { Text("Bekor qilish") } }
+    )
+}
+
+@Composable
+internal fun ProductEditDialog(
+    product: Product,
+    onDismiss: () -> Unit,
+    onSave: (String, String, Long, Long?, Long, Timestamp?) -> Unit
+) {
+    val context = LocalContext.current
+    var name by rememberSaveable(product.id) { mutableStateOf(product.name) }
+    var description by rememberSaveable(product.id) { mutableStateOf(product.description) }
+    var price by rememberSaveable(product.id) { mutableStateOf(product.price.toString()) }
+    var stock by rememberSaveable(product.id) { mutableStateOf(product.stock?.toString().orEmpty()) }
+    var discount by rememberSaveable(product.id) { mutableStateOf(product.discountPercent.toString()) }
+    var expiryMillis by rememberSaveable(product.id) {
+        mutableStateOf(product.discountEndsAt?.toDate()?.time)
+    }
+    var validation by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Mahsulotni tahrirlash") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Nomi") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(description, { description = it }, label = { Text("Tavsif") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(price, { price = it.filter(Char::isDigit) }, label = { Text("Narx (so'm)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(stock, { stock = it.filter(Char::isDigit) }, label = { Text("Zaxira (ixtiyoriy)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(discount, { discount = it.filter(Char::isDigit) }, label = { Text("Chegirma (0–90%)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedButton(onClick = {
+                    val calendar = Calendar.getInstance().apply {
+                        timeInMillis = expiryMillis ?: System.currentTimeMillis()
+                    }
+                    DatePickerDialog(
+                        context,
+                        { _, year, month, day ->
+                            calendar.set(year, month, day, 23, 59, 59)
+                            expiryMillis = calendar.timeInMillis
+                        },
+                        calendar.get(Calendar.YEAR),
+                        calendar.get(Calendar.MONTH),
+                        calendar.get(Calendar.DAY_OF_MONTH)
+                    ).show()
+                }) {
+                    Text(expiryMillis?.let { "Tugash sanasi: ${SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(it))}" }
+                        ?: "Chegirma muddati cheklanmagan")
+                }
+                TextButton(onClick = { expiryMillis = null }) { Text("Tugash sanasini olib tashlash") }
+                validation?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val parsedPrice = price.toLongOrNull()
+                val parsedStock = stock.takeIf(String::isNotBlank)?.toLongOrNull()
+                val parsedDiscount = discount.toLongOrNull()
+                when {
+                    name.isBlank() -> validation = "Mahsulot nomini kiriting."
+                    parsedPrice == null || parsedPrice <= 0L -> validation = "Narxni tekshiring."
+                    stock.isNotBlank() && (parsedStock == null || parsedStock < 0L) -> validation = "Zaxirani tekshiring."
+                    parsedDiscount == null || parsedDiscount !in 0L..90L -> validation = "Chegirma 0–90 oralig'ida bo'lsin."
+                    else -> onSave(
+                        name.trim(),
+                        description.trim(),
+                        parsedPrice,
+                        parsedStock,
+                        parsedDiscount,
+                        expiryMillis?.let { Timestamp(Date(it)) }
+                    )
+                }
+            }) { Text("Saqlash") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Bekor qilish") } }
+    )
+}
+
+@Composable
+internal fun OrderCard(
+    order: CustomerOrder,
+    ownerActions: Boolean = false,
+    onStatusChange: (String) -> Unit = {}
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                Text(
+                    text = order.productName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+                com.example.dasturxon.core.designsystem.StatusChip(
+                    status = com.example.dasturxon.core.model.OrderStatus.fromStoredValue(order.status)
+                )
+            }
+            Text("Biznes: ${order.businessName}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Soni: ${order.quantity} • Jami: ${com.example.dasturxon.core.common.MoneyFormatter.formatSoM(order.totalPrice)}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            order.pickupTime?.let {
+                Text("Olib ketish: " + SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(it.toDate()), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+            }
+            if (ownerActions) {
+                Spacer(Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    when (order.status) {
+                        "new" -> {
+                            Button(
+                                onClick = { onStatusChange("accepted") },
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Qabul qilish")
+                            }
+                            OutlinedButton(
+                                onClick = { onStatusChange("cancelled") },
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Rad etish")
+                            }
+                        }
+                        "accepted" -> Button(
+                            onClick = { onStatusChange("ready") },
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Tayyor")
+                        }
+                        "ready" -> Button(
+                            onClick = { onStatusChange("done") },
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Topshirildi (Yakunlash)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

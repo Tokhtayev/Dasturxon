@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dasturxon Brand Palette (Golden Tandoor & Samarkand Turquoise) -->
+    <color name="primary">#B7500A</color>
+    <color name="primary_container">#FFDCC2</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="on_primary_container">#3A1A00</color>
+    <color name="secondary">#0F7C84</color>
+    <color name="secondary_container">#C6EEF0</color>
+    <color name="on_secondary">#FFFFFF</color>
+    <color name="on_secondary_container">#00292C</color>
+    <color name="tertiary">#4C7A2B</color>
+    <color name="tertiary_container">#D2EDB6</color>
+    <color name="background">#FFF8F1</color>
+    <color name="surface">#FFFBF7</color>
+    <color name="surface_variant">#F3E5D8</color>
+    <color name="outline">#8A7566</color>
+    <color name="on_surface">#2A1C12</color>
+    <color name="error">#BA1A1A</color>
+
+    <!-- Compatibility aliases -->
+    <color name="purple_200">#FFDCC2</color>
+    <color name="purple_500">#B7500A</color>
+    <color name="purple_700">#7D3200</color>
+    <color name="teal_200">#C6EEF0</color>
+    <color name="teal_700">#0F7C84</color>
+    <color name="black">#2A1C12</color>
+    <color name="white">#FFFFFF</color>
+</resources>
