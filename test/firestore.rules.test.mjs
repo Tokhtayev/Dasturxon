@@ -185,6 +185,10 @@ test("5. Admin can approve a business", async () => {
   await assertSucceeds(updateDoc(doc(db, "businesses/business-2"), {
     status: "approved"
   }));
+  // Reset status back to pending so business-2 remains unapproved for test 8
+  await updateDoc(doc(db, "businesses/business-2"), {
+    status: "pending"
+  });
 });
 
 // 6. Approved business owner can publish a product
@@ -232,3 +236,37 @@ test("10. Owner can update order status only for their own business", async () =
     status: "accepted"
   }));
 });
+
+// 11. Role escalation prevention on creation
+test("11. User cannot create profile with admin role", async () => {
+  const db = testEnv.authenticatedContext("attacker-1").firestore();
+  await assertFails(setDoc(doc(db, "users/attacker-1"), {
+    fullName: "Attacker",
+    email: "attacker@example.test",
+    role: "admin",
+    createdAt: Timestamp.now()
+  }));
+});
+
+// 12. Role escalation prevention on update
+test("12. User cannot escalate role to admin on update", async () => {
+  const db = testEnv.authenticatedContext("customer-1").firestore();
+  await assertFails(updateDoc(doc(db, "users/customer-1"), {
+    role: "admin"
+  }));
+});
+
+// 13. Writing to another user's document prevention
+test("13. User cannot write to another user's document", async () => {
+  const db = testEnv.authenticatedContext("customer-1").firestore();
+  await assertFails(updateDoc(doc(db, "users/customer-2"), {
+    fullName: "Hacked Name"
+  }));
+});
+
+// 14. Reading others' orders prevention
+test("14. Customer cannot read another customer's order", async () => {
+  const db = testEnv.authenticatedContext("customer-2").firestore();
+  await assertFails(getDoc(doc(db, "orders/order-1")));
+});
+

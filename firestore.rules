@@ -19,6 +19,18 @@ service cloud.firestore {
       return isSignedIn() && getUserData().role == 'admin';
     }
 
+    function getBusiness(businessId) {
+      return get(/databases/$(database)/documents/businesses/$(businessId)).data;
+    }
+
+    function isBusinessOwner(businessId) {
+      return isSignedIn() && getBusiness(businessId).ownerId == request.auth.uid;
+    }
+
+    function isBusinessApproved(businessId) {
+      return getBusiness(businessId).status == 'approved';
+    }
+
     // ------------------------------------------------------------------------
     // User Profiles Collection: /users/{userId}
     // ------------------------------------------------------------------------
@@ -26,15 +38,15 @@ service cloud.firestore {
       // Allow user to read their own profile, or admins to read all profiles
       allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
 
-      // Create profile: User can only create their own document, role must be 'customer' or 'owner'
+      // Create profile: User can only create their own document, role must be 'customer' or 'owner' (no admin creation)
       allow create: if isOwner(userId)
         && request.resource.data.role in ['customer', 'owner']
         && request.resource.data.email is string
         && request.resource.data.fullName is string;
 
-      // Update profile: User can update fields, but CANNOT alter their role
-      allow update: if isOwner(userId)
-        && request.resource.data.role == resource.data.role;
+      // Update profile: User can update their own doc, but CANNOT alter their role (no role escalation)
+      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role)
+        || isAdmin();
 
       // Deletion allowed by owner or admin
       allow delete: if isOwner(userId) || isAdmin();
@@ -60,9 +72,25 @@ service cloud.firestore {
     // Businesses Collection: /businesses/{businessId}
     // ------------------------------------------------------------------------
     match /businesses/{businessId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      // Read: Any signed in user can read approved businesses; owner or admin can read pending/suspended
+      allow read: if isSignedIn() && (
+        resource.data.status == 'approved' ||
+        resource.data.ownerId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Create: Owner can create their business, but initial status must be 'pending'
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      // Update: Owner can update business info, but CANNOT change status (e.g. self-approve); admin can change status
+      allow update: if isSignedIn() && (
+        (resource.data.ownerId == request.auth.uid && request.resource.data.status == resource.data.status) ||
+        isAdmin()
+      );
+
+      // Delete: Only admin
       allow delete: if isAdmin();
     }
 
@@ -70,24 +98,61 @@ service cloud.firestore {
     // Products Collection: /products/{productId}
     // ------------------------------------------------------------------------
     match /products/{productId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      // Read: Customers can read products from approved businesses.
+      // Business owner can read products of their own business (even if pending).
+      // Admin can read all products.
+      allow read: if isSignedIn() && (
+        isBusinessApproved(resource.data.businessId) ||
+        isBusinessOwner(resource.data.businessId) ||
+        isAdmin()
+      );
+
+      // Create: Only the owner of an APPROVED business (or admin) can create products
+      allow create: if isSignedIn() && (
+        (isBusinessOwner(request.resource.data.businessId) && isBusinessApproved(request.resource.data.businessId)) ||
+        isAdmin()
+      );
+
+      // Update & Delete: Only the owner of that business (or admin) can update/delete products
+      // Also cannot change businessId to hijack ownership
+      allow update: if isSignedIn() && (
+        (isBusinessOwner(resource.data.businessId) && request.resource.data.businessId == resource.data.businessId) ||
+        isAdmin()
+      );
+
+      allow delete: if isSignedIn() && (
+        isBusinessOwner(resource.data.businessId) ||
+        isAdmin()
+      );
     }
 
     // ------------------------------------------------------------------------
     // Orders Collection: /orders/{orderId}
     // ------------------------------------------------------------------------
     match /orders/{orderId} {
+      // Read: Customer can read their own orders; Business owner can read orders for their business; Admin can read all
       allow read: if isSignedIn() && (
         resource.data.customerId == request.auth.uid ||
-        resource.data.businessId in getUserData().businessIds ||
+        isBusinessOwner(resource.data.businessId) ||
         isAdmin()
       );
-      allow create: if isSignedIn() && request.resource.data.customerId == request.auth.uid;
+
+      // Create: Signed-in customer creates order for themselves with initial status
+      allow create: if isSignedIn()
+        && request.resource.data.customerId == request.auth.uid;
+
+      // Update:
+      // - Customer can only update their own order
+      // - Business owner can update order status for their own business
+      // - Admin can update any order
       allow update: if isSignedIn() && (
-        resource.data.customerId == request.auth.uid ||
+        (resource.data.customerId == request.auth.uid && request.resource.data.customerId == resource.data.customerId) ||
+        isBusinessOwner(resource.data.businessId) ||
         isAdmin()
       );
+
+      // Delete: Admin only
+      allow delete: if isAdmin();
     }
   }
 }
