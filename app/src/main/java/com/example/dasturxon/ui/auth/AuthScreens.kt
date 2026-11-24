@@ -875,8 +875,8 @@ private suspend fun performGoogleCredentialManagerSignIn(
             onIdTokenReceived(credential.idToken)
         }
     } catch (e: GetCredentialException) {
-        Log.e("AuthScreens", "Google Credential Manager error", e)
+        Log.w("AuthScreens", "Google credential retrieval cancelled or failed")
     } catch (e: Exception) {
-        Log.e("AuthScreens", "Google sign in error", e)
+        Log.w("AuthScreens", "Google sign in request could not be completed")
     }
 }
