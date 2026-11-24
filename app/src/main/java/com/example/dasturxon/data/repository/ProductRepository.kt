@@ -5,6 +5,10 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 
 class ProductRepository(private val firestore: FirebaseFirestore) {
     fun create(
@@ -37,6 +41,23 @@ class ProductRepository(private val firestore: FirebaseFirestore) {
             .addOnFailureListener { onComplete(Result.failure(it)) }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeForBusiness(businessId: String): Flow<Result<List<Product>>> = callbackFlow {
+        val registration = firestore.collection("products")
+            .whereEqualTo("businessId", businessId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(Result.failure(error))
+                } else {
+                    val products = snapshot?.documents.orEmpty().map { doc ->
+                        Product.fromDocument(doc.id, doc.data.orEmpty())
+                    }
+                    trySend(Result.success(products))
+                }
+            }
+        awaitClose { registration.remove() }
+    }
+
     fun listenForBusiness(
         businessId: String,
         onUpdate: (Result<List<Product>>) -> Unit
@@ -55,6 +76,23 @@ class ProductRepository(private val firestore: FirebaseFirestore) {
                 )
             }
         }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeFeed(): Flow<Result<List<Product>>> = callbackFlow {
+        val registration = firestore.collection("products")
+            .whereIn("status", listOf("available", "hot_ready"))
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(Result.failure(error))
+                } else {
+                    val products = snapshot?.documents.orEmpty().map { doc ->
+                        Product.fromDocument(doc.id, doc.data.orEmpty())
+                    }
+                    trySend(Result.success(products))
+                }
+            }
+        awaitClose { registration.remove() }
+    }
 
     fun listenFeed(onUpdate: (Result<List<Product>>) -> Unit): ListenerRegistration =
         firestore.collection("products")

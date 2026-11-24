@@ -6,7 +6,7 @@ import {
   assertFails,
   assertSucceeds
 } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, onSnapshot, query, where, collection, Timestamp } from "firebase/firestore";
 
 const projectId = "demo-dasturxon";
 let testEnv;
@@ -269,4 +269,115 @@ test("14. Customer cannot read another customer's order", async () => {
   const db = testEnv.authenticatedContext("customer-2").firestore();
   await assertFails(getDoc(doc(db, "orders/order-1")));
 });
+
+function waitForSnapshot(ref, predicate, timeoutMs = 4000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      unsubscribe();
+      reject(new Error("waitForSnapshot timed out"));
+    }, timeoutMs);
+
+    const unsubscribe = onSnapshot(ref, (snapshot) => {
+      try {
+        if (predicate(snapshot)) {
+          clearTimeout(timer);
+          unsubscribe();
+          resolve(snapshot);
+        }
+      } catch (err) {
+        clearTimeout(timer);
+        unsubscribe();
+        reject(err);
+      }
+    }, (error) => {
+      clearTimeout(timer);
+      unsubscribe();
+      reject(error);
+    });
+  });
+}
+
+// 15. Real-time: owner adds product -> customer sees it via snapshot listener
+test("15. Real-time: owner adds product -> customer sees it via snapshot listener", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+
+  // Create initial product
+  const productRefOwner = doc(dbOwner, "products/product-rt-feed");
+  const productRefCust = doc(dbCust, "products/product-rt-feed");
+
+  await setDoc(productRefOwner, validProduct({
+    businessId: "business-1",
+    name: "Realtime Non Init",
+    price: 7000
+  }));
+
+  // Customer sets up real-time listener for this approved business's product
+  const watchPromise = waitForSnapshot(productRefCust, (snap) => snap.data()?.name === "Realtime Non Updated");
+
+  // Owner updates product in real time
+  await updateDoc(productRefOwner, {
+    name: "Realtime Non Updated",
+    price: 8500
+  });
+
+  const snap = await watchPromise;
+  assert.equal(snap.data().name, "Realtime Non Updated");
+  assert.equal(snap.data().price, 8500);
+});
+
+// 16. Real-time: customer orders -> owner sees it instantly
+test("16. Real-time: customer orders -> owner sees it instantly", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+
+  const orderRefCust = doc(dbCust, "orders/order-rt-instant");
+  const orderRefOwner = doc(dbOwner, "orders/order-rt-instant");
+
+  await setDoc(orderRefCust, {
+    customerId: "customer-1",
+    businessId: "business-1",
+    businessName: "Nonvoyxona 1",
+    productId: "product-approved",
+    productName: "Patir Non",
+    quantity: 3,
+    totalPrice: 24000,
+    status: "new",
+    pickupTime: Timestamp.fromMillis(Date.now() + 3600000),
+    createdAt: Timestamp.now()
+  });
+
+  // Owner sets up real-time listener for orders of their business
+  const watchPromise = waitForSnapshot(orderRefOwner, (snap) => snap.data()?.customerId === "customer-1");
+  const snap = await watchPromise;
+  assert.equal(snap.data().totalPrice, 24000);
+  assert.equal(snap.data().status, "new");
+});
+
+// 17. Real-time: owner changes status -> customer sees it
+test("17. Real-time: owner changes status -> customer sees it", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+
+  const orderDocCust = doc(dbCust, "orders/order-rt-instant");
+  const orderDocOwner = doc(dbOwner, "orders/order-rt-instant");
+
+  const watchReady = waitForSnapshot(orderDocCust, (snap) => snap.data()?.status === "ready");
+
+  await updateDoc(orderDocOwner, {
+    status: "ready"
+  });
+
+  const readySnap = await watchReady;
+  assert.equal(readySnap.data().status, "ready");
+
+  const watchDone = waitForSnapshot(orderDocCust, (snap) => snap.data()?.status === "done");
+  await updateDoc(orderDocOwner, {
+    status: "done"
+  });
+
+  const doneSnap = await watchDone;
+  assert.equal(doneSnap.data().status, "done");
+});
+
 

@@ -8,7 +8,20 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 
-class BusinessRepository(private val firestore: FirebaseFirestore) {
+open class BusinessRepository {
+    private val firestore: FirebaseFirestore?
+
+    constructor(firestore: FirebaseFirestore) {
+        this.firestore = firestore
+    }
+
+    constructor() {
+        this.firestore = null
+    }
+
+    protected fun db(): FirebaseFirestore =
+        firestore ?: throw IllegalStateException("Firestore not configured")
+
     fun create(
         ownerId: String,
         name: String,
@@ -28,7 +41,7 @@ class BusinessRepository(private val firestore: FirebaseFirestore) {
             "createdAt" to FieldValue.serverTimestamp()
         )
         typeNote?.trim()?.takeIf(String::isNotEmpty)?.let { data["typeNote"] = it }
-        firestore.collection("businesses").add(data)
+        db().collection("businesses").add(data)
             .addOnSuccessListener { onComplete(Result.success(Unit)) }
             .addOnFailureListener { onComplete(Result.failure(it)) }
     }
@@ -54,14 +67,14 @@ class BusinessRepository(private val firestore: FirebaseFirestore) {
         updates["typeNote"] = typeNote?.trim()
             ?.takeIf(String::isNotEmpty)
             ?: FieldValue.delete()
-        firestore.collection("businesses").document(businessId)
+        db().collection("businesses").document(businessId)
             .update(updates)
             .addOnSuccessListener { onComplete(Result.success(Unit)) }
             .addOnFailureListener { onComplete(Result.failure(it)) }
     }
 
-    suspend fun getById(businessId: String): Business? = suspendCancellableCoroutine { continuation ->
-        firestore.collection("businesses").document(businessId).get()
+    open suspend fun getById(businessId: String): Business? = suspendCancellableCoroutine { continuation ->
+        db().collection("businesses").document(businessId).get()
             .addOnSuccessListener { snapshot ->
                 if (continuation.isActive) {
                     continuation.resume(
@@ -77,7 +90,7 @@ class BusinessRepository(private val firestore: FirebaseFirestore) {
     fun listenForOwner(
         ownerId: String,
         onUpdate: (Result<List<Business>>) -> Unit
-    ): ListenerRegistration = firestore.collection("businesses")
+    ): ListenerRegistration = db().collection("businesses")
         .whereEqualTo("ownerId", ownerId)
         .addSnapshotListener { snapshot, error ->
             if (error != null) {
@@ -94,7 +107,7 @@ class BusinessRepository(private val firestore: FirebaseFirestore) {
         }
 
     fun listenPending(onUpdate: (Result<List<Business>>) -> Unit): ListenerRegistration =
-        firestore.collection("businesses")
+        db().collection("businesses")
             .whereEqualTo("status", "pending")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
@@ -111,7 +124,7 @@ class BusinessRepository(private val firestore: FirebaseFirestore) {
             }
 
     fun listenApproved(onUpdate: (Result<List<Business>>) -> Unit): ListenerRegistration =
-        firestore.collection("businesses")
+        db().collection("businesses")
             .whereEqualTo("status", "approved")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
@@ -128,7 +141,7 @@ class BusinessRepository(private val firestore: FirebaseFirestore) {
             }
 
     fun listenAll(onUpdate: (Result<List<Business>>) -> Unit): ListenerRegistration =
-        firestore.collection("businesses")
+        db().collection("businesses")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     onUpdate(Result.failure(error))
@@ -151,7 +164,7 @@ class BusinessRepository(private val firestore: FirebaseFirestore) {
     ) {
         val updates = mutableMapOf<String, Any>("status" to status)
         if (rejectionReason != null) updates["rejectionReason"] = rejectionReason
-        firestore.collection("businesses").document(businessId)
+        db().collection("businesses").document(businessId)
             .update(updates)
             .addOnSuccessListener { onComplete(Result.success(Unit)) }
             .addOnFailureListener { onComplete(Result.failure(it)) }

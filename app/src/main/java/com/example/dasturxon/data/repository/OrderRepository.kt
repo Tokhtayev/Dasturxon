@@ -28,8 +28,21 @@ data class HistoryOrderPage(
     val lastDocument: DocumentSnapshot?
 )
 
-class OrderRepository(private val firestore: FirebaseFirestore) {
-    fun create(
+open class OrderRepository {
+    private val firestore: FirebaseFirestore?
+
+    constructor(firestore: FirebaseFirestore) {
+        this.firestore = firestore
+    }
+
+    constructor() {
+        this.firestore = null
+    }
+
+    protected fun db(): FirebaseFirestore =
+        firestore ?: throw IllegalStateException("Firestore not configured")
+
+    open fun create(
         customerId: String,
         business: Business,
         product: Product,
@@ -37,11 +50,11 @@ class OrderRepository(private val firestore: FirebaseFirestore) {
         pickupTime: Timestamp,
         onComplete: (Result<Unit>) -> Unit
     ) {
-        val productRef = firestore.collection("products").document(product.id)
-        val businessRef = firestore.collection("businesses").document(business.id)
-        val orderRef = firestore.collection("orders").document()
+        val productRef = db().collection("products").document(product.id)
+        val businessRef = db().collection("businesses").document(business.id)
+        val orderRef = db().collection("orders").document()
 
-        firestore.runTransaction { transaction ->
+        db().runTransaction { transaction ->
             val productSnapshot = transaction.get(productRef)
             val businessSnapshot = transaction.get(businessRef)
             val status = productSnapshot.getString("status")
@@ -105,7 +118,7 @@ class OrderRepository(private val firestore: FirebaseFirestore) {
     fun listenForCustomer(
         customerId: String,
         onUpdate: (Result<List<CustomerOrder>>) -> Unit
-    ): ListenerRegistration = firestore.collection("orders")
+    ): ListenerRegistration = db().collection("orders")
         .whereEqualTo("customerId", customerId)
         .addSnapshotListener { snapshot, error ->
             if (error != null) onUpdate(Result.failure(error))
@@ -117,8 +130,8 @@ class OrderRepository(private val firestore: FirebaseFirestore) {
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun observeActiveForCustomer(customerId: String): Flow<Result<List<CustomerOrder>>> = callbackFlow {
-        val registration = firestore.collection("orders")
+    open fun observeActiveForCustomer(customerId: String): Flow<Result<List<CustomerOrder>>> = callbackFlow {
+        val registration = db().collection("orders")
             .whereEqualTo("customerId", customerId)
             .whereIn("status", OrderStatus.firestoreValues(OrderStatusGroup.ACTIVE))
             .limit(ACTIVE_ORDER_LIMIT.toLong())
@@ -135,11 +148,11 @@ class OrderRepository(private val firestore: FirebaseFirestore) {
         awaitClose { registration.remove() }
     }
 
-    suspend fun loadHistoryPage(
+    open suspend fun loadHistoryPage(
         customerId: String,
         cursor: DocumentSnapshot?
     ): HistoryOrderPage = suspendCancellableCoroutine { continuation ->
-        var query: Query = firestore.collection("orders")
+        var query: Query = db().collection("orders")
             .whereEqualTo("customerId", customerId)
             .whereIn("status", OrderStatus.firestoreValues(OrderStatusGroup.HISTORY))
             .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -163,10 +176,44 @@ class OrderRepository(private val firestore: FirebaseFirestore) {
             }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeAllForCustomer(customerId: String): Flow<Result<List<CustomerOrder>>> = callbackFlow {
+        val registration = db().collection("orders")
+            .whereEqualTo("customerId", customerId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(Result.failure(error))
+                } else {
+                    val orders = snapshot?.documents.orEmpty()
+                        .map { CustomerOrder.fromDocument(it.id, it.data.orEmpty()) }
+                        .sortedByDescending { it.pickupTime?.toDate() ?: Date(0) }
+                    trySend(Result.success(orders))
+                }
+            }
+        awaitClose { registration.remove() }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeOrdersForBusiness(businessId: String): Flow<Result<List<CustomerOrder>>> = callbackFlow {
+        val registration = db().collection("orders")
+            .whereEqualTo("businessId", businessId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(Result.failure(error))
+                } else {
+                    val orders = snapshot?.documents.orEmpty().map {
+                        CustomerOrder.fromDocument(it.id, it.data.orEmpty())
+                    }.sortedByDescending { it.createdAt?.toDate() ?: Date(0) }
+                    trySend(Result.success(orders))
+                }
+            }
+        awaitClose { registration.remove() }
+    }
+
     fun listenForBusiness(
         businessId: String,
         onUpdate: (Result<List<CustomerOrder>>) -> Unit
-    ): ListenerRegistration = firestore.collection("orders")
+    ): ListenerRegistration = db().collection("orders")
         .whereEqualTo("businessId", businessId)
         .addSnapshotListener { snapshot, error ->
             if (error != null) onUpdate(Result.failure(error))
@@ -182,7 +229,7 @@ class OrderRepository(private val firestore: FirebaseFirestore) {
         status: String,
         onComplete: (Result<Unit>) -> Unit
     ) {
-        firestore.collection("orders").document(orderId)
+        db().collection("orders").document(orderId)
             .update("status", status)
             .addOnSuccessListener { onComplete(Result.success(Unit)) }
             .addOnFailureListener { onComplete(Result.failure(it)) }
