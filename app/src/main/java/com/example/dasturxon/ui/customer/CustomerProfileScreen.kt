@@ -22,8 +22,8 @@ fun CustomerProfileScreen(
     fullName: String,
     onSignOut: () -> Unit,
     onOrdersClick: () -> Unit,
-    onSeedDemoData: (() -> Unit)? = null,
-    onUpdateFullName: (suspend (String) -> Unit)? = null
+    onUpdateFullName: (suspend (String) -> Unit)? = null,
+    onSwitchToOwner: (() -> Unit)? = null
 ) {
     var currentFullName by remember(fullName) { mutableStateOf(fullName) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
@@ -324,18 +324,38 @@ fun CustomerProfileScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    // Role badge
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = RoundedCornerShape(20.dp)
+                    // Role badge & switch to owner
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "🛒  Xaridor",
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                        )
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Text(
+                                text = "🛒  Xaridor",
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                            )
+                        }
+                        if (onSwitchToOwner != null) {
+                            Surface(
+                                onClick = onSwitchToOwner,
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                shape = RoundedCornerShape(20.dp)
+                            ) {
+                                Text(
+                                    text = "🏢  Biznesga o'tish →",
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -358,6 +378,15 @@ fun CustomerProfileScreen(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
+                if (onSwitchToOwner != null) {
+                    ProfileMenuItem(
+                        icon = { Text("🏢", fontSize = 20.sp) },
+                        title = "Biznes boshqaruvi",
+                        subtitle = "Biznes egasi paneliga o'tish",
+                        onClick = onSwitchToOwner
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                }
                 ProfileMenuItem(
                     icon = { Text("🛍️", fontSize = 20.sp) },
                     title = "Buyurtmalarim",
@@ -452,15 +481,6 @@ fun CustomerProfileScreen(
                     subtitle = "Dasturxon v2.0",
                     onClick = { showAboutDialog = true }
                 )
-                if (onSeedDemoData != null) {
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    ProfileMenuItem(
-                        icon = { Text("🚀", fontSize = 20.sp) },
-                        title = "Demo ma'lumotlarni yuklash",
-                        subtitle = "Yunusobod do'konlari va mahsulotlarini Firestore'ga yozish",
-                        onClick = onSeedDemoData
-                    )
-                }
             }
         }
 

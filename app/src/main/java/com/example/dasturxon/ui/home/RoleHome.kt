@@ -68,6 +68,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import java.io.ByteArrayOutputStream
 import com.example.dasturxon.R
 import com.example.dasturxon.core.common.MoneyFormatter
@@ -106,10 +107,25 @@ fun RoleHome(
     onSignOut: () -> Unit,
     fullName: String = ""
 ) {
-    when (role) {
-        "owner" -> OwnerHome(uid, email, firestore, onSignOut)
+    var activeRole by rememberSaveable(uid) { mutableStateOf(role) }
+
+    when (activeRole) {
+        "owner" -> OwnerHome(
+            uid = uid,
+            email = email,
+            firestore = firestore,
+            onSignOut = onSignOut,
+            onSwitchToCustomer = { activeRole = "customer" }
+        )
         "admin" -> AdminHome(email, firestore, onSignOut)
-        else -> CustomerOrderFlow(uid, email, fullName = fullName, firestore, onSignOut)
+        else -> CustomerOrderFlow(
+            uid = uid,
+            email = email,
+            fullName = fullName,
+            firestore = firestore,
+            onSignOut = onSignOut,
+            onSwitchToOwner = { activeRole = "owner" }
+        )
     }
 }
 
@@ -118,7 +134,8 @@ private fun OwnerHome(
     uid: String,
     email: String,
     firestore: FirebaseFirestore,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onSwitchToCustomer: () -> Unit = {}
 ) {
     val businessRepository = remember(firestore) { BusinessRepository(firestore) }
     val productRepository = remember(firestore) { ProductRepository(firestore) }
@@ -157,11 +174,15 @@ private fun OwnerHome(
     val business = businesses.firstOrNull { it.status == "approved" }
         ?: businesses.firstOrNull { it.status == "pending" }
         ?: businesses.firstOrNull { it.status == "rejected" }
-        ?: if (uid.startsWith("guest")) com.example.dasturxon.data.demo.DemoData.businesses.first() else null
+        ?: com.example.dasturxon.data.demo.DemoData.businesses.first().copy(
+            id = if (uid.isNotBlank() && !uid.startsWith("guest")) "biz_${uid.take(12)}" else "demo_bakery_baraka",
+            ownerId = uid,
+            status = "approved"
+        )
 
-    val effectiveProducts = remember(products, business?.id, uid) {
+    val effectiveProducts = remember(products, business.id, uid) {
         if (uid.startsWith("guest") || products.isEmpty()) {
-            val demoProds = com.example.dasturxon.data.demo.DemoData.products.filter { it.businessId == (business?.id ?: "demo_bakery_baraka") }
+            val demoProds = com.example.dasturxon.data.demo.DemoData.products.filter { it.businessId == business.id }
             (demoProds + products).distinctBy { it.id }
         } else products
     }
@@ -172,8 +193,8 @@ private fun OwnerHome(
                 CustomerOrder(
                     id = "demo_order_2715",
                     customerId = "demo_customer_1",
-                    businessId = business?.id ?: "demo_bakery_baraka",
-                    businessName = business?.name ?: "Baraka novvoyxonasi",
+                    businessId = business.id,
+                    businessName = business.name,
                     productName = "Tandir non va somsa",
                     productId = "demo_prod_tandir_non",
                     quantity = 4,
@@ -185,8 +206,8 @@ private fun OwnerHome(
                 CustomerOrder(
                     id = "demo_order_2698",
                     customerId = "demo_customer_1",
-                    businessId = business?.id ?: "demo_bakery_baraka",
-                    businessName = business?.name ?: "Baraka novvoyxonasi",
+                    businessId = business.id,
+                    businessName = business.name,
                     productName = "Tandir non - 2 dona",
                     productId = "demo_prod_tandir_non",
                     quantity = 2,
@@ -199,62 +220,46 @@ private fun OwnerHome(
         } else orders
     }
 
-    DisposableEffect(business?.id, productRepository) {
-        if (business?.status != "approved") {
-            products = emptyList()
-            productsLoaded = true
-            onDispose { }
-        } else {
-            productsLoaded = false
-            val registration = productRepository.listenForBusiness(business.id) { result ->
-                result.onSuccess { products = it; productsLoaded = true }
-                    .onFailure { errorMessage = "Mahsulotlarni yuklab bo'lmadi."; productsLoaded = true }
-            }
-            onDispose { registration.remove() }
+    DisposableEffect(business.id, productRepository) {
+        productsLoaded = false
+        val registration = productRepository.listenForBusiness(business.id) { result ->
+            result.onSuccess { products = it; productsLoaded = true }
+                .onFailure { errorMessage = "Mahsulotlarni yuklab bo'lmadi."; productsLoaded = true }
+        }
+        onDispose { registration.remove() }
+    }
+
+    DisposableEffect(business.id, orderRepository) {
+        ordersLoaded = false
+        val registration = orderRepository.listenForBusiness(business.id) { result ->
+            result.onSuccess { orders = it; ordersLoaded = true }
+                .onFailure { errorMessage = "Buyurtmalarni yuklab bo'lmadi."; ordersLoaded = true }
+        }
+        onDispose { registration.remove() }
+    }
+
+    LaunchedEffect(business.id, currentTab) {
+        val bId = business.id
+        analyticsRepository.getViewCount(bId) { result ->
+            result.onSuccess { viewCount = it }
+                .onFailure { errorMessage = it.localizedMessage ?: "Ko'rishlar sonini yuklab bo'lmadi." }
+        }
+        if (!uid.startsWith("guest")) {
+            firestore.collection("expenses")
+                .whereEqualTo("businessId", bId)
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    expenses = snapshot.documents.map { Expense.fromDocument(it.id, it.data.orEmpty()) }
+                }
         }
     }
 
-    DisposableEffect(business?.id, orderRepository) {
-        if (business?.status != "approved") {
-            orders = emptyList()
-            ordersLoaded = true
-            onDispose { }
-        } else {
-            ordersLoaded = false
-            val registration = orderRepository.listenForBusiness(business.id) { result ->
-                result.onSuccess { orders = it; ordersLoaded = true }
-                    .onFailure { errorMessage = "Buyurtmalarni yuklab bo'lmadi."; ordersLoaded = true }
-            }
-            onDispose { registration.remove() }
-        }
-    }
-
-    LaunchedEffect(business?.id, currentTab) {
-        val bId = business?.id
-        if (business?.status == "approved" && bId != null) {
-            analyticsRepository.getViewCount(bId) { result ->
-                result.onSuccess { viewCount = it }
-                    .onFailure { errorMessage = it.localizedMessage ?: "Ko'rishlar sonini yuklab bo'lmadi." }
-            }
-            if (!uid.startsWith("guest")) {
-                firestore.collection("expenses")
-                    .whereEqualTo("businessId", bId)
-                    .get()
-                    .addOnSuccessListener { snapshot ->
-                        expenses = snapshot.documents.map { Expense.fromDocument(it.id, it.data.orEmpty()) }
-                    }
-            }
-        } else {
-            viewCount = 0
-        }
-    }
-
-    val effectiveExpenses = remember(expenses, business?.id, uid) {
+    val effectiveExpenses = remember(expenses, business.id, uid) {
         if (uid.startsWith("guest") && expenses.isEmpty()) {
             listOf(
                 Expense(
                     id = "demo_exp_1",
-                    businessId = business?.id ?: "demo_bakery_baraka",
+                    businessId = business.id,
                     title = "Oliy navli un (10 qop)",
                     amount = 3500000L,
                     category = "Xomashyo",
@@ -262,7 +267,7 @@ private fun OwnerHome(
                 ),
                 Expense(
                     id = "demo_exp_2",
-                    businessId = business?.id ?: "demo_bakery_baraka",
+                    businessId = business.id,
                     title = "Elektr energiyasi to'lovi",
                     amount = 850000L,
                     category = "Kommunal",
@@ -272,91 +277,26 @@ private fun OwnerHome(
         } else expenses
     }
 
-    // If business is not yet approved or not yet created:
-    if (business == null || business.status != "approved") {
-        DxScaffold(
-            topBar = { DxTopBar(showLogo = true) }
-        ) { innerPadding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                PageHeader(title = "Biznes paneli", email = email, onSignOut = onSignOut)
-
-                errorMessage?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
-                }
-
-                when (business?.status) {
-                    "pending" -> {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("⏳ Tasdiq kutilmoqda", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                Text("Biznes nomi: ${business.name}")
-                                Text("Manzil: ${business.address}")
-                                Text("Telefon: ${business.phone}")
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    "Profilingiz administrator tasdig'ini kutmoqda. Tasdiqlangach, barcha boshqaruv va mahsulot qo'shish imkoniyatlari ochiladi.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                    "rejected" -> {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("❌ Profil rad etildi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
-                                Text("Sabab: ${business.rejectionReason ?: "ko'rsatilmagan"}", color = MaterialTheme.colorScheme.onErrorContainer)
-                                Text("Iltimos, ma'lumotlarni to'g'rilab, qayta yuboring.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
-                            }
-                        }
-                        BusinessEditor(
-                            ownerId = uid,
-                            existingBusiness = business,
-                            repository = businessRepository,
-                            onError = { errorMessage = it },
-                            onSuccess = { errorMessage = "Biznes qayta ko'rib chiqish uchun yuborildi." }
-                        )
-                    }
-                    else -> {
-                        if (!businessesLoaded) {
-                            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator()
-                            }
-                        } else {
-                            Text("Biznes profilingizni yarating", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            BusinessEditor(
-                                ownerId = uid,
-                                repository = businessRepository,
-                                onError = { errorMessage = it },
-                                onSuccess = { errorMessage = "Biznes administrator tasdig'iga yuborildi." }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        return
-    }
-
-    // APPROVED BUSINESS: Full 5-tab owner interface
+    // Direct access to 5-tab owner interface (no blocking on admin approval)
     DxScaffold(
         topBar = {
             DxTopBar(
                 showLogo = true,
                 actions = {
+                    Surface(
+                        onClick = onSwitchToCustomer,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = "🛒 Xaridor",
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
                     Surface(
                         color = MaterialTheme.colorScheme.primaryContainer,
                         shape = RoundedCornerShape(12.dp),
@@ -438,6 +378,34 @@ private fun OwnerHome(
                     ) {
                         Spacer(Modifier.height(4.dp))
                         SectionHeader(title = "Boshqaruv paneli")
+
+                        if (business.status == "pending") {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Text("⏳", fontSize = 22.sp)
+                                    Column {
+                                        Text(
+                                            text = "Biznesingiz ko'rib chiqilmoqda",
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                        Text(
+                                            text = "Barcha boshqaruv funksiyalari ochiq. Administrator tasdiqlagach, mijozlar qidiruvida ham ko'rinadi.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
                         errorMessage?.let {
                             Text(it, color = MaterialTheme.colorScheme.error)
@@ -1028,7 +996,15 @@ private fun OwnerHome(
                             Text("Biznes ma'lumotlarini tahrirlash")
                         }
 
-                        Spacer(Modifier.height(16.dp))
+                        OutlinedButton(
+                            onClick = onSwitchToCustomer,
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("🛒  Xaridor rejimiga o'tish", fontWeight = FontWeight.SemiBold)
+                        }
+
+                        Spacer(Modifier.height(8.dp))
 
                         Button(
                             onClick = onSignOut,

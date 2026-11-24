@@ -158,8 +158,13 @@ class CustomerOrdersViewModel(
     private fun handleActiveUpdate(active: ActiveOrdersState) {
         if (active.loading || active.error != null) return
         val currentIds = active.orders.mapTo(mutableSetOf()) { it.id }
+        val orderDisappeared = hasActiveSnapshot && (previousActiveIds - currentIds).isNotEmpty()
         previousActiveIds = currentIds
         hasActiveSnapshot = true
+
+        if (orderDisappeared) {
+            refreshHistory()
+        }
 
         historyDetail.update { detail ->
             val latestSelected = detail.selectedOrder?.let { selected ->

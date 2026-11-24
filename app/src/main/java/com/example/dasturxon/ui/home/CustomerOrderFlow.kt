@@ -60,7 +60,8 @@ internal fun CustomerOrderFlow(
     email: String,
     fullName: String = "",
     firestore: FirebaseFirestore,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onSwitchToOwner: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val productRepository = remember(firestore) { ProductRepository(firestore) }
@@ -377,11 +378,7 @@ internal fun CustomerOrderFlow(
                         fullName = userFullName,
                         onSignOut = onSignOut,
                         onOrdersClick = { currentTab = 2 },
-                        onSeedDemoData = {
-                            DemoData.seedToFirestore(firestore, uid) { success, msg ->
-                                orderSuccessMsg = msg
-                            }
-                        },
+                        onSwitchToOwner = onSwitchToOwner,
                         onUpdateFullName = { newName ->
                             if (uid.isNotBlank() && !uid.startsWith("guest")) {
                                 firestore.collection("users").document(uid)
