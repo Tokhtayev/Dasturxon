@@ -22,8 +22,9 @@ class ProductModelTest {
             stock = 10L,
             discountPercent = 0L,
             discountEndsAt = null,
-            costPrice = 3000L,
-            image = "base64data"
+            published = true,
+            imageUrl = "base64data",
+            costPrice = 3000L
         )
 
         assertEquals(5000L, product.price)
@@ -44,8 +45,8 @@ class ProductModelTest {
             "name" to "Patir non",
             "description" to "Sariyog'li",
             "price" to 12000L,
-            "costPrice" to 7000L,
-            "image" to "img_sample_base64",
+            "costPrice" to 7000L, // public doc should never contain it, but if it does, fromDocument ignores it
+            "imageUrl" to "img_sample",
             "status" to "hot_ready",
             "stock" to 15L,
             "discountPercent" to 10L
@@ -58,8 +59,9 @@ class ProductModelTest {
         assertEquals("Patir non", product.name)
         assertEquals(12000L, product.price)
         assertEquals(12000L, product.sellingPrice)
-        assertEquals(7000L, product.costPrice)
-        assertEquals("img_sample_base64", product.image)
+        // STRICT: costPrice must remain 0L from public doc!
+        assertEquals(0L, product.costPrice)
+        assertEquals("img_sample", product.imageUrl)
         assertEquals("hot_ready", product.status)
         assertEquals(15L, product.stock)
         assertEquals(10L, product.discountPercent)

@@ -435,4 +435,121 @@ test("19. Customer or other owner cannot access expenses of another business", a
   await assertFails(getDoc(doc(dbOtherOwner, "expenses/expense-1")));
 });
 
+// 20. Public product doc forbids costPrice
+test("20. Public product doc forbids costPrice", async () => {
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  // Attempting to write costPrice on public product doc must fail
+  await assertFails(setDoc(doc(dbOwner, "products/product-with-cost"), validProduct({
+    costPrice: 5000
+  })));
+});
+
+// 21. Owner can write and read products/{id}/private/cost
+test("21. Owner can manage products/{id}/private/cost", async () => {
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  const costRef = doc(dbOwner, "products/product-approved/private/cost");
+
+  await assertSucceeds(setDoc(costRef, {
+    costPrice: 5000,
+    updatedAt: Timestamp.now()
+  }));
+
+  const snap = await assertSucceeds(getDoc(costRef));
+  assert.equal(snap.data().costPrice, 5000);
+});
+
+// 22. Customer cannot read products/{id}/private/cost
+test("22. Customer cannot read products/{id}/private/cost", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  await assertFails(getDoc(doc(dbCust, "products/product-approved/private/cost")));
+});
+
+// 23. Customer can cancel while pending, but cannot set status to completed or accepted
+test("23. Customer status transitions: only pending -> cancelled allowed", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const orderRef = doc(dbCust, "orders/order-pending-test");
+
+  // Create order with pending status
+  await assertSucceeds(setDoc(orderRef, {
+    customerId: "customer-1",
+    businessId: "business-1",
+    businessName: "Nonvoyxona 1",
+    productId: "product-approved",
+    productName: "Patir Non",
+    quantity: 1,
+    status: "pending",
+    paymentStatus: "unpaid",
+    createdAt: Timestamp.now()
+  }));
+
+  // Customer cannot escalate to completed
+  await assertFails(updateDoc(orderRef, { status: "completed" }));
+
+  // Customer cannot escalate to accepted
+  await assertFails(updateDoc(orderRef, { status: "accepted" }));
+
+  // Customer CAN cancel while pending
+  await assertSucceeds(updateDoc(orderRef, { status: "cancelled" }));
+});
+
+// 24. Customer cannot cancel once order is accepted by owner
+test("24. Customer cannot cancel order once status is accepted", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  const orderRef = doc(dbCust, "orders/order-accepted-test");
+
+  // Customer creates order in pending status
+  await setDoc(orderRef, {
+    customerId: "customer-1",
+    businessId: "business-1",
+    businessName: "Nonvoyxona 1",
+    productId: "product-approved",
+    productName: "Patir Non",
+    quantity: 1,
+    status: "pending",
+    paymentStatus: "unpaid",
+    createdAt: Timestamp.now()
+  });
+
+  // Owner accepts the order
+  await updateDoc(doc(dbOwner, "orders/order-accepted-test"), {
+    status: "accepted"
+  });
+
+  // Customer cannot cancel accepted order
+  await assertFails(updateDoc(doc(dbCust, "orders/order-accepted-test"), {
+    status: "cancelled"
+  }));
+});
+
+// 25. Line item unitPrice must match product sellingPrice
+test("25. Order line item unitPrice must match product sellingPrice", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  const itemRef = doc(dbCust, "orders/order-pending-test/items/item-1");
+
+  // product-approved price is 8000. Customer trying 1000 must fail
+  await assertFails(setDoc(itemRef, {
+    productId: "product-approved",
+    name: "Patir Non",
+    qty: 2,
+    unitPrice: 1000
+  }));
+
+  // Customer using exact sellingPrice 8000 succeeds
+  await assertSucceeds(setDoc(itemRef, {
+    productId: "product-approved",
+    name: "Patir Non",
+    qty: 2,
+    unitPrice: 8000
+  }));
+
+  // Owner writes unitCost snapshot upon completion
+  const ownerItemRef = doc(dbOwner, "orders/order-pending-test/items/item-1");
+  await assertSucceeds(updateDoc(ownerItemRef, {
+    unitCost: 5000
+  }));
+});
+
+
 

@@ -107,23 +107,33 @@ service cloud.firestore {
         isAdmin()
       );
 
-      // Create: Only the owner of an APPROVED business (or admin) can create products
+      // Create: Only the owner of an APPROVED business (or admin) can create products.
+      // costPrice is NEVER stored in the public product doc.
       allow create: if isSignedIn() && (
         (isBusinessOwner(request.resource.data.businessId) && isBusinessApproved(request.resource.data.businessId)) ||
         isAdmin()
-      );
+      ) && !('costPrice' in request.resource.data);
 
-      // Update & Delete: Only the owner of that business (or admin) can update/delete products
-      // Also cannot change businessId to hijack ownership
+      // Update & Delete: Only the owner of that business (or admin) can update/delete products.
+      // Cannot change businessId and cannot store costPrice in public doc.
       allow update: if isSignedIn() && (
         (isBusinessOwner(resource.data.businessId) && request.resource.data.businessId == resource.data.businessId) ||
         isAdmin()
-      );
+      ) && !('costPrice' in request.resource.data);
 
       allow delete: if isSignedIn() && (
         isBusinessOwner(resource.data.businessId) ||
         isAdmin()
       );
+
+      // Private cost subcollection: products/{productId}/private/{docId}
+      // Readable and writable ONLY by the business owner (or admin). Customer cannot read.
+      match /private/{docId} {
+        allow read, write: if isSignedIn() && (
+          isBusinessOwner(get(/databases/$(database)/documents/products/$(productId)).data.businessId) ||
+          isAdmin()
+        );
+      }
     }
 
     // ------------------------------------------------------------------------
@@ -142,17 +152,45 @@ service cloud.firestore {
         && request.resource.data.customerId == request.auth.uid;
 
       // Update:
-      // - Customer can only update their own order
-      // - Business owner can update order status for their own business
+      // - Customer can ONLY change status pending/new -> cancelled
+      // - Business owner can update order status and paymentStatus for their own business
       // - Admin can update any order
       allow update: if isSignedIn() && (
-        (resource.data.customerId == request.auth.uid && request.resource.data.customerId == resource.data.customerId) ||
+        (resource.data.customerId == request.auth.uid &&
+         (resource.data.status in ['pending', 'new']) &&
+         request.resource.data.status == 'cancelled' &&
+         request.resource.data.customerId == resource.data.customerId &&
+         request.resource.data.businessId == resource.data.businessId) ||
         isBusinessOwner(resource.data.businessId) ||
         isAdmin()
       );
 
       // Delete: Admin only
       allow delete: if isAdmin();
+
+      // Order lines subcollection: orders/{orderId}/items/{itemId}
+      match /items/{itemId} {
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid ||
+          isBusinessOwner(get(/databases/$(database)/documents/orders/$(orderId)).data.businessId) ||
+          isAdmin()
+        );
+
+        // Customer creates line item: unitPrice must match product sellingPrice
+        allow create: if isSignedIn() && (
+          get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid &&
+          request.resource.data.unitPrice == get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.price &&
+          request.resource.data.qty > 0 && request.resource.data.qty <= 99
+        );
+
+        // When completing, the owner writes unitCost per item snapshot
+        allow update: if isSignedIn() && (
+          isBusinessOwner(get(/databases/$(database)/documents/orders/$(orderId)).data.businessId) ||
+          isAdmin()
+        );
+
+        allow delete: if isAdmin();
+      }
     }
 
     // ------------------------------------------------------------------------

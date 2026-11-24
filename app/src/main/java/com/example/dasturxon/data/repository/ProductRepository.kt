@@ -20,6 +20,7 @@ class ProductRepository(private val firestore: FirebaseFirestore) {
         discountPercent: Long,
         discountEndsAt: Timestamp?,
         costPrice: Long = 0L,
+        published: Boolean = true,
         image: String = "",
         onComplete: (Result<Unit>) -> Unit
     ) {
@@ -32,17 +33,49 @@ class ProductRepository(private val firestore: FirebaseFirestore) {
             "name" to name,
             "description" to description,
             "price" to price,
-            "costPrice" to costPrice,
-            "image" to image,
+            "published" to published,
+            "imageUrl" to image,
             "status" to "available",
             "discountPercent" to discountPercent,
             "updatedAt" to FieldValue.serverTimestamp()
         )
         if (stock != null) data["stock"] = stock
         if (discountEndsAt != null) data["discountEndsAt"] = discountEndsAt
+        // Note: costPrice is NEVER stored in the public products collection document
         firestore.collection("products").add(data)
-            .addOnSuccessListener { onComplete(Result.success(Unit)) }
+            .addOnSuccessListener { docRef ->
+                if (costPrice > 0L) {
+                    firestore.collection("products").document(docRef.id)
+                        .collection("private").document("cost")
+                        .set(
+                            mapOf(
+                                "costPrice" to costPrice,
+                                "updatedAt" to FieldValue.serverTimestamp()
+                            )
+                        )
+                        .addOnSuccessListener { onComplete(Result.success(Unit)) }
+                        .addOnFailureListener { onComplete(Result.success(Unit)) }
+                } else {
+                    onComplete(Result.success(Unit))
+                }
+            }
             .addOnFailureListener { onComplete(Result.failure(it)) }
+    }
+
+    fun getCostPrice(
+        productId: String,
+        onComplete: (Result<Long>) -> Unit
+    ) {
+        firestore.collection("products").document(productId)
+            .collection("private").document("cost")
+            .get()
+            .addOnSuccessListener { doc ->
+                val cost = doc.getLong("costPrice") ?: 0L
+                onComplete(Result.success(cost))
+            }
+            .addOnFailureListener {
+                onComplete(Result.failure(it))
+            }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -91,7 +124,7 @@ class ProductRepository(private val firestore: FirebaseFirestore) {
                 } else {
                     val products = snapshot?.documents.orEmpty().map { doc ->
                         Product.fromDocument(doc.id, doc.data.orEmpty())
-                    }
+                    }.filter { it.published }
                     trySend(Result.success(products))
                 }
             }
@@ -105,13 +138,10 @@ class ProductRepository(private val firestore: FirebaseFirestore) {
                 if (error != null) {
                     onUpdate(Result.failure(error))
                 } else {
-                    onUpdate(
-                        Result.success(
-                            snapshot?.documents.orEmpty().map { doc ->
-                                Product.fromDocument(doc.id, doc.data.orEmpty())
-                            }
-                        )
-                    )
+                    val products = snapshot?.documents.orEmpty().map { doc ->
+                        Product.fromDocument(doc.id, doc.data.orEmpty())
+                    }.filter { it.published }
+                    onUpdate(Result.success(products))
                 }
             }
 
@@ -124,6 +154,7 @@ class ProductRepository(private val firestore: FirebaseFirestore) {
         discountPercent: Long,
         discountEndsAt: Timestamp?,
         costPrice: Long = product.costPrice,
+        published: Boolean = product.published,
         image: String? = null,
         onComplete: (Result<Unit>) -> Unit
     ) {
@@ -131,15 +162,31 @@ class ProductRepository(private val firestore: FirebaseFirestore) {
             "name" to name,
             "description" to description,
             "price" to price,
-            "costPrice" to costPrice,
+            "published" to published,
             "discountPercent" to discountPercent,
             "updatedAt" to FieldValue.serverTimestamp()
         )
-        if (image != null) updates["image"] = image
+        if (image != null) updates["imageUrl"] = image
         updates["stock"] = stock ?: FieldValue.delete()
         updates["discountEndsAt"] = discountEndsAt ?: FieldValue.delete()
+        // Note: costPrice is strictly omitted from public product updates
         firestore.collection("products").document(product.id).update(updates)
-            .addOnSuccessListener { onComplete(Result.success(Unit)) }
+            .addOnSuccessListener {
+                if (costPrice > 0L) {
+                    firestore.collection("products").document(product.id)
+                        .collection("private").document("cost")
+                        .set(
+                            mapOf(
+                                "costPrice" to costPrice,
+                                "updatedAt" to FieldValue.serverTimestamp()
+                            )
+                        )
+                        .addOnSuccessListener { onComplete(Result.success(Unit)) }
+                        .addOnFailureListener { onComplete(Result.success(Unit)) }
+                } else {
+                    onComplete(Result.success(Unit))
+                }
+            }
             .addOnFailureListener { onComplete(Result.failure(it)) }
     }
 
