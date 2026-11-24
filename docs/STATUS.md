@@ -58,6 +58,14 @@
 - **Indexes**: Defined `firestore.indexes.json` for all compound queries.
 - **Static Security**: `android:allowBackup="false"`, `usesCleartextTraffic="false"`, non-exported components, zero hardcoded secrets.
 
+### P6: Profile Editing, Role Switcher, Direct Owner Access, Notifications & Promotional Banners
+- **Profile Name Editing**: Added "Profil ma'lumotlari" dialog in `CustomerProfileScreen` settings to edit `fullName` with real-time UI updates and Firestore updates.
+- **Direct Owner Access**: Removed the blocking "admin approval waiting" wall from `OwnerHome`. Business owners now immediately enter the full 5-tab interface (Dashboard, Products, Orders, Analytics, Profile) without waiting for admin approval.
+- **Seamless Role Switcher**: Added 1-tap role switching between Customer and Owner modes in Customer Profile and Owner TopBar / Profile.
+- **Top Bar User Name & Notifications**: Integrated user name pill chip (direct profile shortcut) and interactive notification bell (`🔔` with unread badge counter, live order status updates, promotional notices, and mark-as-read functionality).
+- **Promotional Advertising Carousel**: Added modern `PromoBannersCarousel` on Home screen with rich, realistic Canvas food artwork (Uzbek Patir non with sesame & chekich, flaky somsa, Safia confectionery cake, Chilonzor plov), badges, and action triggers.
+- **Realistic Food Visual Art**: Replaced plain emoji placeholders in `Cards.kt` and `ProductDetailScreen.kt` with custom, high-clarity `ProductVisualArt` graphics.
+
 ---
 
 ## 3. Verified by Automated Tests
