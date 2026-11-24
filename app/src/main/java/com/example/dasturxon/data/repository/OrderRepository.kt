@@ -144,14 +144,14 @@ open class OrderRepository {
     open fun observeActiveForCustomer(customerId: String): Flow<Result<List<CustomerOrder>>> = callbackFlow {
         val registration = db().collection("orders")
             .whereEqualTo("customerId", customerId)
-            .whereIn("status", OrderStatus.firestoreValues(OrderStatusGroup.ACTIVE))
-            .limit(ACTIVE_ORDER_LIMIT.toLong())
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     trySend(Result.failure(error))
                 } else {
+                    val activeStatuses = OrderStatus.firestoreValues(OrderStatusGroup.ACTIVE).toSet()
                     val orders = snapshot?.documents.orEmpty()
                         .map { CustomerOrder.fromDocument(it.id, it.data.orEmpty()) }
+                        .filter { it.status in activeStatuses || it.status == "preparing" }
                         .sortedBy { it.pickupTime?.toDate()?.time ?: Long.MAX_VALUE }
                     trySend(Result.success(orders))
                 }
@@ -163,20 +163,20 @@ open class OrderRepository {
         customerId: String,
         cursor: DocumentSnapshot?
     ): HistoryOrderPage = suspendCancellableCoroutine { continuation ->
-        var query: Query = db().collection("orders")
+        db().collection("orders")
             .whereEqualTo("customerId", customerId)
-            .whereIn("status", OrderStatus.firestoreValues(OrderStatusGroup.HISTORY))
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .limit(PAGE_SIZE.toLong())
-        if (cursor != null) query = query.startAfter(cursor)
-
-        query.get()
+            .get()
             .addOnSuccessListener { snapshot ->
                 if (continuation.isActive) {
+                    val historyStatuses = OrderStatus.firestoreValues(OrderStatusGroup.HISTORY).toSet()
                     val documents = snapshot.documents
+                    val orders = documents
+                        .map { CustomerOrder.fromDocument(it.id, it.data.orEmpty()) }
+                        .filter { it.status in historyStatuses }
+                        .sortedByDescending { it.createdAt?.toDate()?.time ?: 0L }
                     continuation.resume(
                         HistoryOrderPage(
-                            orders = documents.map { CustomerOrder.fromDocument(it.id, it.data.orEmpty()) },
+                            orders = orders,
                             lastDocument = documents.lastOrNull()
                         )
                     )

@@ -228,8 +228,8 @@ object DemoData {
             batch.set(docRef, data, SetOptions.merge())
         }
 
-        // 3. Add demo orders (Rasm 08 dagi №2715 faol va №2698 tugallangan buyurtmalar)
-        if (!currentUserId.isNullOrBlank()) {
+        // 3. Add demo orders (active and history) ONLY for guest user
+        if (!currentUserId.isNullOrBlank() && currentUserId.startsWith("guest")) {
             val safeUid = currentUserId.replace("-", "_")
 
             // Active order: Buyurtma №2715 - Tayyorlanmoqda (36 000 so'm)

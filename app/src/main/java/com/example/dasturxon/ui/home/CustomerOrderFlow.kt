@@ -39,6 +39,7 @@ import com.example.dasturxon.ui.customer.ProductDetailScreen
 import com.example.dasturxon.ui.customer.ShopDetailScreen
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 import java.util.Date
 
 private data class CustomerNavItem(
@@ -79,6 +80,7 @@ internal fun CustomerOrderFlow(
     )
 
     var currentTab by rememberSaveable { mutableIntStateOf(0) }
+    var userFullName by remember(fullName) { mutableStateOf(fullName) }
     var products by remember {
         mutableStateOf(if (uid.startsWith("guest")) DemoData.products else emptyList())
     }
@@ -117,7 +119,7 @@ internal fun CustomerOrderFlow(
                 products = it
                 productsLoaded = true
                 loadError = null
-                if (it.isEmpty()) {
+                if (it.isEmpty() && uid.startsWith("guest")) {
                     DemoData.seedToFirestore(firestore, uid) { _, _ -> }
                 }
             }.onFailure {
@@ -133,7 +135,7 @@ internal fun CustomerOrderFlow(
             result.onSuccess {
                 businesses = it
                 businessesLoaded = true
-                if (it.isEmpty()) {
+                if (it.isEmpty() && uid.startsWith("guest")) {
                     DemoData.seedToFirestore(firestore, uid) { _, _ -> }
                 }
             }.onFailure {
@@ -372,13 +374,21 @@ internal fun CustomerOrderFlow(
                     )
                     3 -> CustomerProfileScreen(
                         email = email,
-                        fullName = fullName,
+                        fullName = userFullName,
                         onSignOut = onSignOut,
                         onOrdersClick = { currentTab = 2 },
                         onSeedDemoData = {
                             DemoData.seedToFirestore(firestore, uid) { success, msg ->
                                 orderSuccessMsg = msg
                             }
+                        },
+                        onUpdateFullName = { newName ->
+                            if (uid.isNotBlank() && !uid.startsWith("guest")) {
+                                firestore.collection("users").document(uid)
+                                    .update("fullName", newName)
+                                    .await()
+                            }
+                            userFullName = newName
                         }
                     )
                 }

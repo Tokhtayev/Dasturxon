@@ -7,12 +7,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.lazy.LazyColumn
+import kotlinx.coroutines.launch
 
 @Composable
 fun CustomerProfileScreen(
@@ -20,8 +22,16 @@ fun CustomerProfileScreen(
     fullName: String,
     onSignOut: () -> Unit,
     onOrdersClick: () -> Unit,
-    onSeedDemoData: (() -> Unit)? = null
+    onSeedDemoData: (() -> Unit)? = null,
+    onUpdateFullName: (suspend (String) -> Unit)? = null
 ) {
+    var currentFullName by remember(fullName) { mutableStateOf(fullName) }
+    var showEditProfileDialog by remember { mutableStateOf(false) }
+    var newNameInput by rememberSaveable { mutableStateOf("") }
+    var isSavingProfile by remember { mutableStateOf(false) }
+    var editProfileError by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
@@ -182,6 +192,91 @@ fun CustomerProfileScreen(
         )
     }
 
+    // Edit Profile Dialog
+    if (showEditProfileDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isSavingProfile) showEditProfileDialog = false
+            },
+            title = { Text("Profil ma'lumotlari", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "To'liq ism yoki taxallusingizni kiriting:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = newNameInput,
+                        onValueChange = {
+                            newNameInput = it
+                            if (editProfileError != null) editProfileError = null
+                        },
+                        label = { Text("To'liq ism") },
+                        placeholder = { Text("Masalan: Asadbek") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        isError = editProfileError != null,
+                        enabled = !isSavingProfile
+                    )
+                    if (editProfileError != null) {
+                        Text(
+                            text = editProfileError ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val trimmed = newNameInput.trim()
+                        if (trimmed.length < 2) {
+                            editProfileError = "Ism kamida 2 ta belgidan iborat bo'lishi kerak"
+                            return@Button
+                        }
+                        isSavingProfile = true
+                        editProfileError = null
+                        coroutineScope.launch {
+                            try {
+                                onUpdateFullName?.invoke(trimmed)
+                                currentFullName = trimmed
+                                showEditProfileDialog = false
+                            } catch (e: Exception) {
+                                editProfileError = e.localizedMessage ?: "Saqlashda xatolik yuz berdi"
+                            } finally {
+                                isSavingProfile = false
+                            }
+                        }
+                    },
+                    enabled = !isSavingProfile
+                ) {
+                    if (isSavingProfile) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Text("Saqlash")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showEditProfileDialog = false },
+                    enabled = !isSavingProfile
+                ) {
+                    Text("Bekor qilish")
+                }
+            }
+        )
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -210,7 +305,7 @@ fun CustomerProfileScreen(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
-                                text = (fullName.ifBlank { email }).firstOrNull()?.uppercase() ?: "U",
+                                text = (currentFullName.ifBlank { email }).firstOrNull()?.uppercase() ?: "U",
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -218,11 +313,11 @@ fun CustomerProfileScreen(
                         }
                     }
                     Text(
-                        text = fullName.ifBlank { email },
+                        text = currentFullName.ifBlank { email },
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
-                    if (fullName.isNotBlank()) {
+                    if (currentFullName.isNotBlank()) {
                         Text(
                             text = email,
                             style = MaterialTheme.typography.bodyMedium,
@@ -296,6 +391,17 @@ fun CustomerProfileScreen(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
+                ProfileMenuItem(
+                    icon = { Text("👤", fontSize = 20.sp) },
+                    title = "Profil ma'lumotlari",
+                    subtitle = "Ism: ${currentFullName.ifBlank { "Ko'rsatilmagan" }}",
+                    onClick = {
+                        newNameInput = currentFullName
+                        editProfileError = null
+                        showEditProfileDialog = true
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ProfileMenuItem(
                     icon = { Text("🔔", fontSize = 20.sp) },
                     title = "Bildirishnomalar",
