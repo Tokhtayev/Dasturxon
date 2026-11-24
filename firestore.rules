@@ -154,5 +154,34 @@ service cloud.firestore {
       // Delete: Admin only
       allow delete: if isAdmin();
     }
+
+    // ------------------------------------------------------------------------
+    // Expenses Collection: /expenses/{expenseId}
+    // ------------------------------------------------------------------------
+    match /expenses/{expenseId} {
+      // Read: Business owner can read expenses of their own business; Admin can read all
+      allow read: if isSignedIn() && (
+        isBusinessOwner(resource.data.businessId) ||
+        isAdmin()
+      );
+
+      // Create: Only the owner of that business (or admin) can create expenses
+      allow create: if isSignedIn() && (
+        isBusinessOwner(request.resource.data.businessId) ||
+        isAdmin()
+      );
+
+      // Update: Owner can update their own business expenses
+      allow update: if isSignedIn() && (
+        (isBusinessOwner(resource.data.businessId) && request.resource.data.businessId == resource.data.businessId) ||
+        isAdmin()
+      );
+
+      // Delete: Owner or admin can delete
+      allow delete: if isSignedIn() && (
+        isBusinessOwner(resource.data.businessId) ||
+        isAdmin()
+      );
+    }
   }
 }

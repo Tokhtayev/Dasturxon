@@ -6,7 +6,7 @@ import {
   assertFails,
   assertSucceeds
 } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc, onSnapshot, query, where, collection, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, collection, Timestamp } from "firebase/firestore";
 
 const projectId = "demo-dasturxon";
 let testEnv;
@@ -378,6 +378,61 @@ test("17. Real-time: owner changes status -> customer sees it", async () => {
 
   const doneSnap = await watchDone;
   assert.equal(doneSnap.data().status, "done");
+});
+
+// 18. Business Owner can create, read, and delete expense for their own business
+test("18. Owner can create, read, and delete expense for their own business", async () => {
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  const expenseRef = doc(dbOwner, "expenses/expense-1");
+
+  // Create
+  await assertSucceeds(setDoc(expenseRef, {
+    businessId: "business-1",
+    title: "Un va xamirturush",
+    amount: 150000,
+    category: "Xomashyo",
+    createdAt: Timestamp.now()
+  }));
+
+  // Read
+  const snap = await assertSucceeds(getDoc(expenseRef));
+  assert.equal(snap.data().amount, 150000);
+
+  // Update
+  await assertSucceeds(updateDoc(expenseRef, { amount: 160000 }));
+
+  // Delete
+  await assertSucceeds(deleteDoc(expenseRef));
+});
+
+// 19. Unauthorized user cannot create, read, or delete expense for another business
+test("19. Customer or other owner cannot access expenses of another business", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const dbOtherOwner = testEnv.authenticatedContext("owner-2").firestore();
+
+  // Customer cannot create expense for business-1
+  await assertFails(setDoc(doc(dbCust, "expenses/expense-fraud-1"), {
+    businessId: "business-1",
+    title: "Fake expense",
+    amount: 99999,
+    category: "Xomashyo",
+    createdAt: Timestamp.now()
+  }));
+
+  // Other owner cannot create expense for business-1
+  await assertFails(setDoc(doc(dbOtherOwner, "expenses/expense-fraud-2"), {
+    businessId: "business-1",
+    title: "Other owner expense",
+    amount: 50000,
+    category: "Xomashyo",
+    createdAt: Timestamp.now()
+  }));
+
+  // Customer cannot read owner-1's expense
+  await assertFails(getDoc(doc(dbCust, "expenses/expense-1")));
+
+  // Other owner cannot read owner-1's expense
+  await assertFails(getDoc(doc(dbOtherOwner, "expenses/expense-1")));
 });
 
 

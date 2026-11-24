@@ -81,9 +81,11 @@ import com.example.dasturxon.core.designsystem.charts.DonutChart
 import com.example.dasturxon.core.designsystem.charts.LineChart
 import com.example.dasturxon.data.model.Business
 import com.example.dasturxon.data.model.CustomerOrder
+import com.example.dasturxon.data.model.Expense
 import com.example.dasturxon.data.model.Product
 import com.example.dasturxon.data.repository.AnalyticsRepository
 import com.example.dasturxon.data.repository.BusinessRepository
+import com.example.dasturxon.data.repository.ExpenseRepository
 import com.example.dasturxon.data.repository.OrderRepository
 import com.example.dasturxon.data.repository.ProductRepository
 import com.example.dasturxon.domain.BusinessType
@@ -118,10 +120,12 @@ private fun OwnerHome(
     val businessRepository = remember(firestore) { BusinessRepository(firestore) }
     val productRepository = remember(firestore) { ProductRepository(firestore) }
     val orderRepository = remember(firestore) { OrderRepository(firestore) }
+    val expenseRepository = remember(firestore) { ExpenseRepository(firestore) }
     val analyticsRepository = remember(firestore) { AnalyticsRepository(firestore) }
 
     var currentTab by rememberSaveable { mutableIntStateOf(0) }
     var orders by remember { mutableStateOf(emptyList<CustomerOrder>()) }
+    var expenses by remember { mutableStateOf(emptyList<Expense>()) }
     var viewCount by remember { mutableStateOf(0) }
     var businesses by remember { mutableStateOf(emptyList<Business>()) }
     var businessesLoaded by remember { mutableStateOf(false) }
@@ -130,6 +134,7 @@ private fun OwnerHome(
     var ordersLoaded by remember { mutableStateOf(false) }
     var editingProduct by remember { mutableStateOf<Product?>(null) }
     var showAddProductDialog by rememberSaveable { mutableStateOf(false) }
+    var showAddExpenseDialog by rememberSaveable { mutableStateOf(false) }
     var showEditBusinessDialog by rememberSaveable { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -232,6 +237,45 @@ private fun OwnerHome(
             }
             onDispose { registration.remove() }
         }
+    }
+
+    DisposableEffect(business?.id) {
+        val bId = business?.id
+        if (business?.status == "approved" && bId != null && !uid.startsWith("guest")) {
+            val registration = firestore.collection("expenses")
+                .whereEqualTo("businessId", bId)
+                .addSnapshotListener { snapshot, error ->
+                    if (error == null && snapshot != null) {
+                        expenses = snapshot.documents.map { Expense.fromDocument(it.id, it.data.orEmpty()) }
+                    }
+                }
+            onDispose { registration.remove() }
+        } else {
+            onDispose { }
+        }
+    }
+
+    val effectiveExpenses = remember(expenses, business?.id, uid) {
+        if (uid.startsWith("guest") && expenses.isEmpty()) {
+            listOf(
+                Expense(
+                    id = "demo_exp_1",
+                    businessId = business?.id ?: "demo_bakery_baraka",
+                    title = "Oliy navli un (10 qop)",
+                    amount = 3500000L,
+                    category = "Xomashyo",
+                    createdAt = Timestamp(Date(System.currentTimeMillis() - 86400000L * 2))
+                ),
+                Expense(
+                    id = "demo_exp_2",
+                    businessId = business?.id ?: "demo_bakery_baraka",
+                    title = "Elektr energiyasi to'lovi",
+                    amount = 850000L,
+                    category = "Kommunal",
+                    createdAt = Timestamp(Date(System.currentTimeMillis() - 86400000L * 5))
+                )
+            )
+        } else expenses
     }
 
     // If business is not yet approved or not yet created:
@@ -749,6 +793,32 @@ private fun OwnerHome(
                             }
                         }
 
+                        // Expenses Section
+                        SectionHeader(
+                            title = "Biznes xarajatlari",
+                            actionLabel = "+ Qo'shish",
+                            onAction = { showAddExpenseDialog = true }
+                        )
+
+                        if (effectiveExpenses.isEmpty()) {
+                            Text(
+                                text = "Hozircha xarajatlar mavjud emas. '+ Qo'shish' tugmasi orqali kiriting.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            effectiveExpenses.take(5).forEach { exp ->
+                                ExpenseCard(
+                                    expense = exp,
+                                    onDelete = {
+                                        expenseRepository.delete(exp.id) { result ->
+                                            result.onFailure { errorMessage = it.localizedMessage ?: "Xarajatni o'chirib bo'lmadi." }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+
                         Spacer(Modifier.height(16.dp))
                     }
                 }
@@ -894,6 +964,24 @@ private fun OwnerHome(
                 productRepository.delete(product.id) { result ->
                     result.onSuccess { editingProduct = null }
                         .onFailure { errorMessage = it.localizedMessage ?: "Mahsulotni o'chirib bo'lmadi." }
+                }
+            }
+        )
+    }
+
+    // Add expense dialog
+    if (showAddExpenseDialog) {
+        AddExpenseDialog(
+            onDismiss = { showAddExpenseDialog = false },
+            onSubmit = { title, amount, category ->
+                if (business != null) {
+                    expenseRepository.create(business.id, title, amount, category) { result ->
+                        result.onSuccess {
+                            showAddExpenseDialog = false
+                        }.onFailure {
+                            errorMessage = it.localizedMessage ?: "Xarajatni saqlab bo'lmadi."
+                        }
+                    }
                 }
             }
         )
