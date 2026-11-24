@@ -22,6 +22,25 @@ class AnalyticsRepository(private val firestore: FirebaseFirestore) {
         )
     }
 
+    fun getViewCount(
+        businessId: String,
+        onCount: (Result<Int>) -> Unit
+    ) {
+        firestore.collection("events")
+            .whereEqualTo("businessId", businessId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val views = snapshot.documents.count {
+                    it.getString("type") == "view_product" ||
+                        it.getString("type") == "view_business"
+                }
+                onCount(Result.success(views))
+            }
+            .addOnFailureListener {
+                onCount(Result.failure(it))
+            }
+    }
+
     fun listenViewCount(
         businessId: String,
         onCount: (Result<Int>) -> Unit

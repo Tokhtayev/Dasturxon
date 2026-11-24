@@ -51,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -228,32 +229,23 @@ private fun OwnerHome(
         }
     }
 
-    DisposableEffect(business?.id, analyticsRepository) {
-        if (business?.status != "approved") {
-            viewCount = 0
-            onDispose { }
-        } else {
-            val registration = analyticsRepository.listenViewCount(business.id) { result ->
+    LaunchedEffect(business?.id, currentTab) {
+        val bId = business?.id
+        if (business?.status == "approved" && bId != null) {
+            analyticsRepository.getViewCount(bId) { result ->
                 result.onSuccess { viewCount = it }
                     .onFailure { errorMessage = it.localizedMessage ?: "Ko'rishlar sonini yuklab bo'lmadi." }
             }
-            onDispose { registration.remove() }
-        }
-    }
-
-    DisposableEffect(business?.id) {
-        val bId = business?.id
-        if (business?.status == "approved" && bId != null && !uid.startsWith("guest")) {
-            val registration = firestore.collection("expenses")
-                .whereEqualTo("businessId", bId)
-                .addSnapshotListener { snapshot, error ->
-                    if (error == null && snapshot != null) {
+            if (!uid.startsWith("guest")) {
+                firestore.collection("expenses")
+                    .whereEqualTo("businessId", bId)
+                    .get()
+                    .addOnSuccessListener { snapshot ->
                         expenses = snapshot.documents.map { Expense.fromDocument(it.id, it.data.orEmpty()) }
                     }
-                }
-            onDispose { registration.remove() }
+            }
         } else {
-            onDispose { }
+            viewCount = 0
         }
     }
 

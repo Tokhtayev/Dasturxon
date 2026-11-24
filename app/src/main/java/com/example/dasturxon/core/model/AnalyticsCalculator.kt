@@ -4,8 +4,11 @@ import com.example.dasturxon.data.model.CustomerOrder
 import com.example.dasturxon.data.model.Expense
 import com.example.dasturxon.data.model.Product
 import java.time.Clock
+import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 
 data class ProductAnalytics(
     val productId: String,
@@ -39,8 +42,34 @@ data class AnalyticsReport(
 
 class AnalyticsCalculator(
     private val clock: Clock = Clock.system(ZoneId.of("Asia/Tashkent")),
-    private val zoneId: ZoneId = ZoneId.of("Asia/Tashkent")
+    val zoneId: ZoneId = ZoneId.of("Asia/Tashkent")
 ) {
+
+    /**
+     * Calculates start of day in Asia/Tashkent
+     */
+    fun startOfDay(instant: Instant = clock.instant()): Instant {
+        val localDate = instant.atZone(zoneId).toLocalDate()
+        return localDate.atStartOfDay(zoneId).toInstant()
+    }
+
+    /**
+     * Calculates start of week (Monday 00:00:00) in Asia/Tashkent
+     */
+    fun startOfWeek(instant: Instant = clock.instant()): Instant {
+        val localDate = instant.atZone(zoneId).toLocalDate()
+        val monday = localDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        return monday.atStartOfDay(zoneId).toInstant()
+    }
+
+    /**
+     * Calculates start of month (1st day 00:00:00) in Asia/Tashkent
+     */
+    fun startOfMonth(instant: Instant = clock.instant()): Instant {
+        val localDate = instant.atZone(zoneId).toLocalDate()
+        val firstDay = localDate.with(TemporalAdjusters.firstDayOfMonth())
+        return firstDay.atStartOfDay(zoneId).toInstant()
+    }
 
     @Suppress("UNCHECKED_CAST")
     fun calculate(
@@ -65,9 +94,10 @@ class AnalyticsCalculator(
         start: Instant = Instant.MIN,
         end: Instant = Instant.MAX
     ): AnalyticsReport {
-        // Filter orders in period
+        // Filter orders in period: dated by paidAt for completed orders, fallback to createdAt/pickupTime
         val periodOrders = orders.filter { order ->
-            val orderInstant = order.createdAt?.toDate()?.toInstant()
+            val orderInstant = order.paidAt?.toDate()?.toInstant()
+                ?: order.createdAt?.toDate()?.toInstant()
                 ?: order.pickupTime?.toDate()?.toInstant()
             if (orderInstant == null) true
             else orderInstant in start..end
@@ -80,9 +110,13 @@ class AnalyticsCalculator(
         }
 
         val totalOrders = periodOrders.size
-        val completedList = periodOrders.filter { it.status == "done" }
+        // Revenue = orders with status=completed AND paymentStatus=paid (or legacy 'done')
+        val completedList = periodOrders.filter {
+            (it.status in listOf("completed", "done")) &&
+            (it.paymentStatus == "paid" || it.status == "done")
+        }
         val cancelledList = periodOrders.filter { it.status in listOf("cancelled", "rejected") }
-        val inProgressList = periodOrders.filter { it.status in listOf("new", "accepted", "preparing", "ready") }
+        val inProgressList = periodOrders.filter { it.status in listOf("new", "pending", "accepted", "ready") }
 
         val completedCount = completedList.size
         val cancelledCount = cancelledList.size
@@ -128,11 +162,12 @@ class AnalyticsCalculator(
 
         val bestSellers = productStats.sortedByDescending { it.quantitySold }
         val mostProfitable = productStats.filter { it.profit > 0 }.sortedByDescending { it.profit }
+        // Loss-making product = product revenue - product cost < 0
         val lossMakers = productStats.filter { it.profit < 0 || (it.costPrice > it.sellingPrice && it.costPrice > 0) }
 
         // Trend points for LineChart
         val trendPoints = if (completedList.isNotEmpty()) {
-            val sorted = completedList.sortedBy { it.createdAt?.toDate()?.time ?: 0L }
+            val sorted = completedList.sortedBy { it.paidAt?.toDate()?.time ?: it.createdAt?.toDate()?.time ?: 0L }
             sorted.map { (it.totalPrice / 1000f).coerceAtLeast(1f) }
         } else {
             listOf(0f, 0f)

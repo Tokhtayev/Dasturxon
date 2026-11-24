@@ -232,4 +232,47 @@ class AnalyticsCalculatorTest {
         assertEquals(1, janReport.totalOrders)
         assertEquals(5000L, janReport.totalRevenue)
     }
+
+    @Test
+    fun `revenue calculation strictly requires paymentStatus paid for completed orders dated by paidAt`() {
+        val paidDate = Date.from(Instant.parse("2026-01-20T10:00:00Z"))
+        val unpaidDate = Date.from(Instant.parse("2026-01-20T10:00:00Z"))
+
+        val orders = listOf(
+            // Completed and paid -> counted in revenue
+            CustomerOrder(
+                id = "o-paid", customerId = "c1", businessId = "b1", businessName = "Bakery",
+                productName = "Non", quantity = 2, totalPrice = 10000L, status = "completed",
+                paymentStatus = "paid", paidAt = Timestamp(paidDate),
+                pickupTime = Timestamp(paidDate), createdAt = Timestamp(paidDate)
+            ),
+            // Completed but unpaid -> NOT counted in revenue
+            CustomerOrder(
+                id = "o-unpaid", customerId = "c2", businessId = "b1", businessName = "Bakery",
+                productName = "Somsa", quantity = 1, totalPrice = 8000L, status = "completed",
+                paymentStatus = "unpaid", paidAt = null,
+                pickupTime = Timestamp(unpaidDate), createdAt = Timestamp(unpaidDate)
+            )
+        )
+
+        val report = calculator.calculate(
+            orders = orders,
+            start = Instant.parse("2026-01-01T00:00:00Z"),
+            end = Instant.parse("2026-01-31T23:59:59Z")
+        )
+
+        assertEquals(10000L, report.totalRevenue)
+        assertEquals(1, report.completedOrders)
+    }
+
+    @Test
+    fun `startOfWeek returns Monday in Asia Tashkent timezone`() {
+        // 2026-01-21 is a Wednesday
+        val wednesday = Instant.parse("2026-01-21T14:30:00Z")
+        val mondayStart = calculator.startOfWeek(wednesday)
+
+        // Monday is 2026-01-19. In Asia/Tashkent (UTC+5), 2026-01-19 00:00:00 is 2026-01-18 19:00:00 UTC
+        val expectedMondayUtc = Instant.parse("2026-01-18T19:00:00Z")
+        assertEquals(expectedMondayUtc, mondayStart)
+    }
 }
