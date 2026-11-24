@@ -61,7 +61,7 @@
 - **Results**: BUILD SUCCESSFUL, clean lint report.
 
 ### Task 5: Complete Account Deletion & In-App Cleanup Support
-- **Commit Hash**: Pending
+- **Commit Hash**: `4682973`
 - **Changed Files**:
   - `app/src/main/java/com/example/dasturxon/data/repository/AuthRepository.kt`
   - `app/src/main/java/com/example/dasturxon/data/repository/FirebaseAuthRepositoryImpl.kt`
