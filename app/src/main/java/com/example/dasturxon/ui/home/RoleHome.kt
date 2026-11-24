@@ -79,6 +79,7 @@ import com.example.dasturxon.core.designsystem.SectionHeader
 import com.example.dasturxon.core.designsystem.ShopAvatar
 import com.example.dasturxon.core.designsystem.charts.DonutChart
 import com.example.dasturxon.core.designsystem.charts.LineChart
+import com.example.dasturxon.core.model.AnalyticsCalculator
 import com.example.dasturxon.data.model.Business
 import com.example.dasturxon.data.model.CustomerOrder
 import com.example.dasturxon.data.model.Expense
@@ -91,6 +92,7 @@ import com.example.dasturxon.data.repository.ProductRepository
 import com.example.dasturxon.domain.BusinessType
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import java.time.Instant
 import java.util.Calendar
 import java.util.Date
 
@@ -677,30 +679,44 @@ private fun OwnerHome(
 
                 // TAB 3: Analitika (Analytics)
                 3 -> {
-                    val completedOrders = remember(orders) { orders.filter { it.status == "done" } }
-                    val totalRevenue = remember(completedOrders) { completedOrders.sumOf { it.totalPrice } }
-                    val avgCheck = remember(completedOrders) {
-                        if (completedOrders.isNotEmpty()) totalRevenue / completedOrders.size else 0L
+                    var analyticsPeriod by rememberSaveable { mutableIntStateOf(1) } // 0: Bugun, 1: 7 kun, 2: 30 kun, 3: Barchasi
+                    val periodDates = remember(analyticsPeriod) {
+                        val now = System.currentTimeMillis()
+                        val calendar = Calendar.getInstance()
+                        when (analyticsPeriod) {
+                            0 -> { // Bugun
+                                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                                calendar.set(Calendar.MINUTE, 0)
+                                calendar.set(Calendar.SECOND, 0)
+                                calendar.set(Calendar.MILLISECOND, 0)
+                                Instant.ofEpochMilli(calendar.timeInMillis) to Instant.ofEpochMilli(now)
+                            }
+                            1 -> { // 7 kun
+                                Instant.ofEpochMilli(now - 7L * 24 * 60 * 60 * 1000) to Instant.ofEpochMilli(now)
+                            }
+                            2 -> { // 30 kun
+                                Instant.ofEpochMilli(now - 30L * 24 * 60 * 60 * 1000) to Instant.ofEpochMilli(now)
+                            }
+                            else -> Instant.MIN to Instant.MAX
+                        }
                     }
 
-                    val popularProduct = remember(orders) {
-                        orders.groupBy { it.productName }
-                            .maxByOrNull { (_, list) -> list.sumOf { it.quantity } }
-                            ?.key ?: "—"
+                    val report = remember(effectiveOrders, effectiveExpenses, effectiveProducts, periodDates) {
+                        AnalyticsCalculator().calculate(
+                            orders = effectiveOrders,
+                            expenses = effectiveExpenses,
+                            products = effectiveProducts,
+                            start = periodDates.first,
+                            end = periodDates.second
+                        )
                     }
 
-                    // Status distribution for donut chart
-                    val statusCounts = remember(orders) {
-                        val done = orders.count { it.status == "done" }.toFloat()
-                        val inProgress = orders.count { it.status in listOf("new", "accepted", "ready") }.toFloat()
-                        val cancelled = orders.count { it.status in listOf("cancelled", "rejected") }.toFloat()
-                        listOf(done, inProgress, cancelled)
-                    }
-
-                    // Revenue chart data (mock spark/line from orders)
-                    val chartData = remember(orders) {
-                        if (orders.isEmpty()) listOf(1f, 2f, 1f, 3f)
-                        else orders.take(7).map { it.totalPrice.toFloat() }.ifEmpty { listOf(1f, 2f, 1f, 3f) }
+                    val statusCounts = remember(report) {
+                        listOf(
+                            report.completedOrders.toFloat(),
+                            report.inProgressOrders.toFloat(),
+                            report.cancelledOrders.toFloat()
+                        )
                     }
 
                     Column(
@@ -713,34 +729,69 @@ private fun OwnerHome(
                         Spacer(Modifier.height(4.dp))
                         SectionHeader(title = "Biznes Tahlili")
 
+                        // Period Selector Chips
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val periods = listOf("Bugun", "7 kun", "30 kun", "Barchasi")
+                            periods.forEachIndexed { index, label ->
+                                FilterChip(
+                                    selected = analyticsPeriod == index,
+                                    onClick = { analyticsPeriod = index },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+
+                        // Financial KPIs Row 1: Daromad & Xarajatlar
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             KpiCard(
                                 title = "Jami daromad",
-                                value = MoneyFormatter.formatSoM(totalRevenue),
+                                value = MoneyFormatter.formatSoM(report.totalRevenue),
                                 modifier = Modifier.weight(1f)
                             )
                             KpiCard(
-                                title = "O'rtacha chek",
-                                value = MoneyFormatter.formatSoM(avgCheck),
+                                title = "Jami xarajatlar",
+                                value = MoneyFormatter.formatSoM(report.totalExpenses),
                                 modifier = Modifier.weight(1f)
                             )
                         }
 
+                        // Financial KPIs Row 2: Yalpi foyda & Sof foyda
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             KpiCard(
-                                title = "Ko'rishlar soni",
-                                value = "$viewCount marta",
+                                title = "Yalpi foyda",
+                                value = MoneyFormatter.formatSoM(report.grossProfit),
                                 modifier = Modifier.weight(1f)
                             )
                             KpiCard(
-                                title = "Top mahsulot",
-                                value = popularProduct,
+                                title = "Sof foyda",
+                                value = MoneyFormatter.formatSoM(report.netProfit),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        // Order KPIs Row 3: O'rtacha chek & Bajarilish darajasi
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            KpiCard(
+                                title = "O'rtacha chek",
+                                value = MoneyFormatter.formatSoM(report.averageTicket),
+                                modifier = Modifier.weight(1f)
+                            )
+                            KpiCard(
+                                title = "Bajarilish darajasi",
+                                value = "${(report.completionRate * 100).toInt()}%",
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -752,8 +803,86 @@ private fun OwnerHome(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {
                             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Tushum grafigi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                LineChart(data = chartData)
+                                Text("Tushum grafigi (ming so'mda)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                LineChart(data = report.trendPoints)
+                            }
+                        }
+
+                        // Product Profitability 1: Best sellers
+                        if (report.bestSellers.isNotEmpty()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("🔥 Eng ko'p sotilgan mahsulotlar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    report.bestSellers.take(3).forEach { item ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text(item.productName, fontWeight = FontWeight.Medium)
+                                                Text("${item.quantitySold} ta sotilgan", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                            }
+                                            Text(MoneyFormatter.formatSoM(item.revenue), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Product Profitability 2: Most profitable
+                        if (report.mostProfitable.isNotEmpty()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("💎 Eng foydali mahsulotlar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    report.mostProfitable.take(3).forEach { item ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text(item.productName, fontWeight = FontWeight.Medium)
+                                                Text("Tannarxi: ${MoneyFormatter.formatSoM(item.costPrice)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                            }
+                                            Text("+${MoneyFormatter.formatSoM(item.profit)}", fontWeight = FontWeight.Bold, color = Color(0xFF4C7A2B))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Product Profitability 3: Loss makers
+                        if (report.lossMakers.isNotEmpty()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("⚠️ Zarar keltiruvchi mahsulotlar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                                    report.lossMakers.forEach { item ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text(item.productName, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onErrorContainer)
+                                                Text("Tannarx: ${MoneyFormatter.formatSoM(item.costPrice)} > Sotish: ${MoneyFormatter.formatSoM(item.sellingPrice)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                                            }
+                                            Text(MoneyFormatter.formatSoM(item.profit), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                                        }
+                                    }
+                                }
                             }
                         }
 
