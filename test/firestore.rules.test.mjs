@@ -568,5 +568,102 @@ test("26. Authenticated user can create and read events", async () => {
   assert.equal(snap.data().type, "view_product");
 });
 
+// 27. Business creation must start with 'pending' status
+test("27. Business creation must start with pending status", async () => {
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  const bizRef = doc(dbOwner, "businesses/biz-pending-check");
+
+  // Attempting to self-create as approved must fail
+  await assertFails(setDoc(bizRef, {
+    ownerId: "owner-1",
+    name: "Self Approved Bakery",
+    type: "bakery",
+    address: "Yunusobod",
+    phone: "+998901234567",
+    status: "approved",
+    createdAt: Timestamp.now()
+  }));
+
+  // Creating with pending status succeeds
+  await assertSucceeds(setDoc(bizRef, {
+    ownerId: "owner-1",
+    name: "Legit Pending Bakery",
+    type: "bakery",
+    address: "Yunusobod",
+    phone: "+998901234567",
+    status: "pending",
+    createdAt: Timestamp.now()
+  }));
+});
+
+// 28. Business ownership cannot be reassigned
+test("28. Business ownership cannot be reassigned", async () => {
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  const bizRef = doc(dbOwner, "businesses/business-1");
+
+  // Owner cannot reassign business to owner-2
+  await assertFails(updateDoc(bizRef, {
+    ownerId: "owner-2"
+  }));
+});
+
+// 29. Customer cannot create order for unapproved business
+test("29. Customer cannot create order for unapproved business", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const orderRef = doc(dbCust, "orders/order-unapproved-biz");
+
+  // business-2 has status: 'pending'
+  await assertFails(setDoc(orderRef, {
+    customerId: "customer-1",
+    businessId: "business-2",
+    businessName: "Nonvoyxona 2",
+    productId: "product-pending",
+    productName: "Yopgan Non",
+    quantity: 1,
+    status: "pending",
+    paymentStatus: "unpaid",
+    createdAt: Timestamp.now()
+  }));
+});
+
+// 30. Username creation fails if claiming for another UID
+test("30. Username creation fails if claiming for another UID", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const usernameRef = doc(dbCust, "usernames/stolen_handle");
+
+  // customer-1 trying to register handle for customer-2 UID fails
+  await assertFails(setDoc(usernameRef, {
+    uid: "customer-2",
+    createdAt: Timestamp.now()
+  }));
+});
+
+// 31. User cannot forge events with another user's userId
+test("31. User cannot forge events with another user's userId", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const eventRef = doc(dbCust, "events/forged-event-1");
+
+  // customer-1 sending event pretending to be customer-2
+  await assertFails(setDoc(eventRef, {
+    businessId: "business-1",
+    productId: "product-approved",
+    userId: "customer-2",
+    type: "view_product",
+    createdAt: Timestamp.now()
+  }));
+});
+
+// 32. Owner cannot change product's businessId on update
+test("32. Owner cannot change product businessId on update", async () => {
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  const prodRef = doc(dbOwner, "products/product-approved");
+
+  // owner-1 trying to change businessId to business-2
+  await assertFails(updateDoc(prodRef, {
+    businessId: "business-2"
+  }));
+});
+
+
 
 

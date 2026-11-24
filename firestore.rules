@@ -16,7 +16,10 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && getUserData().role == 'admin';
+      return isSignedIn() && (
+        ('admin' in request.auth.token && request.auth.token.admin == true) ||
+        getUserData().role == 'admin'
+      );
     }
 
     function getBusiness(businessId) {
@@ -44,9 +47,12 @@ service cloud.firestore {
         && request.resource.data.email is string
         && request.resource.data.fullName is string;
 
-      // Update profile: User can update their own doc, but CANNOT alter their role (no role escalation)
-      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role)
-        || isAdmin();
+      // Update profile: User can update their own doc, but CANNOT alter their role or email
+      allow update: if (
+        isOwner(userId) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.email == resource.data.email
+      ) || isAdmin();
 
       // Deletion allowed by owner or admin
       allow delete: if isOwner(userId) || isAdmin();
@@ -60,12 +66,19 @@ service cloud.firestore {
       allow read: if isSignedIn();
 
       // Creation only allowed if the UID matches request.auth.uid and document does not exist yet
+      // Also verifies corresponding users/{uid} document matches normalizedNickname
       allow create: if isSignedIn()
         && request.resource.data.uid == request.auth.uid
-        && !exists(/databases/$(database)/documents/usernames/$(normalizedNickname));
+        && !exists(/databases/$(database)/documents/usernames/$(normalizedNickname))
+        && (
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.normalizedNickname == normalizedNickname) ||
+          (getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.normalizedNickname == normalizedNickname)
+        );
 
-      // Usernames are immutable once registered
-      allow update, delete: if false;
+      // Usernames are immutable once registered; deleted only when account is removed
+      allow update: if false;
+      allow delete: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     // ------------------------------------------------------------------------
@@ -79,13 +92,18 @@ service cloud.firestore {
         isAdmin()
       );
 
-      // Create: Owner can create their business
+      // Create: Owner can create their business, MUST start with 'pending' status
       allow create: if isSignedIn()
-        && request.resource.data.ownerId == request.auth.uid;
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.name is string;
 
-      // Update: Owner can update business info, but CANNOT change status (e.g. self-approve); admin can change status
+      // Update: Owner can update business info, but CANNOT change status (no self-approval) and cannot transfer ownerId
+      // Only admin can change status (e.g. approve/reject)
       allow update: if isSignedIn() && (
-        (resource.data.ownerId == request.auth.uid && request.resource.data.status == resource.data.status) ||
+        (resource.data.ownerId == request.auth.uid &&
+         request.resource.data.ownerId == resource.data.ownerId &&
+         request.resource.data.status == resource.data.status) ||
         isAdmin()
       );
 
@@ -107,11 +125,13 @@ service cloud.firestore {
       );
 
       // Create: Only the owner of the business (or admin) can create products.
-      // costPrice is NEVER stored in the public product doc.
+      // costPrice is NEVER stored in the public product doc. Price must be positive int.
       allow create: if isSignedIn() && (
         isBusinessOwner(request.resource.data.businessId) ||
         isAdmin()
-      ) && !('costPrice' in request.resource.data);
+      ) && !('costPrice' in request.resource.data)
+        && request.resource.data.price is int
+        && request.resource.data.price >= 0;
 
       // Update & Delete: Only the owner of that business (or admin) can update/delete products.
       // Cannot change businessId and cannot store costPrice in public doc.
@@ -146,13 +166,17 @@ service cloud.firestore {
         isAdmin()
       );
 
-      // Create: Signed-in customer creates order for themselves with initial status
+      // Create: Signed-in customer creates order for themselves with initial status 'pending' (or legacy 'new')
+      // for an approved business
       allow create: if isSignedIn()
-        && request.resource.data.customerId == request.auth.uid;
+        && request.resource.data.customerId == request.auth.uid
+        && request.resource.data.status in ['pending', 'new']
+        && (!('paymentStatus' in request.resource.data) || request.resource.data.paymentStatus in ['unpaid', 'pending'])
+        && isBusinessApproved(request.resource.data.businessId);
 
       // Update:
-      // - Customer can ONLY change status pending/new -> cancelled
-      // - Business owner can update order status and paymentStatus for their own business
+      // - Customer can ONLY change status pending/new -> cancelled (ownership immutable)
+      // - Business owner can update order status and paymentStatus for their own business (customerId/businessId immutable)
       // - Admin can update any order
       allow update: if isSignedIn() && (
         (resource.data.customerId == request.auth.uid &&
@@ -160,7 +184,9 @@ service cloud.firestore {
          request.resource.data.status == 'cancelled' &&
          request.resource.data.customerId == resource.data.customerId &&
          request.resource.data.businessId == resource.data.businessId) ||
-        isBusinessOwner(resource.data.businessId) ||
+        (isBusinessOwner(resource.data.businessId) &&
+         request.resource.data.customerId == resource.data.customerId &&
+         request.resource.data.businessId == resource.data.businessId) ||
         isAdmin()
       );
 
@@ -202,13 +228,13 @@ service cloud.firestore {
         isAdmin()
       );
 
-      // Create: Only the owner of that business (or admin) can create expenses
+      // Create: Only the owner of that business (or admin) can create expenses. Amount must be positive int.
       allow create: if isSignedIn() && (
         isBusinessOwner(request.resource.data.businessId) ||
         isAdmin()
-      );
+      ) && request.resource.data.amount is int && request.resource.data.amount >= 0;
 
-      // Update: Owner can update their own business expenses
+      // Update: Owner can update their own business expenses; businessId is immutable
       allow update: if isSignedIn() && (
         (isBusinessOwner(resource.data.businessId) && request.resource.data.businessId == resource.data.businessId) ||
         isAdmin()
@@ -225,9 +251,16 @@ service cloud.firestore {
     // Events / Analytics Collection: /events/{eventId}
     // ------------------------------------------------------------------------
     match /events/{eventId} {
-      // Any signed in user can record view events or read view metrics
-      allow read, create: if isSignedIn();
+      // Any signed in user can record view events for themselves
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.type in ['view_product', 'view_business'];
+
+      // Read: signed-in users can read business views
+      allow read: if isSignedIn();
+
       allow update, delete: if isAdmin();
     }
   }
 }
+
