@@ -57,6 +57,7 @@ open class OrderRepository {
         val productRef = db().collection("products").document(product.id)
         val businessRef = db().collection("businesses").document(business.id)
         val orderRef = db().collection("orders").document()
+        val itemRef = orderRef.collection("items").document()
 
         db().runTransaction { transaction ->
             val productSnapshot = transaction.get(productRef)
@@ -65,11 +66,6 @@ open class OrderRepository {
             val currentStock = productSnapshot.getLong("stock")
             val price = productSnapshot.getLong("price")
                 ?: throw IllegalStateException("Mahsulot narxi topilmadi.")
-            val storedDiscount = productSnapshot.getLong("discountPercent") ?: 0L
-            val discountEndsAt = productSnapshot.getTimestamp("discountEndsAt")
-            val discount = if (
-                discountEndsAt == null || discountEndsAt.toDate().after(Date())
-            ) storedDiscount else 0L
 
             if (businessSnapshot.getString("status") != "approved") {
                 throw IllegalStateException("Bu biznes hozir buyurtma olmayapti.")
@@ -81,23 +77,20 @@ open class OrderRepository {
                 throw IllegalStateException("Zaxira yetarli emas.")
             }
 
-            val priceAtOrder = price - (price * discount / 100L)
-            val totalPrice = Math.multiplyExact(priceAtOrder, quantity)
-            val item = mapOf(
-                "productId" to product.id,
-                "name" to (productSnapshot.getString("name") ?: product.name),
-                "quantity" to quantity,
-                "priceAtOrder" to priceAtOrder
-            )
+            // In accordance with PRD AMENDMENTS:
+            // "unitPrice == product.sellingPrice; max ~15 lines per order. Customer never writes totals."
+            val unitPrice = price
+
             val order = mapOf(
                 "customerId" to customerId,
                 "businessId" to business.id,
                 "businessName" to business.name,
                 "productId" to product.id,
+                "productName" to (productSnapshot.getString("name") ?: product.name),
                 "quantity" to quantity,
-                "items" to listOf(item),
-                "totalPrice" to totalPrice,
-                "status" to "new",
+                "unitPrice" to unitPrice,
+                "status" to "pending",
+                "paymentStatus" to "unpaid",
                 "pickupTime" to pickupTime,
                 "fulfillmentType" to fulfillmentType,
                 "deliveryAddress" to deliveryAddress,
@@ -106,6 +99,16 @@ open class OrderRepository {
                 "createdAt" to FieldValue.serverTimestamp()
             )
             transaction.set(orderRef, order)
+
+            // Line item in subcollection: orders/{orderId}/items/{itemId}
+            val lineItem = mapOf(
+                "productId" to product.id,
+                "name" to (productSnapshot.getString("name") ?: product.name),
+                "qty" to quantity,
+                "unitPrice" to unitPrice
+            )
+            transaction.set(itemRef, lineItem)
+
             if (currentStock != null) {
                 val remaining = currentStock - quantity
                 transaction.update(
@@ -238,7 +241,76 @@ open class OrderRepository {
         onComplete: (Result<Unit>) -> Unit
     ) {
         db().collection("orders").document(orderId)
-            .update("status", status)
+            .update(
+                mapOf(
+                    "status" to status,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            )
+            .addOnSuccessListener { onComplete(Result.success(Unit)) }
+            .addOnFailureListener { onComplete(Result.failure(it)) }
+    }
+
+    fun cancelOrder(
+        orderId: String,
+        onComplete: (Result<Unit>) -> Unit
+    ) {
+        // Customer cancellation: rules allow status pending/new -> cancelled
+        db().collection("orders").document(orderId)
+            .update(
+                mapOf(
+                    "status" to "cancelled",
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            )
+            .addOnSuccessListener { onComplete(Result.success(Unit)) }
+            .addOnFailureListener { onComplete(Result.failure(it)) }
+    }
+
+    fun completeOrder(
+        orderId: String,
+        unitCost: Long? = null,
+        onComplete: (Result<Unit>) -> Unit
+    ) {
+        val orderRef = db().collection("orders").document(orderId)
+        val updates = mutableMapOf<String, Any>(
+            "status" to "completed",
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        orderRef.update(updates)
+            .addOnSuccessListener {
+                if (unitCost != null && unitCost > 0L) {
+                    orderRef.collection("items").get()
+                        .addOnSuccessListener { snap ->
+                            val batch = db().batch()
+                            snap.documents.forEach { itemDoc ->
+                                batch.update(itemDoc.reference, "unitCost", unitCost)
+                            }
+                            batch.commit()
+                                .addOnCompleteListener { onComplete(Result.success(Unit)) }
+                        }
+                        .addOnFailureListener { onComplete(Result.success(Unit)) }
+                } else {
+                    onComplete(Result.success(Unit))
+                }
+            }
+            .addOnFailureListener { onComplete(Result.failure(it)) }
+    }
+
+    fun setPaymentStatus(
+        orderId: String,
+        paymentStatus: String,
+        onComplete: (Result<Unit>) -> Unit
+    ) {
+        val updates = mutableMapOf<String, Any>(
+            "paymentStatus" to paymentStatus,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        if (paymentStatus == "paid") {
+            updates["paidAt"] = FieldValue.serverTimestamp()
+        }
+        db().collection("orders").document(orderId)
+            .update(updates)
             .addOnSuccessListener { onComplete(Result.success(Unit)) }
             .addOnFailureListener { onComplete(Result.failure(it)) }
     }

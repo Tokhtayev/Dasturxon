@@ -14,19 +14,24 @@ enum class OrderStatus(
     @field:StringRes val labelRes: Int,
     val icon: String
 ) {
-    PENDING("new", OrderStatusGroup.ACTIVE, R.string.order_status_pending, "◷"),
+    PENDING("pending", OrderStatusGroup.ACTIVE, R.string.order_status_pending, "◷"),
     ACCEPTED("accepted", OrderStatusGroup.ACTIVE, R.string.order_status_accepted, "✓"),
     READY("ready", OrderStatusGroup.ACTIVE, R.string.order_status_ready, "✓✓"),
-    COMPLETED("done", OrderStatusGroup.HISTORY, R.string.order_status_completed, "✓"),
+    COMPLETED("completed", OrderStatusGroup.HISTORY, R.string.order_status_completed, "✓"),
     REJECTED("rejected", OrderStatusGroup.HISTORY, R.string.order_status_rejected, "!"),
     CANCELLED("cancelled", OrderStatusGroup.HISTORY, R.string.order_status_cancelled, "×");
 
     companion object {
-        fun fromFirestore(value: String): OrderStatus? =
-            entries.firstOrNull { it.firestoreValue == value }
+        fun fromFirestore(value: String): OrderStatus? = when (value) {
+            "new" -> PENDING
+            "done" -> COMPLETED
+            else -> entries.firstOrNull { it.firestoreValue == value }
+        }
 
-        fun firestoreValues(group: OrderStatusGroup): List<String> =
-            entries.filter { it.group == group }.map(OrderStatus::firestoreValue)
+        fun firestoreValues(group: OrderStatusGroup): List<String> = when (group) {
+            OrderStatusGroup.ACTIVE -> listOf("pending", "new", "accepted", "ready")
+            OrderStatusGroup.HISTORY -> listOf("completed", "done", "rejected", "cancelled")
+        }
 
         val timeline: List<OrderStatus>
             get() = listOf(PENDING, ACCEPTED, READY, COMPLETED)

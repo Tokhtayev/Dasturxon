@@ -234,6 +234,21 @@ class CustomerOrdersViewModel(
         }
     }
 
+    fun cancelOrder(orderId: String, onResult: (Result<Unit>) -> Unit = {}) {
+        orderRepository.cancelOrder(orderId) { result ->
+            if (result.isSuccess) {
+                historyDetail.update { current ->
+                    val updated = current.selectedOrder?.let {
+                        if (it.id == orderId) it.copy(status = "cancelled") else it
+                    }
+                    current.copy(selectedOrder = updated)
+                }
+                refreshHistory()
+            }
+            onResult(result)
+        }
+    }
+
     fun closeOrder() {
         historyDetail.update {
             it.copy(selectedOrder = null, business = null, detailLoading = false, detailError = null)

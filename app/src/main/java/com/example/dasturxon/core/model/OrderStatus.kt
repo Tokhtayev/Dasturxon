@@ -1,10 +1,10 @@
 package com.example.dasturxon.core.model
 
 enum class OrderStatus(val storedValue: String) {
-    PENDING("new"),
+    PENDING("pending"),
     ACCEPTED("accepted"),
     READY("ready"),
-    COMPLETED("done"),
+    COMPLETED("completed"),
     REJECTED("rejected"),
     CANCELLED("cancelled");
 
@@ -21,8 +21,10 @@ enum class OrderStatus(val storedValue: String) {
         get() = this == PENDING || this == ACCEPTED || this == READY
 
     companion object {
-        fun fromStoredValue(value: String?): OrderStatus {
-            return entries.firstOrNull { it.storedValue == value } ?: PENDING
+        fun fromStoredValue(value: String?): OrderStatus = when (value) {
+            "new" -> PENDING
+            "done" -> COMPLETED
+            else -> entries.firstOrNull { it.storedValue == value } ?: PENDING
         }
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -31,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
@@ -80,6 +82,9 @@ internal fun CustomerOrdersScreen(
             loadingBusiness = state.detailLoading,
             detailError = state.detailError,
             onBack = viewModel::closeOrder,
+            onCancelOrder = { orderId, onDone ->
+                viewModel.cancelOrder(orderId, onDone)
+            },
             modifier = modifier
         )
         return
@@ -367,6 +372,7 @@ private fun OrderDetailScreen(
     loadingBusiness: Boolean,
     detailError: OrdersError?,
     onBack: () -> Unit,
+    onCancelOrder: (String, (Result<Unit>) -> Unit) -> Unit = { _, _ -> },
     modifier: Modifier
 ) {
     val context = LocalContext.current
@@ -374,6 +380,8 @@ private fun OrderDetailScreen(
     val unavailable = stringResource(R.string.orders_date_unavailable)
     val offlineMessage = stringResource(R.string.orders_offline_error)
     val detailErrorMessage = stringResource(R.string.order_status_detail_error)
+    var showCancelDialog by remember { mutableStateOf(false) }
+    var isCancelling by remember { mutableStateOf(false) }
     val dateFormatter = remember(locale) {
         DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
             .withLocale(locale)
@@ -389,6 +397,35 @@ private fun OrderDetailScreen(
     val title = stringResource(R.string.order_detail_title)
     val contactUnavailable = stringResource(R.string.order_contact_unavailable)
     val phone = business?.phone.orEmpty()
+
+    if (showCancelDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showCancelDialog = false },
+            title = { Text("Buyurtmani bekor qilish") },
+            text = { Text("Haqiqatan ham bu buyurtmani bekor qilmoqchimisiz?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCancelDialog = false
+                        isCancelling = true
+                        onCancelOrder(order.id) {
+                            isCancelling = false
+                        }
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Ha, bekor qilish")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelDialog = false }) {
+                    Text("Yo'q")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = modifier
@@ -421,6 +458,24 @@ private fun OrderDetailScreen(
                 OrderStatusTimeline(order.status)
             }
         }
+
+        if (order.status in listOf("pending", "new")) {
+            OutlinedButton(
+                onClick = { showCancelDialog = true },
+                enabled = !isCancelling,
+                colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isCancelling) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Buyurtmani bekor qilish")
+                }
+            }
+        }
+
         Text(stringResource(R.string.order_business_details), style = MaterialTheme.typography.titleMedium)
         if (loadingBusiness) {
             CircularProgressIndicator()

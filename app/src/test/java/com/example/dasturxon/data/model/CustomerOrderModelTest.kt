@@ -18,18 +18,23 @@ class CustomerOrderModelTest {
             productName = "Tandir non",
             quantity = 5,
             totalPrice = 25000L,
-            status = "new",
+            status = "pending",
             pickupTime = now,
             fulfillmentType = "delivery",
             deliveryAddress = "Chilonzor 12-mavze 4-uy",
             customerPhone = "+998901234567",
-            customerName = "Ali Valiyev"
+            customerName = "Ali Valiyev",
+            paymentStatus = "paid",
+            paidAt = now
         )
 
         assertEquals("delivery", order.fulfillmentType)
         assertEquals("Chilonzor 12-mavze 4-uy", order.deliveryAddress)
         assertEquals("+998901234567", order.customerPhone)
         assertEquals("Ali Valiyev", order.customerName)
+        assertEquals("paid", order.paymentStatus)
+        assertEquals(now, order.paidAt)
+        assertEquals("pending", order.status)
     }
 
     @Test
@@ -50,6 +55,8 @@ class CustomerOrderModelTest {
         assertEquals("", order.deliveryAddress)
         assertEquals("", order.customerPhone)
         assertEquals("", order.customerName)
+        assertEquals("unpaid", order.paymentStatus)
+        assertEquals(null, order.paidAt)
     }
 
     @Test
