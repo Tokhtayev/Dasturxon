@@ -923,12 +923,20 @@ private suspend fun performGoogleCredentialManagerSignIn(
     onIdTokenReceived: (String) -> Unit
 ) {
     try {
-        val credentialManager = CredentialManager.create(context)
         val serverClientId = try {
             context.getString(R.string.default_web_client_id)
         } catch (_: Exception) {
             "437798898747-default.apps.googleusercontent.com"
         }
+
+        if (serverClientId.contains("default")) {
+            val msg = "Google orqali kirish uchun Firebase Console'da SHA-1 va Web Client ID sozlanishi kerak."
+            android.util.Log.w("AuthScreens", msg)
+            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val credentialManager = CredentialManager.create(context)
         val googleIdOption = GetGoogleIdOption.Builder()
             .setFilterByAuthorizedAccounts(false)
             .setServerClientId(serverClientId)
@@ -954,9 +962,13 @@ private suspend fun performGoogleCredentialManagerSignIn(
         } else if (credential is GoogleIdTokenCredential) {
             onIdTokenReceived(credential.idToken)
         }
-    } catch (_: GetCredentialException) {
-        Log.w("AuthScreens", "Google credential retrieval cancelled or failed")
-    } catch (_: Exception) {
-        Log.w("AuthScreens", "Google sign in request could not be completed")
+    } catch (e: GetCredentialException) {
+        val msg = "Google hisobini tanlash amalga oshmadi: ${e.localizedMessage ?: "Bekor qilindi"}"
+        Log.w("AuthScreens", msg)
+        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+    } catch (e: Exception) {
+        val msg = "Google kirishda xatolik: ${e.localizedMessage ?: "Noma'lum xatolik"}"
+        Log.w("AuthScreens", msg)
+        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
     }
 }
