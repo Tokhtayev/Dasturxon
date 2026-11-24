@@ -426,15 +426,32 @@ fun ProductDetailScreen(
                             }
                             val phone = shopBusiness?.phone ?: product.businessPhone
                             if (phone.isNotBlank()) {
-                                OutlinedButton(
-                                    onClick = {
-                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
-                                        context.startActivity(intent)
-                                    },
+                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text("📞  $phone")
+                                    OutlinedButton(
+                                        onClick = {
+                                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                                            context.startActivity(intent)
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text("📞 Qo'ng'iroq")
+                                    }
+                                    val cleanPhone = phone.filter(Char::isDigit)
+                                    OutlinedButton(
+                                        onClick = {
+                                            val tgUri = Uri.parse("https://t.me/+$cleanPhone")
+                                            val intent = Intent(Intent.ACTION_VIEW, tgUri)
+                                            context.startActivity(intent)
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text("✈️ Telegram")
+                                    }
                                 }
                             }
                         }

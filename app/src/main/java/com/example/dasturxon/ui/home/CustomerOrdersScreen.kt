@@ -491,13 +491,30 @@ private fun OrderDetailScreen(
             }
             if (phone.isNotBlank()) {
                 Text(stringResource(R.string.order_business_phone, phone))
-                OutlinedButton(
-                    onClick = {
-                        val dialIntent = Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", phone, null))
-                        context.startActivity(dialIntent)
-                    }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(stringResource(R.string.order_call_business))
+                    OutlinedButton(
+                        onClick = {
+                            val dialIntent = Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", phone, null))
+                            context.startActivity(dialIntent)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.order_call_business))
+                    }
+                    val cleanPhone = phone.filter(Char::isDigit)
+                    OutlinedButton(
+                        onClick = {
+                            val tgUri = Uri.parse("https://t.me/+$cleanPhone")
+                            val intent = Intent(Intent.ACTION_VIEW, tgUri)
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("✈️ Telegram")
+                    }
                 }
             }
             if (business == null || (business.address.isBlank() && phone.isBlank())) {
