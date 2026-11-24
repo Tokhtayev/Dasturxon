@@ -487,9 +487,26 @@ private fun OwnerHome(
                         if (pendingOrders.isNotEmpty()) {
                             SectionHeader(title = "Diqqat talab qiladi (${pendingOrders.size})")
                             pendingOrders.forEach { order ->
-                                OrderCard(order = order, ownerActions = true) { nextStatus ->
-                                    orderRepository.updateStatus(order.id, nextStatus) { result ->
-                                        result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma yangilanmadi." }
+                                OrderCard(
+                                    order = order,
+                                    ownerActions = true,
+                                    onPaymentStatusChange = { newPaymentStatus ->
+                                        orderRepository.setPaymentStatus(order.id, newPaymentStatus) { result ->
+                                            result.onFailure { errorMessage = it.localizedMessage ?: "To'lov yangilanmadi." }
+                                        }
+                                    }
+                                ) { nextStatus ->
+                                    if (nextStatus == "completed") {
+                                        productRepository.getCostPrice(order.productId) { costResult ->
+                                            val cost = costResult.getOrNull() ?: 0L
+                                            orderRepository.completeOrder(order.id, cost) { result ->
+                                                result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma yakunlanmadi." }
+                                            }
+                                        }
+                                    } else {
+                                        orderRepository.updateStatus(order.id, nextStatus) { result ->
+                                            result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma yangilanmadi." }
+                                        }
                                     }
                                 }
                             }
@@ -666,9 +683,26 @@ private fun OwnerHome(
                             )
                         } else {
                             filteredOrders.forEach { order ->
-                                OrderCard(order = order, ownerActions = true) { nextStatus ->
-                                    orderRepository.updateStatus(order.id, nextStatus) { result ->
-                                        result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma yangilanmadi." }
+                                OrderCard(
+                                    order = order,
+                                    ownerActions = true,
+                                    onPaymentStatusChange = { newPaymentStatus ->
+                                        orderRepository.setPaymentStatus(order.id, newPaymentStatus) { result ->
+                                            result.onFailure { errorMessage = it.localizedMessage ?: "To'lov yangilanmadi." }
+                                        }
+                                    }
+                                ) { nextStatus ->
+                                    if (nextStatus == "completed") {
+                                        productRepository.getCostPrice(order.productId) { costResult ->
+                                            val cost = costResult.getOrNull() ?: 0L
+                                            orderRepository.completeOrder(order.id, cost) { result ->
+                                                result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma yakunlanmadi." }
+                                            }
+                                        }
+                                    } else {
+                                        orderRepository.updateStatus(order.id, nextStatus) { result ->
+                                            result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma yangilanmadi." }
+                                        }
                                     }
                                 }
                             }

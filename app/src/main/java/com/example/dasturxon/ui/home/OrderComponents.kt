@@ -227,6 +227,7 @@ internal fun ProductEditDialog(
 internal fun OrderCard(
     order: CustomerOrder,
     ownerActions: Boolean = false,
+    onPaymentStatusChange: (String) -> Unit = {},
     onStatusChange: (String) -> Unit = {}
 ) {
     Card(
@@ -259,6 +260,53 @@ internal fun OrderCard(
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary
             )
+
+            // Payment status indicator
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                if (order.paymentStatus == "paid") {
+                    androidx.compose.material3.Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = "✓ To'langan",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                } else {
+                    Row(
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        androidx.compose.material3.Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "To'lanmagan",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        if (ownerActions) {
+                            OutlinedButton(
+                                onClick = { onPaymentStatusChange("paid") },
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                            ) {
+                                Text("To'lovni tasdiqlash", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
+            }
+
             val isDelivery = order.fulfillmentType == "delivery"
             Text(
                 text = if (isDelivery) "🚚 Yetkazib berish: ${order.deliveryAddress.ifBlank { "Manzil ko'rsatilmagan" }}"
@@ -295,7 +343,7 @@ internal fun OrderCard(
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     when (order.status) {
-                        "new" -> {
+                        "new", "pending" -> {
                             Button(
                                 onClick = { onStatusChange("accepted") },
                                 shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
@@ -303,7 +351,7 @@ internal fun OrderCard(
                                 Text("Qabul qilish")
                             }
                             OutlinedButton(
-                                onClick = { onStatusChange("cancelled") },
+                                onClick = { onStatusChange("rejected") },
                                 shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
                             ) {
                                 Text("Rad etish")
@@ -316,7 +364,7 @@ internal fun OrderCard(
                             Text("Tayyor")
                         }
                         "ready" -> Button(
-                            onClick = { onStatusChange("done") },
+                            onClick = { onStatusChange("completed") },
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
                         ) {
                             Text("Topshirildi (Yakunlash)")
