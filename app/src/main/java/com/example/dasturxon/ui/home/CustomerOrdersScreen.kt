@@ -44,6 +44,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.dasturxon.R
+import com.example.dasturxon.core.designsystem.EmptyState
+import com.example.dasturxon.core.designsystem.ErrorState
+import com.example.dasturxon.core.designsystem.SkeletonItem
 import com.example.dasturxon.data.model.Business
 import com.example.dasturxon.data.model.CustomerOrder
 import com.example.dasturxon.domain.OrderHistoryMonthGroup
@@ -155,22 +158,23 @@ private fun ActiveOrdersList(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (state.activeLoading && state.activeOrders.isEmpty()) {
-                item(key = "active_loading") {
-                    CenterMessage {
-                        CircularProgressIndicator()
-                        Text(loadingMessage)
-                    }
+                items(3, key = { "active_skeleton_$it" }) {
+                    SkeletonItem(height = 110)
                 }
             } else if (state.activeError != null && state.activeOrders.isEmpty()) {
                 item(key = "active_error") {
-                    RetryMessage(
+                    ErrorState(
                         message = if (state.activeError == OrdersError.OFFLINE) offlineMessage else errorMessage,
-                        retryLabel = stringResource(R.string.orders_retry),
                         onRetry = onRetry
                     )
                 }
             } else if (state.activeOrders.isEmpty()) {
-                item(key = "active_empty") { CenterMessage { Text(emptyMessage) } }
+                item(key = "active_empty") {
+                    EmptyState(
+                        title = emptyMessage,
+                        description = "Hozircha sizda faol buyurtmalar mavjud emas."
+                    )
+                }
             }
 
             items(state.activeOrders, key = CustomerOrder::id) { order ->
@@ -246,22 +250,23 @@ private fun HistoryOrdersList(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (state.historyLoading && state.historyOrders.isEmpty()) {
-                item(key = "history_loading") {
-                    CenterMessage {
-                        CircularProgressIndicator()
-                        Text(loadingMessage)
-                    }
+                items(3, key = { "history_skeleton_$it" }) {
+                    SkeletonItem(height = 110)
                 }
             } else if (state.historyError != null && state.historyOrders.isEmpty()) {
                 item(key = "history_error") {
-                    RetryMessage(
+                    ErrorState(
                         message = if (state.historyError == OrdersError.OFFLINE) offlineMessage else errorMessage,
-                        retryLabel = stringResource(R.string.orders_retry),
                         onRetry = onRetry
                     )
                 }
             } else if (state.historyOrders.isEmpty()) {
-                item(key = "history_empty") { CenterMessage { Text(emptyMessage) } }
+                item(key = "history_empty") {
+                    EmptyState(
+                        title = emptyMessage,
+                        description = "Oldingi buyurtmalaringiz bu yerda saqlanadi."
+                    )
+                }
             }
 
             groups.forEach { group ->
