@@ -8,7 +8,7 @@
 
 ---
 
-## 2. Completed Tasks
+## 2. Completed Tasks & MVP Features
 
 ### Task 1: Firestore Least-Privilege Security Rules & Emulator Tests
 - Implemented production-grade security rules in `firestore.rules` for:
@@ -17,17 +17,13 @@
   - `/businesses/{businessId}`: Read restricted to approved businesses for customers, owners restricted from self-approving status.
   - `/products/{productId}`: Only approved business owners can publish; cross-owner modifications and hijacks blocked.
   - `/orders/{orderId}`: Strict isolation preventing customers from accessing others' orders, owner restricted to their own business orders.
-- Validated via 17 automated tests in the Firebase Firestore Emulator (`test/firestore.rules.test.mjs`).
+  - `/expenses/{expenseId}`: Business expenses accessible and manageable only by the authentic business owner and admin.
+- Validated via 19 automated tests in the Firebase Firestore Emulator (`test/firestore.rules.test.mjs`).
 
 ### Task 2: Authentication Hardening & Unit Tests
 - Fixed `sendPasswordResetEmail` in `FirebaseAuthRepositoryImpl.kt` to avoid email enumeration by returning success on `ERROR_USER_NOT_FOUND`.
 - Standardized error message mapping for invalid credentials, user not found, and wrong passwords.
-- Authored 8 unit tests in `AuthViewModelTest` covering:
-  - Duplicate nickname rejection without navigation.
-  - Atomic write failure rollback when user profile write fails.
-  - Unified wrong-password / user-not-found error messaging (anti-enumeration).
-  - Validation error handling for phone and email registration.
-- Added `AuthRepositoryErrorMappingTest` verifying identical user-facing messages.
+- Authored unit tests covering duplicate nickname rejection, atomic profile write rollback, and unified anti-enumeration messages.
 
 ### Task 3: Real-Time Firestore Flows
 - Converted product and order repository methods to Kotlin coroutine `Flow` using `callbackFlow` with lifecycle-aware cleanup:
@@ -39,7 +35,6 @@
   1. Owner adds product $\rightarrow$ Customer feed updates without manual refresh.
   2. Customer places order $\rightarrow$ Owner receives instant order notification in dashboard.
   3. Owner advances order status (`new` $\rightarrow$ `accepted` $\rightarrow$ `ready` $\rightarrow$ `done`) $\rightarrow$ Customer sees status update immediately.
-- Verified by automated emulator tests and 9 unit tests in `CustomerOrdersViewModelTest`.
 
 ### Task 4: Customer Order History Screen
 - Updated `CustomerOrdersScreen.kt` with:
@@ -60,15 +55,53 @@
   - **Logging**: Sanitized exception handling in `AuthScreens.kt` to prevent PII exposure in Logcat.
 - Published comprehensive findings in `docs/SECURITY_REVIEW.md`.
 
+### MVP Feature 1: Product `costPrice`, `sellingPrice`, Image Management & Deletion
+- Extended `Product` model and `ProductRepository` with:
+  - `costPrice: Long` and `val sellingPrice: Long get() = price`.
+  - Base64 image compression (<= 600px, JPEG 75%) and LRU memory-cached decoding.
+  - Image picker integration in `ProductEditor` using `ActivityResultContracts.PickVisualMedia`.
+  - Product deletion with `productRepository.delete(productId)` and owner UI triggers in `ProductCard` and `ProductEditDialog`.
+  - Display of cost price and profit margin in owner product cards.
+
+### MVP Feature 2: Business Expenses Tracking & Access Control
+- Created `Expense` model and `ExpenseRepository` supporting:
+  - Expense creation (`title`, `amount`, `category`, server timestamp).
+  - Real-time stream `observeForBusiness(businessId)`.
+  - Expense deletion.
+- Enforced strict least-privilege security rules for `/expenses/{expenseId}` in `firestore.rules`.
+- Created owner UI with `AddExpenseDialog`, category selection (`Xomashyo`, `Ijara`, `Kommunal`, `Maosh`, `Boshqa`), and recent expenses list in Owner Analytics.
+
+### MVP Feature 3: Order Delivery & Customer Contact
+- Extended `CustomerOrder` and `OrderRepository.create()` with:
+  - `fulfillmentType: "pickup" | "delivery"`.
+  - `deliveryAddress: String` and `customerPhone: String`.
+  - `customerName: String`.
+- Updated `CheckoutSheet` with fulfillment mode selector (🛍️ Olib ketish vs 🚚 Yetkazib berish) and conditional delivery address and phone inputs.
+- Enabled customer contact in `OrderCard` with direct phone dialing intent (`tel:`) for business owners, and business owner contact for customers in `OrderDetailScreen`.
+
+### MVP Feature 4: Real Firestore Business Analytics & Profitability
+- Implemented pure-Kotlin domain `AnalyticsCalculator` operating exclusively on real Firestore order and expense data:
+  - Filterable by timeframe: Bugun (Today), 7 kun (Week), 30 kun (Month), Barchasi (All time).
+  - Revenue calculation using completed orders only (`status == "done"`).
+  - COGS (Cost of Goods Sold) calculated per product: $\sum (\text{item.quantity} \times \text{product.costPrice})$.
+  - Gross Profit: $\text{Revenue} - \text{COGS}$.
+  - Net Profit: $\text{Gross Profit} - \sum \text{Expenses}$.
+  - Product-level analytics:
+    - 🔥 **Eng ko'p sotilgan mahsulotlar** (Best sellers by quantity).
+    - 💎 **Eng foydali mahsulotlar** (Most profitable by net contribution).
+    - ⚠️ **Zarar keltiruvchi mahsulotlar** (Loss makers where cost exceeds selling price).
+  - Order counts and completion rate ($\frac{\text{completed}}{\text{total}}$).
+  - Real trend points for revenue line chart.
+
 ---
 
 ## 3. Verified by Automated Tests
 
 | Test Suite | Count | Result | Scope / Coverage |
 | :--- | :--- | :--- | :--- |
-| **Firestore Emulator Rules Tests** (`npm run test:rules`) | 17 | **PASS** | Role escalation prevention, cross-user doc protection, order privacy, cross-owner product isolation, real-time snapshot listeners. |
-| **JVM Unit Tests** (`./gradlew testDebugUnitTest`) | 44 | **PASS** | AuthViewModel (8), Auth error mapping (3), CustomerOrdersViewModel (9), OrderHistoryPaging (4), OrderStatus (4), AnalyticsCalculator (10), DomainValidation (4), BusinessType (1), Example (1). |
-| **Android Lint** (`./gradlew lintDebug`) | - | **PASS** | Zero fatal errors; clean resource and manifest checks. |
+| **Firestore Emulator Rules Tests** (`npm run test:rules`) | **19** | **PASS** | Role escalation prevention, cross-user doc protection, order privacy, cross-owner product isolation, real-time snapshot listeners, expense isolation and owner write access. |
+| **JVM Unit Tests** (`./gradlew testDebugUnitTest`) | **57** | **PASS** | AnalyticsCalculator (5), CustomerOrderModel (3), ExpenseModel (3), ProductModel (3), OrderStatus (3), AuthRepositoryErrorMapping (4), BusinessType (4), DomainValidation (10), OrderHistoryPaging (4), AuthViewModel (8), CustomerOrdersViewModel (9), Example (1). |
+| **Android Lint** (`./gradlew lintDebug`) | - | **PASS** | Zero fatal errors; clean resource, accessibility, and manifest checks. |
 | **Debug Build** (`./gradlew assembleDebug`) | - | **PASS** | Debug APK built successfully without compiler warnings. |
 
 ---
@@ -76,7 +109,7 @@
 ## 4. NOT Verified (Out-of-Scope / Manual Verification Needed)
 - **Physical Device Push Notifications**: Firebase Cloud Messaging (FCM) is not deployed (serverless Spark tier).
 - **Physical Device Doze Mode / Deep Sleep**: Background lifecycle behavior was tested via ViewModel test scopes and Compose lifecycle flows, but not on physical battery-saving modes.
-- **In-App Billing / Live Payment Gateways**: The app uses a pickup marketplace model where payments occur in person; no third-party payment gateway SDK is integrated.
+- **In-App Billing / Live Payment Gateways**: The app uses a pickup/cash-on-delivery marketplace model where payments occur in person; no third-party payment gateway SDK is integrated.
 - **Production Firebase Deployment**: Live Firebase deployment (`firebase deploy`) was intentionally not performed in compliance with project rules.
 
 ---
