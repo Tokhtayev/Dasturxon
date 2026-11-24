@@ -81,18 +81,12 @@ fun ProductCard(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    // Central subtle food icon placeholder
-                    Text(
-                        text = when {
-                            product.name.contains("non", ignoreCase = true) -> "🥖"
-                            product.name.contains("somsa", ignoreCase = true) -> "🥟"
-                            product.name.contains("osh", ignoreCase = true) -> "🍲"
-                            product.name.contains("choy", ignoreCase = true) -> "🫖"
-                            product.name.contains("tort", ignoreCase = true) || product.name.contains("pishiriq", ignoreCase = true) -> "🍰"
-                            else -> "🍽️"
-                        },
-                        style = MaterialTheme.typography.displayLarge,
-                        modifier = Modifier.align(Alignment.Center)
+                    com.example.dasturxon.ui.customer.ProductVisualArt(
+                        productName = product.name,
+                        businessType = product.businessType,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
                     )
                 }
 

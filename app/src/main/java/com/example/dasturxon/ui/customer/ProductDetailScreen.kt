@@ -175,23 +175,10 @@ fun ProductDetailScreen(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    // Type-colored gradient + food icon placeholder
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    )
-                                )
-                            )
-                    )
-                    Text(
-                        text = productEmoji(product),
-                        fontSize = 80.sp,
-                        modifier = Modifier.align(Alignment.Center)
+                    ProductVisualArt(
+                        productName = product.name,
+                        businessType = product.businessType,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
 

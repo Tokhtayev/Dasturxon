@@ -33,6 +33,9 @@ import com.example.dasturxon.data.repository.BusinessRepository
 import com.example.dasturxon.data.repository.OrderRepository
 import com.example.dasturxon.data.repository.ProductRepository
 import com.example.dasturxon.domain.BusinessType
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.style.TextOverflow
+import com.example.dasturxon.ui.customer.*
 import com.example.dasturxon.ui.customer.CheckoutSheet
 import com.example.dasturxon.ui.customer.CustomerProfileScreen
 import com.example.dasturxon.ui.customer.ProductDetailScreen
@@ -99,6 +102,46 @@ internal fun CustomerOrderFlow(
     var isSubmitting by remember { mutableStateOf(false) }
     var checkoutError by remember { mutableStateOf<String?>(null) }
     var orderSuccessMsg by remember { mutableStateOf<String?>(null) }
+
+    // Notifications State
+    var showNotificationsDialog by remember { mutableStateOf(false) }
+    var notifications by remember {
+        mutableStateOf(
+            listOf(
+                AppNotification(
+                    id = "notif_order_1",
+                    title = "Buyurtma tayyorlanmoqda",
+                    message = "Baraka novvoyxonasi: 4 dona Tandir non va somsa buyurtmangiz tayyorlanmoqda.",
+                    timeAgo = "15 daqiqa oldin",
+                    icon = "🥖",
+                    isRead = false,
+                    targetTab = 2,
+                    type = NotificationType.ORDER
+                ),
+                AppNotification(
+                    id = "notif_promo_1",
+                    title = "Yangi chegirma: -15%",
+                    message = "Baraka novvoyxonasida barcha issiq patirlarga 15% chegirma boshlandi!",
+                    timeAgo = "1 soat oldin",
+                    icon = "🏷️",
+                    isRead = false,
+                    targetTab = 0,
+                    type = NotificationType.PROMO
+                ),
+                AppNotification(
+                    id = "notif_welcome",
+                    title = "Dasturxonga xush kelibsiz!",
+                    message = "Mahallangizdagi eng sara novvoyxona va oshxonalardan issiq taomlarni tanlang.",
+                    timeAgo = "Bugun",
+                    icon = "👋",
+                    isRead = true,
+                    targetTab = 0,
+                    type = NotificationType.SYSTEM
+                )
+            )
+        )
+    }
+    val unreadNotificationsCount = remember(notifications) { notifications.count { !it.isRead } }
 
     // Filters
     var businessTypeFilter by rememberSaveable { mutableStateOf("all") }
@@ -295,14 +338,91 @@ internal fun CustomerOrderFlow(
         )
     }
 
+    if (showNotificationsDialog) {
+        NotificationsDialog(
+            notifications = notifications,
+            onDismiss = { showNotificationsDialog = false },
+            onNotificationClick = { notif ->
+                notifications = notifications.map {
+                    if (it.id == notif.id) it.copy(isRead = true) else it
+                }
+                showNotificationsDialog = false
+                if (notif.targetTab != null) {
+                    currentTab = notif.targetTab
+                }
+            },
+            onMarkAllAsRead = {
+                notifications = notifications.map { it.copy(isRead = true) }
+            }
+        )
+    }
+
     // --- Main Scaffold ---
     DxScaffold(
         topBar = {
+            val topBarActions: @Composable RowScope.() -> Unit = {
+                // User Name Chip
+                Surface(
+                    onClick = { currentTab = 3 },
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
+                    modifier = Modifier.padding(end = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(24.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = (userFullName.ifBlank { email }).firstOrNull()?.uppercase() ?: "U",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
+                        Text(
+                            text = userFullName.ifBlank { email.substringBefore("@") },
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // Notification Bell
+                IconButton(
+                    onClick = { showNotificationsDialog = true }
+                ) {
+                    BadgedBox(
+                        badge = {
+                            if (unreadNotificationsCount > 0) {
+                                Badge(
+                                    containerColor = MaterialTheme.colorScheme.error,
+                                    contentColor = MaterialTheme.colorScheme.onError
+                                ) {
+                                    Text("$unreadNotificationsCount")
+                                }
+                            }
+                        }
+                    ) {
+                        Text("🔔", fontSize = 20.sp)
+                    }
+                }
+            }
+
             when (currentTab) {
-                0 -> DxTopBar(showLogo = true)
-                1 -> DxTopBar(title = "Do'konlar")
-                2 -> DxTopBar(title = "Buyurtmalarim")
-                3 -> DxTopBar(title = "Profil")
+                0 -> DxTopBar(showLogo = true, actions = topBarActions)
+                1 -> DxTopBar(title = "Do'konlar", actions = topBarActions)
+                2 -> DxTopBar(title = "Buyurtmalarim", actions = topBarActions)
+                3 -> DxTopBar(title = "Profil", actions = topBarActions)
             }
         },
         bottomBar = {
@@ -464,6 +584,22 @@ private fun CustomerHomeTab(
                         )
                     }
                 }
+            }
+        }
+
+        // Promotional Advertising Banners Carousel
+        if (searchQuery.isBlank()) {
+            item {
+                PromoBannersCarousel(
+                    onBannerClick = { banner ->
+                        when (banner.kind) {
+                            BannerKind.BREAD -> onFilterChange("bakery")
+                            BannerKind.SOMSA -> onFilterChange("pastry")
+                            BannerKind.CAKE -> onFilterChange("confectionery")
+                            BannerKind.PLOV -> onFilterChange("kitchen")
+                        }
+                    }
+                )
             }
         }
 
