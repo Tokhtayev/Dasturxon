@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.dasturxon.core.common.AppResult
 import com.example.dasturxon.core.common.NicknameUtils
 import com.example.dasturxon.data.repository.AuthRepository
+import com.example.dasturxon.data.repository.AuthSessionState
 import com.example.dasturxon.data.repository.PhoneVerificationState
 import com.example.dasturxon.data.repository.UserProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -52,13 +53,45 @@ class AuthViewModel @Inject constructor(
 
     private fun observeAuthState() {
         viewModelScope.launch {
-            authRepository.observeAuthState().collect { profile ->
-                _uiState.update {
-                    it.copy(
-                        userProfile = profile,
-                        isInitialLoading = false,
-                        errorMessage = null
-                    )
+            authRepository.observeSessionState().collect { sessionState ->
+                when (sessionState) {
+                    is AuthSessionState.Ready -> {
+                        _uiState.update {
+                            it.copy(
+                                userProfile = sessionState.profile,
+                                isInitialLoading = false,
+                                errorMessage = null
+                            )
+                        }
+                    }
+                    is AuthSessionState.SignedOut -> {
+                        _uiState.update {
+                            it.copy(
+                                userProfile = null,
+                                isInitialLoading = false
+                            )
+                        }
+                    }
+                    is AuthSessionState.ProfileMissing -> {
+                        _uiState.update {
+                            it.copy(
+                                userProfile = null,
+                                isInitialLoading = false,
+                                errorMessage = "Foydalanuvchi profili topilmadi."
+                            )
+                        }
+                    }
+                    is AuthSessionState.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isInitialLoading = false,
+                                errorMessage = sessionState.message
+                            )
+                        }
+                    }
+                    is AuthSessionState.Loading -> {
+                        _uiState.update { it.copy(isInitialLoading = true) }
+                    }
                 }
             }
         }

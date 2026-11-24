@@ -30,14 +30,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
+import com.example.dasturxon.R
 import com.example.dasturxon.core.common.NicknameUtils
 import com.example.dasturxon.core.designsystem.DxLogo
 import com.example.dasturxon.core.designsystem.DxTextField
 import com.example.dasturxon.data.repository.PhoneVerificationState
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import kotlinx.coroutines.launch
 
 // --- Sign In Screen ---
@@ -208,7 +211,7 @@ fun SignInScreen(
                 DxTextField(
                     value = identifier,
                     onValueChange = { identifier = it },
-                    label = "Nickname yoki Email manzil",
+                    label = "Email manzil (masalan: foydalanuvchi@gmail.com)",
                     keyboardType = KeyboardType.Email,
                     enabled = !uiState.isLoading
                 )
@@ -916,9 +919,14 @@ private suspend fun performGoogleCredentialManagerSignIn(
 ) {
     try {
         val credentialManager = CredentialManager.create(context)
+        val serverClientId = try {
+            context.getString(R.string.default_web_client_id)
+        } catch (_: Exception) {
+            "437798898747-default.apps.googleusercontent.com"
+        }
         val googleIdOption = GetGoogleIdOption.Builder()
             .setFilterByAuthorizedAccounts(false)
-            .setServerClientId("437798898747-default.apps.googleusercontent.com")
+            .setServerClientId(serverClientId)
             .setAutoSelectEnabled(false)
             .build()
 
@@ -929,12 +937,21 @@ private suspend fun performGoogleCredentialManagerSignIn(
         val result = credentialManager.getCredential(context, request)
         val credential = result.credential
 
-        if (credential is GoogleIdTokenCredential) {
+        if (credential is CustomCredential) {
+            if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                try {
+                    val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                    onIdTokenReceived(googleIdTokenCredential.idToken)
+                } catch (_: GoogleIdTokenParsingException) {
+                    Log.w("AuthScreens", "Google credential parsing failed: invalid ID token")
+                }
+            }
+        } else if (credential is GoogleIdTokenCredential) {
             onIdTokenReceived(credential.idToken)
         }
-    } catch (e: GetCredentialException) {
+    } catch (_: GetCredentialException) {
         Log.w("AuthScreens", "Google credential retrieval cancelled or failed")
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         Log.w("AuthScreens", "Google sign in request could not be completed")
     }
 }

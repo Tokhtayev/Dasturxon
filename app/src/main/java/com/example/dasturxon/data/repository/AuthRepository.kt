@@ -15,6 +15,14 @@ data class UserProfile(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+sealed class AuthSessionState {
+    data object Loading : AuthSessionState()
+    data object SignedOut : AuthSessionState()
+    data class Ready(val profile: UserProfile) : AuthSessionState()
+    data class ProfileMissing(val uid: String, val email: String) : AuthSessionState()
+    data class Error(val message: String) : AuthSessionState()
+}
+
 sealed class PhoneVerificationState {
     data object Idle : PhoneVerificationState()
     data object CodeSent : PhoneVerificationState()
@@ -25,6 +33,7 @@ sealed class PhoneVerificationState {
 
 interface AuthRepository {
     fun observeAuthState(): Flow<UserProfile?>
+    fun observeSessionState(): Flow<AuthSessionState>
     suspend fun getProfile(uid: String): AppResult<UserProfile?>
     suspend fun signUpWithEmail(
         nickname: String,
@@ -33,11 +42,9 @@ interface AuthRepository {
         role: String
     ): AppResult<UserProfile>
 
-    suspend fun signUpWithPhone(
-        nickname: String,
-        phone: String,
-        password: String,
-        role: String
+    suspend fun signInWithEmail(
+        email: String,
+        password: String
     ): AppResult<UserProfile>
 
     suspend fun signInWithEmailOrNickname(
@@ -50,12 +57,22 @@ interface AuthRepository {
         selectedRole: String = "customer"
     ): AppResult<UserProfile>
 
+    @Deprecated("Phone sign up is deprecated in favor of email and Google sign-in")
+    suspend fun signUpWithPhone(
+        nickname: String,
+        phone: String,
+        password: String,
+        role: String
+    ): AppResult<UserProfile>
+
+    @Deprecated("Phone verification is deprecated in favor of email and Google sign-in")
     fun startPhoneVerification(
         activity: Activity,
         phoneNumber: String,
         onStateChanged: (PhoneVerificationState) -> Unit
     )
 
+    @Deprecated("Phone verification is deprecated in favor of email and Google sign-in")
     suspend fun verifyPhoneOtpCode(
         verificationId: String,
         code: String,

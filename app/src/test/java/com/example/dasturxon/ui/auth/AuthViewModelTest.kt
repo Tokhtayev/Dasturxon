@@ -225,11 +225,20 @@ class FakeAuthRepository : AuthRepository {
     var signUpCallCount = 0
 
     private val authStateFlow = MutableStateFlow<UserProfile?>(null)
+    private val sessionStateFlow = MutableStateFlow<com.example.dasturxon.data.repository.AuthSessionState>(com.example.dasturxon.data.repository.AuthSessionState.SignedOut)
 
     override fun observeAuthState(): Flow<UserProfile?> = authStateFlow
+    override fun observeSessionState(): Flow<com.example.dasturxon.data.repository.AuthSessionState> = sessionStateFlow
 
     override suspend fun getProfile(uid: String): AppResult<UserProfile?> {
         return AppResult.Success(null)
+    }
+
+    override suspend fun signInWithEmail(
+        email: String,
+        password: String
+    ): AppResult<UserProfile> {
+        return signInWithEmailOrNickname(email, password)
     }
 
     override suspend fun signUpWithEmail(
@@ -258,6 +267,7 @@ class FakeAuthRepository : AuthRepository {
             role = role
         )
         authStateFlow.value = profile
+        sessionStateFlow.value = com.example.dasturxon.data.repository.AuthSessionState.Ready(profile)
         return AppResult.Success(profile)
     }
 
@@ -287,6 +297,7 @@ class FakeAuthRepository : AuthRepository {
             role = "customer"
         )
         authStateFlow.value = profile
+        sessionStateFlow.value = com.example.dasturxon.data.repository.AuthSessionState.Ready(profile)
         return AppResult.Success(profile)
     }
 
@@ -294,7 +305,9 @@ class FakeAuthRepository : AuthRepository {
         idToken: String,
         selectedRole: String
     ): AppResult<UserProfile> {
-        return AppResult.Success(UserProfile("g_uid", "Google", "google", "g@example.com", "", selectedRole))
+        val profile = UserProfile("g_uid", "Google", "google", "g@example.com", "", selectedRole)
+        sessionStateFlow.value = com.example.dasturxon.data.repository.AuthSessionState.Ready(profile)
+        return AppResult.Success(profile)
     }
 
     override fun startPhoneVerification(
@@ -318,5 +331,6 @@ class FakeAuthRepository : AuthRepository {
 
     override suspend fun signOut() {
         authStateFlow.value = null
+        sessionStateFlow.value = com.example.dasturxon.data.repository.AuthSessionState.SignedOut
     }
 }

@@ -26,6 +26,30 @@ class FirebaseAuthRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : AuthRepository {
 
+    override fun observeSessionState(): Flow<AuthSessionState> = callbackFlow {
+        val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+            val firebaseUser = firebaseAuth.currentUser
+            if (firebaseUser == null) {
+                trySend(AuthSessionState.SignedOut)
+            } else {
+                firestore.collection("users").document(firebaseUser.uid).get()
+                    .addOnSuccessListener { doc ->
+                        if (doc.exists()) {
+                            trySend(AuthSessionState.Ready(mapDocumentToProfile(firebaseUser.uid, doc.data.orEmpty())))
+                        } else {
+                            trySend(AuthSessionState.ProfileMissing(firebaseUser.uid, firebaseUser.email.orEmpty()))
+                        }
+                    }
+                    .addOnFailureListener { error ->
+                        // Crucial: A Firestore read failure or offline state must never be interpreted as a successful sign-out!
+                        trySend(AuthSessionState.Error(mapAuthError(error)))
+                    }
+            }
+        }
+        auth.addAuthStateListener(listener)
+        awaitClose { auth.removeAuthStateListener(listener) }
+    }
+
     override fun observeAuthState(): Flow<UserProfile?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
             val firebaseUser = firebaseAuth.currentUser
@@ -36,12 +60,10 @@ class FirebaseAuthRepositoryImpl @Inject constructor(
                     .addOnSuccessListener { doc ->
                         if (doc.exists()) {
                             trySend(mapDocumentToProfile(firebaseUser.uid, doc.data.orEmpty()))
-                        } else {
-                            trySend(null)
                         }
                     }
                     .addOnFailureListener {
-                        trySend(null)
+                        // Crucial: Do not emit null on read failure/offline to prevent unintended sign-out
                     }
             }
         }
@@ -185,28 +207,20 @@ class FirebaseAuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun signInWithEmailOrNickname(
-        identifier: String,
+    override suspend fun signInWithEmail(
+        email: String,
         password: String
     ): AppResult<UserProfile> {
-        val cleanId = identifier.trim()
-        val normalized = NicknameUtils.normalize(cleanId)
+        val cleanEmail = email.trim()
+        if (cleanEmail.isBlank()) {
+            return AppResult.Error(IllegalArgumentException("Email manzilni kiriting."))
+        }
+        if (!cleanEmail.contains("@")) {
+            return AppResult.Error(IllegalArgumentException("Email formati noto'g'ri."))
+        }
 
         return try {
-            val emailToUse: String = if (cleanId.contains("@")) {
-                cleanId
-            } else {
-                val usernameSnap = firestore.collection("usernames").document(normalized).get().await()
-                if (usernameSnap.exists()) {
-                    val uid = usernameSnap.getString("uid") ?: throw IllegalStateException("Hisob topilmadi.")
-                    val userSnap = firestore.collection("users").document(uid).get().await()
-                    userSnap.getString("email") ?: "${normalized}@dasturxon.uz"
-                } else {
-                    "${normalized}@dasturxon.uz"
-                }
-            }
-
-            val authResult = auth.signInWithEmailAndPassword(emailToUse, password).await()
+            val authResult = auth.signInWithEmailAndPassword(cleanEmail, password).await()
             val uid = authResult.user?.uid ?: throw IllegalStateException("Kirish amalga oshmadi.")
             val profileSnap = firestore.collection("users").document(uid).get().await()
 
@@ -218,6 +232,19 @@ class FirebaseAuthRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             AppResult.Error(Exception(mapAuthError(e)))
         }
+    }
+
+    override suspend fun signInWithEmailOrNickname(
+        identifier: String,
+        password: String
+    ): AppResult<UserProfile> {
+        val cleanId = identifier.trim()
+        if (!cleanId.contains("@")) {
+            return AppResult.Error(
+                IllegalArgumentException("Iltimos, haqiqiy email manzilingizni kiriting (masalan: foydalanuvchi@gmail.com). Nickname faqat profilingiz uchun nom hisoblanadi.")
+            )
+        }
+        return signInWithEmail(cleanId, password)
     }
 
     override suspend fun signInWithGoogleCredential(
@@ -386,11 +413,20 @@ class FirebaseAuthRepositoryImpl @Inject constructor(
         if (error.message.orEmpty().contains("CONFIGURATION_NOT_FOUND")) {
             return "Firebase Console'da Authentication bo'limida kirish usullarini yoqing."
         }
+        if (error is com.google.firebase.firestore.FirebaseFirestoreException) {
+            return when (error.code) {
+                com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+                    "Ruxsat cheklangan yoki hisob ma'lumotlariga kirish taqiqlangan."
+                com.google.firebase.firestore.FirebaseFirestoreException.Code.UNAVAILABLE ->
+                    "Internet aloqasi mavjud emas yoki server bilan aloqa uzildi."
+                else -> "Ma'lumotlar bazasida xatolik yuz berdi."
+            }
+        }
         return when ((error as? FirebaseAuthException)?.errorCode) {
-            "ERROR_INVALID_EMAIL" -> "Email yoki nickname formati noto'g'ri."
+            "ERROR_INVALID_EMAIL" -> "Email manzili formati noto'g'ri."
             "ERROR_USER_NOT_FOUND", "ERROR_WRONG_PASSWORD", "ERROR_INVALID_CREDENTIAL" ->
-                "Email, nickname yoki parol noto'g'ri."
-            "ERROR_EMAIL_ALREADY_IN_USE" -> "Ushbu email bilan hisob allaqachon yaratilgan."
+                "Email yoki parol noto'g'ri."
+            "ERROR_EMAIL_ALREADY_IN_USE" -> "Ushbu email bilan hisob allaqachon mavjud."
             "ERROR_WEAK_PASSWORD" -> "Parol kamida 8 belgi, harf va raqamdan iborat bo'lishi kerak."
             "ERROR_TOO_MANY_REQUESTS" -> "Urinishlar soni ko'p bo'ldi. Birozdan keyin qayta urinib ko'ring."
             "ERROR_NETWORK_REQUEST_FAILED" -> "Internet aloqasini tekshiring."
