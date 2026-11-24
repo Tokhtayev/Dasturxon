@@ -1659,7 +1659,6 @@ private fun ProductEditor(
     var stockText by rememberSaveable(business.id) { mutableStateOf("") }
     var discountText by rememberSaveable(business.id) { mutableStateOf("0") }
     var discountEndMillis by rememberSaveable(business.id) { mutableStateOf<Long?>(null) }
-    var imageBase64 by rememberSaveable(business.id) { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -1667,24 +1666,7 @@ private fun ProductEditor(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            try {
-                val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
-                } else {
-                    @Suppress("DEPRECATION")
-                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                }
-                val maxDimension = 600
-                val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
-                val targetWidth = if (ratio > 1) maxDimension else (maxDimension * ratio).toInt().coerceAtLeast(1)
-                val targetHeight = if (ratio > 1) (maxDimension / ratio).toInt().coerceAtLeast(1) else maxDimension
-                val scaled = Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
-                val stream = ByteArrayOutputStream()
-                scaled.compress(Bitmap.CompressFormat.JPEG, 75, stream)
-                imageBase64 = Base64.encodeToString(stream.toByteArray(), Base64.DEFAULT)
-            } catch (_: Exception) {
-                onError("Rasmni yuklashda xatolik yuz berdi.")
-            }
+            onError("Rasm yuklash bepul Spark tarifida bloklangan (Firebase Storage talab qilinadi). Avtomatik taom belgilari ishlatiladi.")
         }
     }
 
@@ -1695,37 +1677,13 @@ private fun ProductEditor(
     OutlinedTextField(stockText, { stockText = it.filter(Char::isDigit) }, label = { Text("Mavjud zaxira (dona)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
     OutlinedTextField(discountText, { discountText = it.filter(Char::isDigit) }, label = { Text("Chegirma foizi (0–90)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
 
-    if (imageBase64.isNotBlank()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val bytes = Base64.decode(imageBase64, Base64.DEFAULT)
-            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            if (bmp != null) {
-                Image(
-                    bitmap = bmp,
-                    contentDescription = "Mahsulot rasmi",
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            TextButton(onClick = { imageBase64 = "" }) {
-                Text("Rasmni olib tashlash", color = MaterialTheme.colorScheme.error)
-            }
-        }
-    } else {
-        OutlinedButton(
-            onClick = {
-                imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("📷 Rasm tanlash (ixtiyoriy)")
-        }
+    OutlinedButton(
+        onClick = {
+            imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text("📷 Rasm yuklash (Spark tarifida bloklangan)")
     }
 
     OutlinedButton(
@@ -1775,7 +1733,7 @@ private fun ProductEditor(
                         discountPercent = discount,
                         discountEndsAt = discountEndMillis?.let { Timestamp(Date(it)) },
                         costPrice = costPrice,
-                        image = imageBase64
+                        image = ""
                     ) { result ->
                         saving = false
                         result.onSuccess {
@@ -1786,7 +1744,6 @@ private fun ProductEditor(
                             stockText = ""
                             discountText = "0"
                             discountEndMillis = null
-                            imageBase64 = ""
                             onSuccess()
                         }.onFailure { onError(it.localizedMessage ?: "Mahsulotni saqlab bo'lmadi.") }
                     }

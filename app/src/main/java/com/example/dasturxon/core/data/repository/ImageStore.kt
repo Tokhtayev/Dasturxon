@@ -1,9 +1,8 @@
 package com.example.dasturxon.core.data.repository
 
-import android.graphics.Bitmap
+import android.net.Uri
 import com.example.dasturxon.core.common.AppResult
 
 interface ImageStore {
-    suspend fun compressAndEncodeImage(bitmap: Bitmap): AppResult<String>
-    suspend fun decodeImage(base64String: String): AppResult<Bitmap>
+    suspend fun uploadProductImage(productId: String, imageUri: Uri): AppResult<String>
 }
