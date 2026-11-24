@@ -31,10 +31,13 @@ fun CheckoutSheet(
     isSubmitting: Boolean,
     submitError: String?,
     onDismiss: () -> Unit,
-    onConfirm: (quantity: Long, pickupTime: Timestamp) -> Unit
+    onConfirm: (quantity: Long, pickupTime: Timestamp, fulfillmentType: String, deliveryAddress: String, customerPhone: String) -> Unit
 ) {
     val context = LocalContext.current
     var quantity by rememberSaveable(product.id) { mutableIntStateOf(1) }
+    var fulfillmentType by rememberSaveable(product.id) { mutableStateOf("pickup") }
+    var deliveryAddress by rememberSaveable(product.id) { mutableStateOf("") }
+    var contactPhone by rememberSaveable(product.id) { mutableStateOf("") }
     var pickupMillis by rememberSaveable(product.id) {
         mutableLongStateOf(System.currentTimeMillis() + 60 * 60 * 1000L)
     }
@@ -54,6 +57,7 @@ fun CheckoutSheet(
     val maxQty = product.stock?.coerceAtMost(99L)?.toInt() ?: 99
     val isPickupValid = pickupMillis > System.currentTimeMillis()
     val isStockValid = product.stock == null || quantity <= product.stock
+    val isDeliveryValid = fulfillmentType == "pickup" || (deliveryAddress.isNotBlank() && contactPhone.isNotBlank())
 
     fun openDateTimePicker() {
         val current = Calendar.getInstance().apply { timeInMillis = pickupMillis }
@@ -197,10 +201,57 @@ fun CheckoutSheet(
 
             HorizontalDivider()
 
+            // Fulfillment option
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Qabul qilish usuli",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    FilterChip(
+                        selected = fulfillmentType == "pickup",
+                        onClick = { fulfillmentType = "pickup" },
+                        label = { Text("🛍️ Olib ketish") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = fulfillmentType == "delivery",
+                        onClick = { fulfillmentType = "delivery" },
+                        label = { Text("🚚 Yetkazib berish") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                if (fulfillmentType == "delivery") {
+                    OutlinedTextField(
+                        value = deliveryAddress,
+                        onValueChange = { deliveryAddress = it },
+                        label = { Text("Yetkazib berish manzili") },
+                        placeholder = { Text("Chilonzor, 12-mavze, 4-uy, 15-xonadon") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = false
+                    )
+                    OutlinedTextField(
+                        value = contactPhone,
+                        onValueChange = { contactPhone = it },
+                        label = { Text("Bog'lanish uchun telefon") },
+                        placeholder = { Text("+998 90 123 45 67") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+            }
+
+            HorizontalDivider()
+
             // Pickup time section
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Olib ketish vaqti",
+                    text = if (fulfillmentType == "delivery") "Yetkazish vaqti" else "Olib ketish vaqti",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -328,11 +379,17 @@ fun CheckoutSheet(
             // Confirm button
             Button(
                 onClick = {
-                    if (isPickupValid && isStockValid && quantity > 0) {
-                        onConfirm(quantity.toLong(), Timestamp(Date(pickupMillis)))
+                    if (isPickupValid && isStockValid && quantity > 0 && isDeliveryValid) {
+                        onConfirm(
+                            quantity.toLong(),
+                            Timestamp(Date(pickupMillis)),
+                            fulfillmentType,
+                            deliveryAddress.trim(),
+                            contactPhone.trim()
+                        )
                     }
                 },
-                enabled = !isSubmitting && isPickupValid && isStockValid && quantity > 0,
+                enabled = !isSubmitting && isPickupValid && isStockValid && quantity > 0 && isDeliveryValid,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),

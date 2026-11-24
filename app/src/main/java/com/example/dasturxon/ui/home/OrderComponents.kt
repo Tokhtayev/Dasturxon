@@ -2,6 +2,8 @@ package com.example.dasturxon.ui.home
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -257,8 +259,37 @@ internal fun OrderCard(
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary
             )
-            order.pickupTime?.let {
-                Text("Olib ketish: " + SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(it.toDate()), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+            val isDelivery = order.fulfillmentType == "delivery"
+            Text(
+                text = if (isDelivery) "🚚 Yetkazib berish: ${order.deliveryAddress.ifBlank { "Manzil ko'rsatilmagan" }}"
+                       else "🛍️ Olib ketish: " + (order.pickupTime?.let { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(it.toDate()) } ?: "Vaqt belgilanmagan"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (order.customerPhone.isNotBlank()) {
+                val context = LocalContext.current
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Mijoz: ${order.customerName.ifBlank { order.customerPhone }}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    if (ownerActions) {
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${order.customerPhone}"))
+                                context.startActivity(intent)
+                            },
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                        ) {
+                            Text("📞 Qo'ng'iroq")
+                        }
+                    }
+                }
             }
             if (ownerActions) {
                 Spacer(Modifier.height(4.dp))

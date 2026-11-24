@@ -48,6 +48,10 @@ open class OrderRepository {
         product: Product,
         quantity: Long,
         pickupTime: Timestamp,
+        fulfillmentType: String = "pickup",
+        deliveryAddress: String = "",
+        customerPhone: String = "",
+        customerName: String = "",
         onComplete: (Result<Unit>) -> Unit
     ) {
         val productRef = db().collection("products").document(product.id)
@@ -95,6 +99,10 @@ open class OrderRepository {
                 "totalPrice" to totalPrice,
                 "status" to "new",
                 "pickupTime" to pickupTime,
+                "fulfillmentType" to fulfillmentType,
+                "deliveryAddress" to deliveryAddress,
+                "customerPhone" to customerPhone,
+                "customerName" to customerName,
                 "createdAt" to FieldValue.serverTimestamp()
             )
             transaction.set(orderRef, order)

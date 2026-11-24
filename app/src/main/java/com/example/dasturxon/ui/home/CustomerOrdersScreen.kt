@@ -407,6 +407,15 @@ private fun OrderDetailScreen(
                 Text(stringResource(R.string.order_quantity, order.quantity))
                 order.unitPrice?.let { Text(stringResource(R.string.order_unit_price, formatPrice(it))) }
                 Text(stringResource(R.string.order_total_price, formatPrice(order.totalPrice)))
+                val isDelivery = order.fulfillmentType == "delivery"
+                Text(
+                    text = if (isDelivery) "🚚 Yetkazib berish" else "🛍️ Olib ketish",
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (isDelivery && order.deliveryAddress.isNotBlank()) {
+                    Text("Manzil: ${order.deliveryAddress}")
+                }
                 Text(stringResource(R.string.order_pickup_time, pickup))
                 Text(stringResource(R.string.order_created_time, created))
                 OrderStatusTimeline(order.status)

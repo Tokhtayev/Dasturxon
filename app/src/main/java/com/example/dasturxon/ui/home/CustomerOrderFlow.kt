@@ -229,7 +229,7 @@ internal fun CustomerOrderFlow(
                     checkoutError = null
                 }
             },
-            onConfirm = { quantity, pickupTime: Timestamp ->
+            onConfirm = { quantity, pickupTime, fulfillmentType, deliveryAddress, customerPhone ->
                 val business = effectiveBusinesses.find { it.id == product.businessId } ?: Business(
                     id = product.businessId,
                     ownerId = "",
@@ -241,7 +241,17 @@ internal fun CustomerOrderFlow(
                 )
                 isSubmitting = true
                 checkoutError = null
-                orderRepository.create(uid, business, product, quantity, pickupTime) { result ->
+                orderRepository.create(
+                    customerId = uid,
+                    business = business,
+                    product = product,
+                    quantity = quantity,
+                    pickupTime = pickupTime,
+                    fulfillmentType = fulfillmentType,
+                    deliveryAddress = deliveryAddress,
+                    customerPhone = customerPhone,
+                    customerName = fullName
+                ) { result ->
                     isSubmitting = false
                     result.onSuccess {
                         checkoutProduct = null
@@ -252,7 +262,17 @@ internal fun CustomerOrderFlow(
                         // Automatically seed demo products/business to Firestore and retry order transaction
                         DemoData.seedToFirestore(firestore, uid) { seeded, _ ->
                             if (seeded) {
-                                orderRepository.create(uid, business, product, quantity, pickupTime) { retryResult ->
+                                orderRepository.create(
+                                    customerId = uid,
+                                    business = business,
+                                    product = product,
+                                    quantity = quantity,
+                                    pickupTime = pickupTime,
+                                    fulfillmentType = fulfillmentType,
+                                    deliveryAddress = deliveryAddress,
+                                    customerPhone = customerPhone,
+                                    customerName = fullName
+                                ) { retryResult ->
                                     retryResult.onSuccess {
                                         checkoutProduct = null
                                         selectedProduct = null

@@ -14,7 +14,11 @@ data class CustomerOrder(
     val pickupTime: Timestamp?,
     val productId: String = "",
     val unitPrice: Long? = null,
-    val createdAt: Timestamp? = null
+    val createdAt: Timestamp? = null,
+    val fulfillmentType: String = "pickup",
+    val deliveryAddress: String = "",
+    val customerPhone: String = "",
+    val customerName: String = ""
 ) {
     companion object {
         fun fromDocument(id: String, data: Map<String, Any?>): CustomerOrder {
@@ -41,7 +45,11 @@ data class CustomerOrder(
                     ?: data["productId"] as? String
                     ?: "",
                 unitPrice = item?.get("priceAtOrder") as? Long,
-                createdAt = data["createdAt"] as? Timestamp
+                createdAt = data["createdAt"] as? Timestamp,
+                fulfillmentType = data["fulfillmentType"] as? String ?: "pickup",
+                deliveryAddress = (data["deliveryAddress"] as? String).orEmpty(),
+                customerPhone = (data["customerPhone"] as? String).orEmpty(),
+                customerName = (data["customerName"] as? String).orEmpty()
             )
         }
     }
