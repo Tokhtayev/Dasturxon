@@ -354,6 +354,33 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    fun deleteAccount(onComplete: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            when (val res = authRepository.deleteCurrentAccount()) {
+                is AppResult.Success -> {
+                    _uiState.update {
+                        AuthUiState(
+                            isInitialLoading = false,
+                            userProfile = null,
+                            statusMessage = "Hisobingiz va ma'lumotlaringiz muvaffaqiyatli o'chirildi."
+                        )
+                    }
+                    onComplete(true)
+                }
+                is AppResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = res.exception.localizedMessage ?: "Hisobni o'chirishda xatolik yuz berdi."
+                        )
+                    }
+                    onComplete(false)
+                }
+            }
+        }
+    }
+
     private fun validateSignUpInput(nickname: String, contact: String, pass: String): Boolean {
         val errors = mutableMapOf<String, String>()
 

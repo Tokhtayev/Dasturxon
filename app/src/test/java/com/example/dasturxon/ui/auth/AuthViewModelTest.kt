@@ -333,4 +333,10 @@ class FakeAuthRepository : AuthRepository {
         authStateFlow.value = null
         sessionStateFlow.value = com.example.dasturxon.data.repository.AuthSessionState.SignedOut
     }
+
+    override suspend fun deleteCurrentAccount(): AppResult<Unit> {
+        authStateFlow.value = null
+        sessionStateFlow.value = com.example.dasturxon.data.repository.AuthSessionState.SignedOut
+        return AppResult.Success(Unit)
+    }
 }

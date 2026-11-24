@@ -52,8 +52,13 @@ fun SignInScreen(
     onPhoneOtpStart: (activity: Activity, phone: String) -> Unit,
     onPhoneOtpVerify: (verificationId: String, code: String, role: String) -> Unit,
     onGoToRegister: () -> Unit,
-    onForgotPassword: (email: String) -> Unit
+    onForgotPassword: (email: String) -> Unit,
+    onClearMessages: () -> Unit = {}
 ) {
+    LaunchedEffect(Unit) {
+        onClearMessages()
+    }
+
     var identifier by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var selectedRole by rememberSaveable { mutableStateOf(uiState.selectedEntryRole ?: "customer") }
@@ -211,7 +216,7 @@ fun SignInScreen(
                 DxTextField(
                     value = identifier,
                     onValueChange = { identifier = it },
-                    label = "Email manzil (masalan: foydalanuvchi@gmail.com)",
+                    label = "Email manzil",
                     keyboardType = KeyboardType.Email,
                     enabled = !uiState.isLoading
                 )

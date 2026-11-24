@@ -23,7 +23,8 @@ fun CustomerProfileScreen(
     onSignOut: () -> Unit,
     onOrdersClick: () -> Unit,
     onUpdateFullName: (suspend (String) -> Unit)? = null,
-    onSwitchToOwner: (() -> Unit)? = null
+    onSwitchToOwner: (() -> Unit)? = null,
+    onDeleteAccount: (() -> Unit)? = null
 ) {
     var currentFullName by remember(fullName) { mutableStateOf(fullName) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
@@ -33,6 +34,7 @@ fun CustomerProfileScreen(
     val coroutineScope = rememberCoroutineScope()
 
     var showSignOutDialog by remember { mutableStateOf(false) }
+    var showDeleteAccountDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -57,6 +59,27 @@ fun CustomerProfileScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showSignOutDialog = false }) { Text("Bekor qilish") }
+            }
+        )
+    }
+
+    // Delete account confirmation dialog
+    if (showDeleteAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAccountDialog = false },
+            title = { Text("Hisobni butunlay o'chirish", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
+            text = { Text("Haqiqatan ham hisobingizni va barcha ma'lumotlaringizni o'chirib yubormoqchimisiz? Ushbu amal ortga qaytarilmaydi va barcha ma'lumotlaringiz tozalanadi.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteAccountDialog = false
+                        onDeleteAccount?.invoke()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Ha, o'chirish") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteAccountDialog = false }) { Text("Bekor qilish") }
             }
         )
     }
@@ -498,7 +521,19 @@ fun CustomerProfileScreen(
             ) {
                 Text("🚪  Chiqish", fontWeight = FontWeight.SemiBold)
             }
-            Spacer(Modifier.height(16.dp))
+
+            if (onDeleteAccount != null) {
+                Spacer(Modifier.height(10.dp))
+                OutlinedButton(
+                    onClick = { showDeleteAccountDialog = true },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("🗑️  Hisobni butunlay o'chirish (tozalash)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                }
+            }
+            Spacer(Modifier.height(24.dp))
         }
     }
 }

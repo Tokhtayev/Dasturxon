@@ -80,7 +80,8 @@ private fun AuthRootContainer(
                 fullName = profile.fullName,
                 role = uiState.selectedEntryRole ?: profile.role,
                 firestore = firestore,
-                onSignOut = { viewModel.signOut() }
+                onSignOut = { viewModel.signOut() },
+                onDeleteAccount = { viewModel.deleteAccount() }
             )
         }
         uiState.isRegisterMode -> {
@@ -122,7 +123,8 @@ private fun AuthRootContainer(
                 onGoToRegister = { viewModel.toggleRegisterMode(true) },
                 onForgotPassword = { email ->
                     viewModel.sendPasswordResetEmail(email)
-                }
+                },
+                onClearMessages = { viewModel.clearMessages() }
             )
         }
     }

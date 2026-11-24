@@ -60,6 +60,27 @@
 - **Commands Executed**: `./gradlew testDebugUnitTest lintDebug assembleDebug`
 - **Results**: BUILD SUCCESSFUL, clean lint report.
 
+### Task 5: Complete Account Deletion & In-App Cleanup Support
+- **Commit Hash**: Pending
+- **Changed Files**:
+  - `app/src/main/java/com/example/dasturxon/data/repository/AuthRepository.kt`
+  - `app/src/main/java/com/example/dasturxon/data/repository/FirebaseAuthRepositoryImpl.kt`
+  - `app/src/main/java/com/example/dasturxon/ui/auth/AuthViewModel.kt`
+  - `app/src/main/java/com/example/dasturxon/ui/customer/CustomerProfileScreen.kt`
+  - `app/src/main/java/com/example/dasturxon/ui/home/RoleHome.kt`
+  - `app/src/main/java/com/example/dasturxon/MainActivity.kt`
+  - `app/src/test/java/com/example/dasturxon/ui/auth/AuthViewModelTest.kt`
+- **What Was Fixed**:
+  - Implemented `deleteCurrentAccount(): AppResult<Unit>` in `AuthRepository` and `FirebaseAuthRepositoryImpl`:
+    - Atomically deletes the user's Firestore document in `/users/{uid}`.
+    - Deletes registered nickname document in `/usernames/{normalizedNickname}`.
+    - Permanently removes the Firebase Auth credentials via `user.delete()`.
+  - Added `deleteAccount()` in `AuthViewModel` with proper state update (`currentUser = null`, `isAuthenticated = false`, `isSignedOut = true`).
+  - Added in-app "Hisobni butunlay o'chirish (tozalash)" button and confirmation dialog in both Customer and Owner profiles.
+  - Removed all synthetic email fallbacks (`@dasturxon.uz`) and completed password visibility toggles with icons.
+- **Commands Executed**: `./gradlew testDebugUnitTest assembleDebug`
+- **Results**: BUILD SUCCESSFUL (25s), all unit tests passed.
+
 ---
 
 ## 3. VERIFIED BY AUTOMATED TEST

@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -105,7 +106,8 @@ fun RoleHome(
     role: String,
     firestore: FirebaseFirestore,
     onSignOut: () -> Unit,
-    fullName: String = ""
+    fullName: String = "",
+    onDeleteAccount: () -> Unit = {}
 ) {
     var activeRole by rememberSaveable(uid) { mutableStateOf(role) }
 
@@ -115,7 +117,8 @@ fun RoleHome(
             email = email,
             firestore = firestore,
             onSignOut = onSignOut,
-            onSwitchToCustomer = { activeRole = "customer" }
+            onSwitchToCustomer = { activeRole = "customer" },
+            onDeleteAccount = onDeleteAccount
         )
         "admin" -> AdminHome(email, firestore, onSignOut)
         else -> CustomerOrderFlow(
@@ -124,7 +127,8 @@ fun RoleHome(
             fullName = fullName,
             firestore = firestore,
             onSignOut = onSignOut,
-            onSwitchToOwner = { activeRole = "owner" }
+            onSwitchToOwner = { activeRole = "owner" },
+            onDeleteAccount = onDeleteAccount
         )
     }
 }
@@ -135,7 +139,8 @@ private fun OwnerHome(
     email: String,
     firestore: FirebaseFirestore,
     onSignOut: () -> Unit,
-    onSwitchToCustomer: () -> Unit = {}
+    onSwitchToCustomer: () -> Unit = {},
+    onDeleteAccount: () -> Unit = {}
 ) {
     val businessRepository = remember(firestore) { BusinessRepository(firestore) }
     val productRepository = remember(firestore) { ProductRepository(firestore) }
@@ -156,6 +161,7 @@ private fun OwnerHome(
     var showAddProductDialog by rememberSaveable { mutableStateOf(false) }
     var showAddExpenseDialog by rememberSaveable { mutableStateOf(false) }
     var showEditBusinessDialog by rememberSaveable { mutableStateOf(false) }
+    var showDeleteAccountDialog by rememberSaveable { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     // Product tab filter
@@ -1059,6 +1065,17 @@ private fun OwnerHome(
                         ) {
                             Text("Chiqish")
                         }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        OutlinedButton(
+                            onClick = { showDeleteAccountDialog = true },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Text("🗑️  Hisobni butunlay o'chirish (tozalash)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
                     }
                 }
             }
@@ -1121,6 +1138,35 @@ private fun OwnerHome(
             dismissButton = {
                 TextButton(onClick = { showEditBusinessDialog = false }) {
                     Text("Yopish")
+                }
+            }
+        )
+    }
+
+    // Delete account dialog
+    if (showDeleteAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAccountDialog = false },
+            title = { Text("Hisobni o'chirishni tasdiqlaysizmi?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Bu amal hisobingizni, shaxsiy ma'lumotlaringizni va ro'yxatdan o'tgan nomingizni (nickname) butunlay o'chirib tashlaydi. Ushbu email orqali keyin yangidan ro'yxatdan o'tishingiz mumkin bo'ladi."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteAccountDialog = false
+                        onDeleteAccount()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Ha, o'chirilsin")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteAccountDialog = false }) {
+                    Text("Bekor qilish")
                 }
             }
         )

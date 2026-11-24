@@ -81,4 +81,5 @@ interface AuthRepository {
 
     suspend fun sendPasswordResetEmail(email: String): AppResult<Unit>
     suspend fun signOut()
+    suspend fun deleteCurrentAccount(): AppResult<Unit>
 }

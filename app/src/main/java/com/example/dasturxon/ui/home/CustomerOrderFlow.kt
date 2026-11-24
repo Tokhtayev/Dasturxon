@@ -64,7 +64,8 @@ internal fun CustomerOrderFlow(
     fullName: String = "",
     firestore: FirebaseFirestore,
     onSignOut: () -> Unit,
-    onSwitchToOwner: () -> Unit = {}
+    onSwitchToOwner: () -> Unit = {},
+    onDeleteAccount: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val productRepository = remember(firestore) { ProductRepository(firestore) }
@@ -522,7 +523,8 @@ internal fun CustomerOrderFlow(
                                     .await()
                             }
                             userFullName = newName
-                        }
+                        },
+                        onDeleteAccount = onDeleteAccount
                     )
                 }
             }
