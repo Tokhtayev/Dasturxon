@@ -1,11 +1,14 @@
 package com.example.dasturxon.ui.customer
 
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Base64
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -151,24 +156,44 @@ fun ProductDetailScreen(
                     .height(260.dp)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                // Type-colored gradient + food icon placeholder
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                                    MaterialTheme.colorScheme.primaryContainer
+                val imageBitmap = remember(product.image) {
+                    if (product.image.isNotBlank()) {
+                        try {
+                            val bytes = Base64.decode(product.image, Base64.DEFAULT)
+                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } else null
+                }
+
+                if (imageBitmap != null) {
+                    Image(
+                        bitmap = imageBitmap,
+                        contentDescription = product.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    // Type-colored gradient + food icon placeholder
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    )
                                 )
                             )
-                        )
-                )
-                Text(
-                    text = productEmoji(product),
-                    fontSize = 80.sp,
-                    modifier = Modifier.align(Alignment.Center)
-                )
+                    )
+                    Text(
+                        text = productEmoji(product),
+                        fontSize = 80.sp,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
 
                 // Badges top-start
                 Row(

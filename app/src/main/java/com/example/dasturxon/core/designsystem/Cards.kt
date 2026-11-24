@@ -1,5 +1,8 @@
 package com.example.dasturxon.core.designsystem
 
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,9 +22,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -37,6 +43,7 @@ fun ProductCard(
     onOrderClick: (() -> Unit)? = null,
     showOwnerActions: Boolean = false,
     onEditClick: (() -> Unit)? = null,
+    onDeleteClick: (() -> Unit)? = null,
     onStatusChange: ((String) -> Unit)? = null
 ) {
     Card(
@@ -53,19 +60,41 @@ fun ProductCard(
                     .aspectRatio(16f / 9f)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                // Central subtle food icon placeholder
-                Text(
-                    text = when {
-                        product.name.contains("non", ignoreCase = true) -> "🥖"
-                        product.name.contains("somsa", ignoreCase = true) -> "🥟"
-                        product.name.contains("osh", ignoreCase = true) -> "🍲"
-                        product.name.contains("choy", ignoreCase = true) -> "🫖"
-                        product.name.contains("tort", ignoreCase = true) || product.name.contains("pishiriq", ignoreCase = true) -> "🍰"
-                        else -> "🍽️"
-                    },
-                    style = MaterialTheme.typography.displayLarge,
-                    modifier = Modifier.align(Alignment.Center)
-                )
+                val imageBitmap = remember(product.image) {
+                    if (product.image.isNotBlank()) {
+                        try {
+                            val bytes = Base64.decode(product.image, Base64.DEFAULT)
+                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } else null
+                }
+
+                if (imageBitmap != null) {
+                    Image(
+                        bitmap = imageBitmap,
+                        contentDescription = product.name,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    // Central subtle food icon placeholder
+                    Text(
+                        text = when {
+                            product.name.contains("non", ignoreCase = true) -> "🥖"
+                            product.name.contains("somsa", ignoreCase = true) -> "🥟"
+                            product.name.contains("osh", ignoreCase = true) -> "🍲"
+                            product.name.contains("choy", ignoreCase = true) -> "🫖"
+                            product.name.contains("tort", ignoreCase = true) || product.name.contains("pishiriq", ignoreCase = true) -> "🍰"
+                            else -> "🍽️"
+                        },
+                        style = MaterialTheme.typography.displayLarge,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
 
                 // Top Start: Live status badge
                 if (product.status == "hot_ready") {
@@ -147,7 +176,16 @@ fun ProductCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    PriceText(price = product.price, discountPercent = product.discountPercent)
+                    Column {
+                        PriceText(price = product.price, discountPercent = product.discountPercent)
+                        if (showOwnerActions && product.costPrice > 0L) {
+                            Text(
+                                text = "Tannarxi: ${"%,d".format(product.costPrice).replace(',', ' ')} so'm",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
 
                     if (onOrderClick != null && product.status != "sold_out") {
                         androidx.compose.material3.Button(
@@ -172,6 +210,18 @@ fun ProductCard(
                                 shape = RoundedCornerShape(10.dp)
                             ) {
                                 Text("Tahrirlash")
+                            }
+                        }
+                        onDeleteClick?.let {
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = it,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Text("O'chirish")
                             }
                         }
                         if (onStatusChange != null) {

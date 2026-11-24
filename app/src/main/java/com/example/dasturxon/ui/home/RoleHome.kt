@@ -2,7 +2,17 @@ package com.example.dasturxon.ui.home
 
 import android.app.DatePickerDialog
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,11 +59,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.io.ByteArrayOutputStream
 import com.example.dasturxon.R
 import com.example.dasturxon.core.common.MoneyFormatter
 import com.example.dasturxon.core.designsystem.DxScaffold
@@ -533,6 +548,11 @@ private fun OwnerHome(
                                     onClick = { editingProduct = product },
                                     showOwnerActions = true,
                                     onEditClick = { editingProduct = product },
+                                    onDeleteClick = {
+                                        productRepository.delete(product.id) { result ->
+                                            result.onFailure { errorMessage = it.localizedMessage ?: "Mahsulotni o'chirib bo'lmadi." }
+                                        }
+                                    },
                                     onStatusChange = { newStatus ->
                                         productRepository.setStatus(product.id, newStatus) { result ->
                                             result.onFailure { errorMessage = it.localizedMessage ?: "Holat o'zgarmadi." }
@@ -863,13 +883,20 @@ private fun OwnerHome(
     editingProduct?.let { product ->
         ProductEditDialog(
             product = product,
-            onDismiss = { editingProduct = null }
-        ) { name, description, price, stock, discount, endAt ->
-            productRepository.updateProduct(product, name, description, price, stock, discount, endAt) { result ->
-                result.onSuccess { editingProduct = null }
-                    .onFailure { errorMessage = it.localizedMessage ?: "Mahsulotni yangilab bo'lmadi." }
+            onDismiss = { editingProduct = null },
+            onSave = { name, description, price, stock, discount, endAt, costPrice ->
+                productRepository.updateProduct(product, name, description, price, stock, discount, endAt, costPrice) { result ->
+                    result.onSuccess { editingProduct = null }
+                        .onFailure { errorMessage = it.localizedMessage ?: "Mahsulotni yangilab bo'lmadi." }
+                }
+            },
+            onDelete = {
+                productRepository.delete(product.id) { result ->
+                    result.onSuccess { editingProduct = null }
+                        .onFailure { errorMessage = it.localizedMessage ?: "Mahsulotni o'chirib bo'lmadi." }
+                }
             }
-        }
+        )
     }
 }
 
@@ -1385,17 +1412,79 @@ private fun ProductEditor(
     var name by rememberSaveable(business.id) { mutableStateOf("") }
     var description by rememberSaveable(business.id) { mutableStateOf("") }
     var priceText by rememberSaveable(business.id) { mutableStateOf("") }
+    var costPriceText by rememberSaveable(business.id) { mutableStateOf("") }
     var stockText by rememberSaveable(business.id) { mutableStateOf("") }
     var discountText by rememberSaveable(business.id) { mutableStateOf("0") }
     var discountEndMillis by rememberSaveable(business.id) { mutableStateOf<Long?>(null) }
+    var imageBase64 by rememberSaveable(business.id) { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                }
+                val maxDimension = 600
+                val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+                val targetWidth = if (ratio > 1) maxDimension else (maxDimension * ratio).toInt().coerceAtLeast(1)
+                val targetHeight = if (ratio > 1) (maxDimension / ratio).toInt().coerceAtLeast(1) else maxDimension
+                val scaled = Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
+                val stream = ByteArrayOutputStream()
+                scaled.compress(Bitmap.CompressFormat.JPEG, 75, stream)
+                imageBase64 = Base64.encodeToString(stream.toByteArray(), Base64.DEFAULT)
+            } catch (_: Exception) {
+                onError("Rasmni yuklashda xatolik yuz berdi.")
+            }
+        }
+    }
+
     OutlinedTextField(name, { name = it }, label = { Text("Mahsulot nomi") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
     OutlinedTextField(description, { description = it }, label = { Text("Tavsif (ixtiyoriy)") }, modifier = Modifier.fillMaxWidth())
-    OutlinedTextField(priceText, { priceText = it.filter(Char::isDigit) }, label = { Text("Narx (so'm)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+    OutlinedTextField(priceText, { priceText = it.filter(Char::isDigit) }, label = { Text("Sotish narxi (so'm)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+    OutlinedTextField(costPriceText, { costPriceText = it.filter(Char::isDigit) }, label = { Text("Tannarxi (so'm, ixtiyoriy)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
     OutlinedTextField(stockText, { stockText = it.filter(Char::isDigit) }, label = { Text("Mavjud zaxira (dona)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
     OutlinedTextField(discountText, { discountText = it.filter(Char::isDigit) }, label = { Text("Chegirma foizi (0–90)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+
+    if (imageBase64.isNotBlank()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val bytes = Base64.decode(imageBase64, Base64.DEFAULT)
+            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            if (bmp != null) {
+                Image(
+                    bitmap = bmp,
+                    contentDescription = "Mahsulot rasmi",
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            TextButton(onClick = { imageBase64 = "" }) {
+                Text("Rasmni olib tashlash", color = MaterialTheme.colorScheme.error)
+            }
+        }
+    } else {
+        OutlinedButton(
+            onClick = {
+                imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("📷 Rasm tanlash (ixtiyoriy)")
+        }
+    }
+
     OutlinedButton(
         onClick = {
             val calendar = Calendar.getInstance().apply {
@@ -1424,6 +1513,7 @@ private fun ProductEditor(
     Button(
         onClick = {
             val price = priceText.toLongOrNull()
+            val costPrice = costPriceText.toLongOrNull() ?: 0L
             val stock = stockText.takeIf(String::isNotBlank)?.toLongOrNull()
             val discount = discountText.toLongOrNull()
             when {
@@ -1440,16 +1530,20 @@ private fun ProductEditor(
                         price = price,
                         stock = stock,
                         discountPercent = discount,
-                        discountEndsAt = discountEndMillis?.let { Timestamp(Date(it)) }
+                        discountEndsAt = discountEndMillis?.let { Timestamp(Date(it)) },
+                        costPrice = costPrice,
+                        image = imageBase64
                     ) { result ->
                         saving = false
                         result.onSuccess {
                             name = ""
                             description = ""
                             priceText = ""
+                            costPriceText = ""
                             stockText = ""
                             discountText = "0"
                             discountEndMillis = null
+                            imageBase64 = ""
                             onSuccess()
                         }.onFailure { onError(it.localizedMessage ?: "Mahsulotni saqlab bo'lmadi.") }
                     }

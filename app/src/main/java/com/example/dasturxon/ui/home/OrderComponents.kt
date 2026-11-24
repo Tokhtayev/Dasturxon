@@ -126,12 +126,14 @@ internal fun PlaceOrderDialog(
 internal fun ProductEditDialog(
     product: Product,
     onDismiss: () -> Unit,
-    onSave: (String, String, Long, Long?, Long, Timestamp?) -> Unit
+    onSave: (String, String, Long, Long?, Long, Timestamp?, Long) -> Unit,
+    onDelete: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var name by rememberSaveable(product.id) { mutableStateOf(product.name) }
     var description by rememberSaveable(product.id) { mutableStateOf(product.description) }
     var price by rememberSaveable(product.id) { mutableStateOf(product.price.toString()) }
+    var costPrice by rememberSaveable(product.id) { mutableStateOf(if (product.costPrice > 0L) product.costPrice.toString() else "") }
     var stock by rememberSaveable(product.id) { mutableStateOf(product.stock?.toString().orEmpty()) }
     var discount by rememberSaveable(product.id) { mutableStateOf(product.discountPercent.toString()) }
     var expiryMillis by rememberSaveable(product.id) {
@@ -146,7 +148,8 @@ internal fun ProductEditDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Nomi") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(description, { description = it }, label = { Text("Tavsif") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(price, { price = it.filter(Char::isDigit) }, label = { Text("Narx (so'm)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(price, { price = it.filter(Char::isDigit) }, label = { Text("Sotish narxi (so'm)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(costPrice, { costPrice = it.filter(Char::isDigit) }, label = { Text("Tannarxi (so'm, ixtiyoriy)") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(stock, { stock = it.filter(Char::isDigit) }, label = { Text("Zaxira (ixtiyoriy)") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(discount, { discount = it.filter(Char::isDigit) }, label = { Text("Chegirma (0–90%)") }, modifier = Modifier.fillMaxWidth())
                 OutlinedButton(onClick = {
@@ -157,7 +160,7 @@ internal fun ProductEditDialog(
                         context,
                         { _, year, month, day ->
                             calendar.set(year, month, day, 23, 59, 59)
-                            expiryMillis = calendar.timeInMillis
+                        expiryMillis = calendar.timeInMillis
                         },
                         calendar.get(Calendar.YEAR),
                         calendar.get(Calendar.MONTH),
@@ -168,12 +171,27 @@ internal fun ProductEditDialog(
                         ?: "Chegirma muddati cheklanmagan")
                 }
                 TextButton(onClick = { expiryMillis = null }) { Text("Tugash sanasini olib tashlash") }
+                if (onDelete != null) {
+                    OutlinedButton(
+                        onClick = {
+                            onDelete()
+                            onDismiss()
+                        },
+                        colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("🗑️ Mahsulotni o'chirish")
+                    }
+                }
                 validation?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = {
             Button(onClick = {
                 val parsedPrice = price.toLongOrNull()
+                val parsedCostPrice = costPrice.toLongOrNull() ?: 0L
                 val parsedStock = stock.takeIf(String::isNotBlank)?.toLongOrNull()
                 val parsedDiscount = discount.toLongOrNull()
                 when {
@@ -187,7 +205,8 @@ internal fun ProductEditDialog(
                         parsedPrice,
                         parsedStock,
                         parsedDiscount,
-                        expiryMillis?.let { Timestamp(Date(it)) }
+                        expiryMillis?.let { Timestamp(Date(it)) },
+                        parsedCostPrice
                     )
                 }
             }) { Text("Saqlash") }

@@ -19,6 +19,8 @@ class ProductRepository(private val firestore: FirebaseFirestore) {
         stock: Long?,
         discountPercent: Long,
         discountEndsAt: Timestamp?,
+        costPrice: Long = 0L,
+        image: String = "",
         onComplete: (Result<Unit>) -> Unit
     ) {
         val data = mutableMapOf<String, Any>(
@@ -30,6 +32,8 @@ class ProductRepository(private val firestore: FirebaseFirestore) {
             "name" to name,
             "description" to description,
             "price" to price,
+            "costPrice" to costPrice,
+            "image" to image,
             "status" to "available",
             "discountPercent" to discountPercent,
             "updatedAt" to FieldValue.serverTimestamp()
@@ -119,18 +123,31 @@ class ProductRepository(private val firestore: FirebaseFirestore) {
         stock: Long?,
         discountPercent: Long,
         discountEndsAt: Timestamp?,
+        costPrice: Long = product.costPrice,
+        image: String? = null,
         onComplete: (Result<Unit>) -> Unit
     ) {
         val updates = mutableMapOf<String, Any>(
             "name" to name,
             "description" to description,
             "price" to price,
+            "costPrice" to costPrice,
             "discountPercent" to discountPercent,
             "updatedAt" to FieldValue.serverTimestamp()
         )
+        if (image != null) updates["image"] = image
         updates["stock"] = stock ?: FieldValue.delete()
         updates["discountEndsAt"] = discountEndsAt ?: FieldValue.delete()
         firestore.collection("products").document(product.id).update(updates)
+            .addOnSuccessListener { onComplete(Result.success(Unit)) }
+            .addOnFailureListener { onComplete(Result.failure(it)) }
+    }
+
+    fun delete(
+        productId: String,
+        onComplete: (Result<Unit>) -> Unit
+    ) {
+        firestore.collection("products").document(productId).delete()
             .addOnSuccessListener { onComplete(Result.success(Unit)) }
             .addOnFailureListener { onComplete(Result.failure(it)) }
     }
