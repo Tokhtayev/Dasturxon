@@ -29,14 +29,17 @@ import com.example.dasturxon.ui.home.RoleHome
 import com.example.dasturxon.ui.theme.DasturxonTheme
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var firestore: FirebaseFirestore
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        val firestore = FirebaseFirestore.getInstance()
 
         setContent {
             DasturxonTheme {
