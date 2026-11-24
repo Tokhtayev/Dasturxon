@@ -535,7 +535,7 @@ fun HomeScreen(
                 Column {
                     Text("Yetkazib berish manzili:", fontSize = 11.sp, color = MutedText)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Chilonzor, 12-mavze", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                        Text("Yunusobod, 4-mavze", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DarkText)
                         Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = DarkText, modifier = Modifier.size(18.dp))
                     }
                 }
@@ -862,7 +862,7 @@ fun ProductDetailDemoScreen(
                         }
                         HorizontalDivider(color = BorderColor)
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Nonvoy (Chilonzor 9)", fontSize = 14.sp, color = MutedText)
+                            Text("Nonvoy (Yunusobod 11)", fontSize = 14.sp, color = MutedText)
                             Text("5 500 so'm", fontSize = 14.sp, color = MutedText)
                         }
                     }
@@ -1167,7 +1167,7 @@ fun CheckoutDemoScreen(
                         Text("📍", fontSize = 20.sp)
                         Spacer(Modifier.width(12.dp))
                         Column {
-                            Text("Uy - Chilonzor, 12-mavze", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                            Text("Uy - Yunusobod, 4-mavze", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DarkText)
                             Text("Yetkazib berish manzili", fontSize = 12.sp, color = MutedText)
                         }
                     }

@@ -44,15 +44,16 @@ import kotlinx.coroutines.launch
 @Composable
 fun SignInScreen(
     uiState: AuthUiState,
-    onSignIn: (identifier: String, password: String) -> Unit,
-    onGoogleSignInClick: (idToken: String) -> Unit,
+    onSignIn: (identifier: String, password: String, role: String) -> Unit,
+    onGoogleSignInClick: (idToken: String, role: String) -> Unit = { _, _ -> },
     onPhoneOtpStart: (activity: Activity, phone: String) -> Unit,
-    onPhoneOtpVerify: (verificationId: String, code: String) -> Unit,
+    onPhoneOtpVerify: (verificationId: String, code: String, role: String) -> Unit,
     onGoToRegister: () -> Unit,
     onForgotPassword: (email: String) -> Unit
 ) {
     var identifier by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
+    var selectedRole by rememberSaveable { mutableStateOf(uiState.selectedEntryRole ?: "customer") }
     var showForgotSheet by remember { mutableStateOf(false) }
     var showPhoneOtpSheet by remember { mutableStateOf(false) }
 
@@ -81,7 +82,7 @@ fun SignInScreen(
                 }
             },
             onVerifyOtp = { verificationId, code ->
-                onPhoneOtpVerify(verificationId, code)
+                onPhoneOtpVerify(verificationId, code, selectedRole)
             }
         )
     }
@@ -151,6 +152,59 @@ fun SignInScreen(
                     fontWeight = FontWeight.Bold
                 )
 
+                // Role selection for sign in: Xaridor (Customer) vs Biznes egasi (Business Owner)
+                Text(
+                    text = "Kirish turi",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    RoleCard(
+                        emoji = "🛍️",
+                        title = "Xaridor",
+                        subtitle = "Buyurtma berish uchun",
+                        isSelected = selectedRole == "customer",
+                        onClick = { selectedRole = "customer" },
+                        modifier = Modifier.weight(1f)
+                    )
+                    RoleCard(
+                        emoji = "🏪",
+                        title = "Biznes egasi",
+                        subtitle = "Do'konni boshqarish",
+                        isSelected = selectedRole == "owner",
+                        onClick = { selectedRole = "owner" },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Surface(
+                    color = if (selectedRole == "owner") MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(if (selectedRole == "owner") "🏪" else "🛍️", fontSize = 16.sp)
+                        Text(
+                            text = if (selectedRole == "owner")
+                                "Biznes kabineti: Yunusoboddagi novvoyxona, oshxona va mahsulotlaringizni boshqaring"
+                            else
+                                "Xaridor kabineti: Yunusoboddagi yangi non va issiq taomlarga buyurtma bering",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
                 DxTextField(
                     value = identifier,
                     onValueChange = { identifier = it },
@@ -211,7 +265,7 @@ fun SignInScreen(
                 }
 
                 Button(
-                    onClick = { onSignIn(identifier.trim(), password) },
+                    onClick = { onSignIn(identifier.trim(), password, selectedRole) },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     enabled = !uiState.isLoading && identifier.isNotBlank() && password.isNotBlank(),
                     shape = RoundedCornerShape(14.dp)
@@ -223,7 +277,11 @@ fun SignInScreen(
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                     } else {
-                        Text("Kirish", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(
+                            text = if (selectedRole == "owner") "🏪 Biznes egasi sifatida kirish" else "🛍️ Xaridor sifatida kirish",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
                     }
                 }
             }
@@ -255,7 +313,7 @@ fun SignInScreen(
                 onClick = {
                     coroutineScope.launch {
                         performGoogleCredentialManagerSignIn(context) { idToken ->
-                            onGoogleSignInClick(idToken)
+                            onGoogleSignInClick(idToken, selectedRole)
                         }
                     }
                 },

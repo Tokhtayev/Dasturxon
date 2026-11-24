@@ -154,6 +154,32 @@ class AuthViewModelTest {
     }
 
     @Test
+    fun `signIn as owner sets selectedEntryRole to owner`() = runTest {
+        advanceUntilIdle()
+
+        viewModel.signInWithEmailOrNickname("registered@example.com", "ValidPass123", targetRole = "owner")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isLoading)
+        assertNotNull(state.userProfile)
+        assertEquals("owner", state.selectedEntryRole)
+    }
+
+    @Test
+    fun `signIn as customer sets selectedEntryRole to customer`() = runTest {
+        advanceUntilIdle()
+
+        viewModel.signInWithEmailOrNickname("registered@example.com", "ValidPass123", targetRole = "customer")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isLoading)
+        assertNotNull(state.userProfile)
+        assertEquals("customer", state.selectedEntryRole)
+    }
+
+    @Test
     fun `signUp with weak password sets inline error`() = runTest {
         advanceUntilIdle()
 

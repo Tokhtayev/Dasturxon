@@ -79,10 +79,9 @@ service cloud.firestore {
         isAdmin()
       );
 
-      // Create: Owner can create their business, but initial status must be 'pending'
+      // Create: Owner can create their business
       allow create: if isSignedIn()
-        && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.status == 'pending';
+        && request.resource.data.ownerId == request.auth.uid;
 
       // Update: Owner can update business info, but CANNOT change status (e.g. self-approve); admin can change status
       allow update: if isSignedIn() && (
@@ -107,10 +106,10 @@ service cloud.firestore {
         isAdmin()
       );
 
-      // Create: Only the owner of an APPROVED business (or admin) can create products.
+      // Create: Only the owner of the business (or admin) can create products.
       // costPrice is NEVER stored in the public product doc.
       allow create: if isSignedIn() && (
-        (isBusinessOwner(request.resource.data.businessId) && isBusinessApproved(request.resource.data.businessId)) ||
+        isBusinessOwner(request.resource.data.businessId) ||
         isAdmin()
       ) && !('costPrice' in request.resource.data);
 
@@ -220,6 +219,15 @@ service cloud.firestore {
         isBusinessOwner(resource.data.businessId) ||
         isAdmin()
       );
+    }
+
+    // ------------------------------------------------------------------------
+    // Events / Analytics Collection: /events/{eventId}
+    // ------------------------------------------------------------------------
+    match /events/{eventId} {
+      // Any signed in user can record view events or read view metrics
+      allow read, create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
   }
 }

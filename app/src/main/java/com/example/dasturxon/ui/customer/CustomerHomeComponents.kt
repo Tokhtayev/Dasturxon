@@ -93,10 +93,10 @@ val demoPromoBanners = listOf(
     PromoBanner(
         id = "promo_plov",
         tag = "MAXSUS TAYYORLANGAN",
-        title = "Chilonzor To'y Oshi",
-        subtitle = "Har kuni soat 12:00 da damlangan issiq to'y oshi va qazi",
+        title = "Yunusobod To'y Oshi",
+        subtitle = "Har kuni soat 11:30 da damlangan tansiq to'y oshi va qazi",
         badge = "🔥 Issiq damlangan",
-        businessName = "Chilonzor Osh Markazi",
+        businessName = "Yunusobod Osh Markazi",
         kind = BannerKind.PLOV,
         bgGradient = listOf(Color(0xFF1E3A2F), Color(0xFF2E5E4C), Color(0xFF4A8C73))
     )

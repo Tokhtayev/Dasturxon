@@ -361,6 +361,22 @@ internal fun CustomerOrderFlow(
     DxScaffold(
         topBar = {
             val topBarActions: @Composable RowScope.() -> Unit = {
+                // Switch to Business Management Button
+                Surface(
+                    onClick = onSwitchToOwner,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.padding(end = 6.dp)
+                ) {
+                    Text(
+                        text = "🏪 Biznes",
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                    )
+                }
+
                 // User Name Chip
                 Surface(
                     onClick = { currentTab = 3 },

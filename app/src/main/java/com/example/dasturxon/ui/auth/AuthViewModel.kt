@@ -22,6 +22,7 @@ data class AuthUiState(
     val isLoading: Boolean = false,
     val isInitialLoading: Boolean = true,
     val userProfile: UserProfile? = null,
+    val selectedEntryRole: String? = null,
     val errorMessage: String? = null,
     val statusMessage: String? = null,
     val isRegisterMode: Boolean = false,
@@ -152,9 +153,14 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    fun setEntryRole(role: String) {
+        _uiState.update { it.copy(selectedEntryRole = role) }
+    }
+
     fun signInWithEmailOrNickname(
         identifier: String,
-        password: String
+        password: String,
+        targetRole: String? = null
     ) {
         val cleanId = identifier.trim()
         if (cleanId.isBlank()) {
@@ -166,17 +172,20 @@ class AuthViewModel @Inject constructor(
             return
         }
 
+        val roleToUse = targetRole ?: _uiState.value.selectedEntryRole
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
             when (val result = authRepository.signInWithEmailOrNickname(cleanId, password)) {
                 is AppResult.Success -> {
+                    val finalRole = roleToUse ?: result.data.role
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            userProfile = result.data
+                            userProfile = result.data,
+                            selectedEntryRole = finalRole
                         )
                     }
-                    _eventChannel.send(AuthEvent.NavigateHome(result.data.role))
+                    _eventChannel.send(AuthEvent.NavigateHome(finalRole))
                 }
                 is AppResult.Error -> {
                     _uiState.update {
@@ -190,19 +199,20 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun signInWithGoogleIdToken(idToken: String, isOwner: Boolean = false) {
+    fun signInWithGoogleIdToken(idToken: String, isOwner: Boolean = false, targetRole: String? = null) {
+        val role = targetRole ?: (if (isOwner) "owner" else "customer")
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
-            val role = if (isOwner) "owner" else "customer"
             when (val result = authRepository.signInWithGoogleCredential(idToken, role)) {
                 is AppResult.Success -> {
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            userProfile = result.data
+                            userProfile = result.data,
+                            selectedEntryRole = role
                         )
                     }
-                    _eventChannel.send(AuthEvent.NavigateHome(result.data.role))
+                    _eventChannel.send(AuthEvent.NavigateHome(role))
                 }
                 is AppResult.Error -> {
                     _uiState.update {
@@ -235,26 +245,27 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun verifyPhoneOtpCode(verificationId: String, code: String, isOwner: Boolean = false) {
+    fun verifyPhoneOtpCode(verificationId: String, code: String, isOwner: Boolean = false, targetRole: String? = null) {
         val cleanCode = code.trim()
         if (cleanCode.length < 4) {
             _uiState.update { it.copy(errorMessage = "Tasdiqlash kodini kiriting.") }
             return
         }
 
+        val role = targetRole ?: (if (isOwner) "owner" else "customer")
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
-            val role = if (isOwner) "owner" else "customer"
             when (val result = authRepository.verifyPhoneOtpCode(verificationId, cleanCode, role)) {
                 is AppResult.Success -> {
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             userProfile = result.data,
+                            selectedEntryRole = role,
                             phoneVerificationState = PhoneVerificationState.Verified(result.data.uid)
                         )
                     }
-                    _eventChannel.send(AuthEvent.NavigateHome(result.data.role))
+                    _eventChannel.send(AuthEvent.NavigateHome(role))
                 }
                 is AppResult.Error -> {
                     _uiState.update {

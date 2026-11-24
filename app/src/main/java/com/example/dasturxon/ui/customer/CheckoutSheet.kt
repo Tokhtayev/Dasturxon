@@ -231,7 +231,7 @@ fun CheckoutSheet(
                         value = deliveryAddress,
                         onValueChange = { deliveryAddress = it },
                         label = { Text("Yetkazib berish manzili") },
-                        placeholder = { Text("Chilonzor, 12-mavze, 4-uy, 15-xonadon") },
+                        placeholder = { Text("Yunusobod tumani, 4-mavze, 12-uy, 15-xonadon") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = false
                     )

@@ -551,5 +551,22 @@ test("25. Order line item unitPrice must match product sellingPrice", async () =
   }));
 });
 
+// 26. Events collection can be written and read by authenticated users
+test("26. Authenticated user can create and read events", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const eventRef = doc(dbCust, "events/event-test-1");
+
+  await assertSucceeds(setDoc(eventRef, {
+    businessId: "business-1",
+    productId: "product-approved",
+    userId: "customer-1",
+    type: "view_product",
+    createdAt: Timestamp.now()
+  }));
+
+  const snap = await assertSucceeds(getDoc(eventRef));
+  assert.equal(snap.data().type, "view_product");
+});
+
 
 

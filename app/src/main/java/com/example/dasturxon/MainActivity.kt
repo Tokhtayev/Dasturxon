@@ -75,7 +75,7 @@ private fun AuthRootContainer(
                 uid = profile.uid,
                 email = profile.email,
                 fullName = profile.fullName,
-                role = profile.role,
+                role = uiState.selectedEntryRole ?: profile.role,
                 firestore = firestore,
                 onSignOut = { viewModel.signOut() }
             )
@@ -104,17 +104,17 @@ private fun AuthRootContainer(
         else -> {
             SignInScreen(
                 uiState = uiState,
-                onSignIn = { identifier, password ->
-                    viewModel.signInWithEmailOrNickname(identifier, password)
+                onSignIn = { identifier, password, role ->
+                    viewModel.signInWithEmailOrNickname(identifier, password, role)
                 },
-                onGoogleSignInClick = { idToken ->
-                    viewModel.signInWithGoogleIdToken(idToken)
+                onGoogleSignInClick = { idToken, role ->
+                    viewModel.signInWithGoogleIdToken(idToken, isOwner = role == "owner", targetRole = role)
                 },
                 onPhoneOtpStart = { activity, phone ->
                     viewModel.startPhoneVerification(activity, phone)
                 },
-                onPhoneOtpVerify = { verificationId, code ->
-                    viewModel.verifyPhoneOtpCode(verificationId, code)
+                onPhoneOtpVerify = { verificationId, code, role ->
+                    viewModel.verifyPhoneOtpCode(verificationId, code, isOwner = role == "owner", targetRole = role)
                 },
                 onGoToRegister = { viewModel.toggleRegisterMode(true) },
                 onForgotPassword = { email ->

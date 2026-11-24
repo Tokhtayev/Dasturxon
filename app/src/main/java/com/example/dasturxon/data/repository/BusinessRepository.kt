@@ -53,7 +53,8 @@ open class BusinessRepository {
         address: String,
         phone: String,
         onComplete: (Result<Unit>) -> Unit,
-        typeNote: String? = null
+        typeNote: String? = null,
+        ownerId: String? = null
     ) {
         val updates = mutableMapOf<String, Any>(
             "name" to name,
@@ -64,11 +65,12 @@ open class BusinessRepository {
             "rejectionReason" to FieldValue.delete(),
             "updatedAt" to FieldValue.serverTimestamp()
         )
+        if (ownerId != null) updates["ownerId"] = ownerId
         updates["typeNote"] = typeNote?.trim()
             ?.takeIf(String::isNotEmpty)
             ?: FieldValue.delete()
         db().collection("businesses").document(businessId)
-            .update(updates)
+            .set(updates, com.google.firebase.firestore.SetOptions.merge())
             .addOnSuccessListener { onComplete(Result.success(Unit)) }
             .addOnFailureListener { onComplete(Result.failure(it)) }
     }
