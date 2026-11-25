@@ -197,6 +197,7 @@
 - **Results**: `tsc -b && vite build` (`782ms`), ESLint + oxlint (`0` errors, `0` warnings on `54` files), Prettier PASS, `4/4` unit tests PASS.
 
 ### Task 19 (Phase 2.2c): CSP Headers, Security Headers & Zero Token/Storage Exposure
+- **Commit Hash**: `633fff0`
 - **Changed Files**: `firebase.json`, `web/index.html`, `web/src/config/firebase.ts`, `web/src/services/errors.ts`, `docs/STATUS.md`
 - **What Was Fixed**:
   - Added Firebase Hosting `headers` in `firebase.json`: strict `Content-Security-Policy` (`script-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, `base-uri 'self'`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Permissions-Policy`.
@@ -205,6 +206,14 @@
 - **Commands Executed**: `cd web && npm run build && npm run lint && npm run format:check && npm test`
 - **Results**: `tsc -b && vite build` (`757ms`), ESLint + oxlint (`0` warnings/errors on `54` files), Prettier PASS, `4/4` unit tests PASS.
 
+### Task 20 (Phase 3.1): Vitest Suite (20 Tests & Boundary Coverage)
+- **Changed Files**: `web/package.json`, `web/package-lock.json`, `web/tests/orderLogic.test.ts`, `web/tests/validators.test.ts`, `web/tests/analytics.test.ts`, removed `web/tests/domain.test.ts`, `docs/STATUS.md`
+- **What Was Done**:
+  - Installed Vitest (`v5.1.1`) and configured `"test": "vitest run"` in `web/package.json`.
+  - Wrote 20 automated tests across 3 suites covering order totals, stock decrement and insufficient-stock errors (`stock 0/1`, `qty 0/1/99/100`), order state machine transitions (`customer` & `owner`), profit/COGS/expense analytics (`completed + paid`), validators (`price 0/negative`, `stock -1`, `password 7/8/128/129`, empty/whitespace strings), text sanitization, and token redaction.
+- **Commands Executed**: `cd web && npm run build && npm run lint && npm run format:check && npm test`
+- **Results**: `tsc -b && vite build` (`780ms`), ESLint + oxlint (`0` errors/warnings on `56` files), Prettier PASS, **Vitest 3 files / 20/20 tests PASSED (`337ms`)**.
+
 ---
 
 ## 3. VERIFIED BY AUTOMATED TEST
@@ -212,10 +221,10 @@
 | Test Suite / Tool | Count | Result | Verification Scope |
 | :--- | :---: | :---: | :--- |
 | **Firestore Security Rules Emulator Tests** (`npm run test:rules`) | **39** | **PASS** | `@firebase/rules-unit-testing`: role escalation prevention, cross-user doc isolation, order privacy & cancellation tamper prevention, bounded order quantities (`1..99`), bounded product `price > 0` / `stock >= 0` / `discount 0..90`, owner-only business creation (`pending`), private cost isolation (`products/{id}/private/cost`), atomic checkout stock decrement (`lastCheckoutOrderId`), forged analytics event prevention, and real-time listeners. |
-| **Web Domain Unit Tests** (`cd web && npm test`) | **4** | **PASS** | `validators` (`email`, strong password, nickname, business/product forms), `formatSoM`, `getEffectivePrice` (`math.floor` parity with `firestore.rules`), `getPeriodBounds` (`Asia/Tashkent` Monday week start), `calculateAnalytics` (`completed + paid` revenue, COGS, gross/net profit). |
+| **Web Domain & Security Unit Tests (Vitest)** (`cd web && npm test`) | **20** | **PASS** | `orderLogic` (`computeRemainingStock`, `applyStockDecrement`, `calculateOrderTotal`, `isValidOrderTransition` with boundary cases `stock 0/1`, `qty 0/1/99/100`), `validators` (`email`, password `7/8/128/129`, `price 0/-5000`, `stock -1`, empty strings, `sanitizeUserText`, `escapeHtml`, `redactSensitiveTokens`), and `analytics` (`math.floor` discounts, `Asia/Tashkent` bounds, `completed + paid` revenue, COGS, profit, lossMakers). |
 | **Web TypeScript & Vite Build** (`cd web && npm run build`) | - | **PASS** | Clean `tsc -b && vite build` static bundle (`web/dist/`). |
-| **Web Linter** (`cd web && npm run lint`) | **54 files** | **PASS** | ESLint (`@typescript-eslint`, `react`, `react-hooks`, `no-console`, `no-magic-numbers`, `max-lines-per-function`, `no-restricted-imports`, `no-restricted-globals`) + `oxlint`: 0 warnings, 0 errors. |
-| **Web Formatter** (`cd web && npm run format:check`) | **54 files** | **PASS** | Prettier style check passed across all TypeScript/TSX sources and tests. |
+| **Web Linter** (`cd web && npm run lint`) | **56 files** | **PASS** | ESLint (`@typescript-eslint`, `react`, `react-hooks`, `no-console`, `no-magic-numbers`, `max-lines-per-function`, `no-restricted-imports`, `no-restricted-globals`) + `oxlint`: 0 warnings, 0 errors. |
+| **Web Formatter** (`cd web && npm run format:check`) | **56 files** | **PASS** | Prettier style check passed across all TypeScript/TSX sources and tests. |
 | **Browser E2E Flow (Emulator)** (`http://127.0.0.1:5173`) | **6 stages** | **PASS** | Real Firebase Auth + Firestore Emulator end-to-end flows for Owner, Admin, and Customer roles plus `390x844` mobile layout check. |
 | **Legacy Android JVM Unit Tests** (`android-legacy/`, historical pre-migration) | **59** | **PASS** | Archived Kotlin/Compose unit tests (`AnalyticsCalculatorTest`, `AuthViewModelTest`, etc.) prior to Phase 0 migration. |
 
