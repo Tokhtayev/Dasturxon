@@ -1,8 +1,15 @@
 import { getApps, initializeApp, type FirebaseApp } from 'firebase/app';
-import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
+import {
+  connectAuthEmulator,
+  indexedDBLocalPersistence,
+  initializeAuth,
+  type Auth,
+} from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore';
 
 const useEmulator = import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true';
+const EMULATOR_AUTH_PORT = 9099;
+const EMULATOR_FIRESTORE_PORT = 8080;
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? '',
@@ -47,14 +54,19 @@ function ensureInitialized(): void {
           );
   }
   if (!authInstance) {
-    authInstance = getAuth(appInstance);
+    // Store Auth tokens strictly in IndexedDB (never localStorage or sessionStorage)
+    authInstance = initializeAuth(appInstance, {
+      persistence: indexedDBLocalPersistence,
+    });
   }
   if (!dbInstance) {
     dbInstance = getFirestore(appInstance);
   }
   if (useEmulator && !emulatorsConnected && authInstance && dbInstance) {
-    connectAuthEmulator(authInstance, 'http://127.0.0.1:9099', { disableWarnings: true });
-    connectFirestoreEmulator(dbInstance, '127.0.0.1', 8080);
+    connectAuthEmulator(authInstance, `http://127.0.0.1:${EMULATOR_AUTH_PORT}`, {
+      disableWarnings: true,
+    });
+    connectFirestoreEmulator(dbInstance, '127.0.0.1', EMULATOR_FIRESTORE_PORT);
     emulatorsConnected = true;
   }
 }

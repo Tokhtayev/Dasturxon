@@ -187,6 +187,7 @@
 - **Results**: `39/39` Firestore Rules emulator tests (`6142.42ms`) and all web checks PASSED.
 
 ### Task 18 (Phase 2.2b): Service-Layer Input Validation & User-Text Sanitization
+- **Commit Hash**: `ff826ba`
 - **Changed Files**: `web/src/services/validators.ts`, `web/src/services/orderLogic.ts`, `web/src/repositories/*.ts`, `web/src/components/owner/ExpenseModal.tsx`, `docs/STATUS.md`
 - **What Was Fixed**:
   - Added `sanitizeUserText` (strips ASCII control characters, Unicode bidi overrides, and `<`/`>` brackets with max lengths) and `escapeHtml` in `validators.ts`, backed by ESLint `react/no-danger` (`dangerouslySetInnerHTML` forbidden).
@@ -194,6 +195,15 @@
   - Extracted pure domain helpers in `web/src/services/orderLogic.ts` (`computeRemainingStock`, `applyStockDecrement`, `calculateOrderTotal`, `isValidOrderTransition`).
 - **Commands Executed**: `cd web && npm run build && npm run lint && npm run format:check && npm test`
 - **Results**: `tsc -b && vite build` (`782ms`), ESLint + oxlint (`0` errors, `0` warnings on `54` files), Prettier PASS, `4/4` unit tests PASS.
+
+### Task 19 (Phase 2.2c): CSP Headers, Security Headers & Zero Token/Storage Exposure
+- **Changed Files**: `firebase.json`, `web/index.html`, `web/src/config/firebase.ts`, `web/src/services/errors.ts`, `docs/STATUS.md`
+- **What Was Fixed**:
+  - Added Firebase Hosting `headers` in `firebase.json`: strict `Content-Security-Policy` (`script-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, `base-uri 'self'`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Permissions-Policy`.
+  - Added matching meta `Content-Security-Policy` and `referrer` meta tag in `web/index.html` for GitHub Pages static hosting parity.
+  - Configured Firebase Auth with explicit `indexedDBLocalPersistence` (zero `localStorage`/`sessionStorage` token persistence, enforced by ESLint `no-restricted-globals`), and extended `redactSensitiveTokens` (`AIza...`, Bearer, JWT, credential query params) with `no-console` enforcement.
+- **Commands Executed**: `cd web && npm run build && npm run lint && npm run format:check && npm test`
+- **Results**: `tsc -b && vite build` (`757ms`), ESLint + oxlint (`0` warnings/errors on `54` files), Prettier PASS, `4/4` unit tests PASS.
 
 ---
 
