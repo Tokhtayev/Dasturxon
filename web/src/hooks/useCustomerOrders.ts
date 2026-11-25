@@ -4,38 +4,36 @@ import type { Business, CustomerOrder, FulfillmentType, Product } from '../types
 
 export function useCustomerOrders(customerId: string | undefined) {
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedForUid, setLoadedForUid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!customerId) {
-      setOrders([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+    if (!customerId) return;
     const unsub = orderRepository.observeForCustomer(
       customerId,
       (data) => {
         setOrders(data);
-        setLoading(false);
+        setLoadedForUid(customerId);
         setError(null);
       },
       (err) => {
         setError(err.message);
-        setLoading(false);
+        setLoadedForUid(customerId);
       }
     );
     return unsub;
   }, [customerId]);
 
+  const visibleOrders = useMemo(() => (customerId ? orders : []), [customerId, orders]);
+  const loading = Boolean(customerId && loadedForUid !== customerId);
+
   const activeOrders = useMemo(
-    () => orders.filter((o) => ['pending', 'accepted', 'ready'].includes(o.status)),
-    [orders]
+    () => visibleOrders.filter((o) => ['pending', 'accepted', 'ready'].includes(o.status)),
+    [visibleOrders]
   );
   const historyOrders = useMemo(
-    () => orders.filter((o) => ['completed', 'rejected', 'cancelled'].includes(o.status)),
-    [orders]
+    () => visibleOrders.filter((o) => ['completed', 'rejected', 'cancelled'].includes(o.status)),
+    [visibleOrders]
   );
 
   const placeOrder = async (params: {
@@ -48,7 +46,7 @@ export function useCustomerOrders(customerId: string | undefined) {
     fulfillmentType: FulfillmentType;
     deliveryAddress: string;
   }) => {
-    if (!customerId) throw new Error("Avval tizimga kiring.");
+    if (!customerId) throw new Error('Avval tizimga kiring.');
     return orderRepository.placeOrderTransaction({
       customerId,
       ...params,
@@ -60,7 +58,7 @@ export function useCustomerOrders(customerId: string | undefined) {
   };
 
   return {
-    orders,
+    orders: visibleOrders,
     activeOrders,
     historyOrders,
     loading,

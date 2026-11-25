@@ -17,7 +17,7 @@ import type {
 
 export function useOwnerDashboard(ownerId: string | undefined) {
   const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [businessesLoaded, setBusinessesLoaded] = useState(false);
+  const [loadedOwnerId, setLoadedOwnerId] = useState<string | null>(null);
 
   const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [costMap, setCostMap] = useState<Map<string, number>>(new Map());
@@ -26,62 +26,65 @@ export function useOwnerDashboard(ownerId: string | undefined) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>('week');
+  const [analyticsAnchorMs, setAnalyticsAnchorMs] = useState<number>(() => Date.now());
 
   useEffect(() => {
-    if (!ownerId) {
-      setBusinesses([]);
-      setBusinessesLoaded(true);
-      return;
-    }
-    setBusinessesLoaded(false);
+    if (!ownerId) return;
     const unsub = businessRepository.observeForOwner(
       ownerId,
       (list) => {
         setBusinesses(list);
-        setBusinessesLoaded(true);
+        setLoadedOwnerId(ownerId);
         setError(null);
       },
       (err) => {
         setError(err.message);
-        setBusinessesLoaded(true);
+        setLoadedOwnerId(ownerId);
       }
     );
     return unsub;
   }, [ownerId]);
 
+  const ownerBusinesses = useMemo(() => (ownerId ? businesses : []), [ownerId, businesses]);
+  const businessesLoaded = !ownerId || loadedOwnerId === ownerId;
+
   const business = useMemo(
     () =>
-      businesses.find((b) => b.status === 'approved') ??
-      businesses.find((b) => b.status === 'pending') ??
-      businesses.find((b) => b.status === 'rejected') ??
-      businesses[0] ??
+      ownerBusinesses.find((b) => b.status === 'approved') ??
+      ownerBusinesses.find((b) => b.status === 'pending') ??
+      ownerBusinesses.find((b) => b.status === 'rejected') ??
+      ownerBusinesses[0] ??
       null,
-    [businesses]
+    [ownerBusinesses]
   );
 
   const businessId = business?.id;
 
   useEffect(() => {
-    if (!businessId) {
-      setRawProducts([]);
-      setOrders([]);
-      setExpenses([]);
-      return;
-    }
+    if (!businessId) return;
 
     const unsubProds = productRepository.observeForBusiness(
       businessId,
-      (list) => setRawProducts(list),
+      (list) => {
+        setRawProducts(list);
+        setAnalyticsAnchorMs(Date.now());
+      },
       (err) => setError(err.message)
     );
     const unsubOrders = orderRepository.observeForBusiness(
       businessId,
-      (list) => setOrders(list),
+      (list) => {
+        setOrders(list);
+        setAnalyticsAnchorMs(Date.now());
+      },
       (err) => setError(err.message)
     );
     const unsubExpenses = expenseRepository.observeForBusiness(
       businessId,
-      (list) => setExpenses(list),
+      (list) => {
+        setExpenses(list);
+        setAnalyticsAnchorMs(Date.now());
+      },
       (err) => setError(err.message)
     );
 
@@ -92,16 +95,17 @@ export function useOwnerDashboard(ownerId: string | undefined) {
     };
   }, [businessId]);
 
+  const scopedProducts = useMemo(() => (businessId ? rawProducts : []), [businessId, rawProducts]);
+  const scopedOrders = useMemo(() => (businessId ? orders : []), [businessId, orders]);
+  const scopedExpenses = useMemo(() => (businessId ? expenses : []), [businessId, expenses]);
+
   const productIdsKey = useMemo(
-    () => rawProducts.map((p) => p.id).sort().join(','),
-    [rawProducts]
+    () => scopedProducts.map((p) => p.id).sort().join(','),
+    [scopedProducts]
   );
 
   useEffect(() => {
-    if (!productIdsKey) {
-      setCostMap(new Map());
-      return;
-    }
+    if (!productIdsKey) return;
     let active = true;
     const ids = productIdsKey.split(',');
     productRepository.loadPrivateCostPrices(ids).then((map) => {
@@ -114,19 +118,16 @@ export function useOwnerDashboard(ownerId: string | undefined) {
 
   const completedOrderIdsKey = useMemo(
     () =>
-      orders
+      scopedOrders
         .filter((o) => o.status === 'completed')
         .map((o) => o.id)
         .sort()
         .join(','),
-    [orders]
+    [scopedOrders]
   );
 
   useEffect(() => {
-    if (!completedOrderIdsKey) {
-      setItemCostMap(new Map());
-      return;
-    }
+    if (!completedOrderIdsKey) return;
     let active = true;
     orderRepository.loadCompletedItemCosts(completedOrderIdsKey.split(',')).then((map) => {
       if (active) setItemCostMap(map);
@@ -138,27 +139,38 @@ export function useOwnerDashboard(ownerId: string | undefined) {
 
   const products = useMemo(
     () =>
-      rawProducts.map((p) => ({
+      scopedProducts.map((p) => ({
         ...p,
         costPrice: costMap.get(p.id) ?? 0,
       })),
-    [rawProducts, costMap]
+    [scopedProducts, costMap]
   );
 
   const report = useMemo(
-    () => calculateAnalytics(orders, expenses, products, analyticsPeriod, Date.now(), itemCostMap),
-    [orders, expenses, products, analyticsPeriod, itemCostMap]
+    () =>
+      calculateAnalytics(
+        scopedOrders,
+        scopedExpenses,
+        products,
+        analyticsPeriod,
+        analyticsAnchorMs,
+        itemCostMap
+      ),
+    [scopedOrders, scopedExpenses, products, analyticsPeriod, analyticsAnchorMs, itemCostMap]
   );
 
   return {
     business,
     businessesLoaded,
     products,
-    orders,
-    expenses,
+    orders: scopedOrders,
+    expenses: scopedExpenses,
     report,
     analyticsPeriod,
-    setAnalyticsPeriod,
+    setAnalyticsPeriod: (period: AnalyticsPeriod) => {
+      setAnalyticsAnchorMs(Date.now());
+      setAnalyticsPeriod(period);
+    },
     error,
     clearError: () => setError(null),
 

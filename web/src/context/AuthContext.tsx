@@ -1,27 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { isEmulatorMode, isFirebaseConfigured } from '../config/firebase';
 import { authRepository } from '../repositories/authRepository';
-import type { AuthSessionState, RegisterableRole } from '../types/domain';
-
-interface AuthContextValue {
-  session: AuthSessionState;
-  firebaseReady: boolean;
-  emulatorMode: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (params: {
-    fullName: string;
-    nickname: string;
-    email: string;
-    password: string;
-    role: RegisterableRole;
-    phone?: string;
-  }) => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
-  updateFullName: (fullName: string) => Promise<void>;
-  signOut: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+import type { AuthSessionState } from '../types/domain';
+import { AuthContext, type AuthContextValue } from './AuthContextDef';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<AuthSessionState>(() =>
@@ -59,11 +40,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuth must be used inside AuthProvider');
-  }
-  return ctx;
-}

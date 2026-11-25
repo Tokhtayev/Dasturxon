@@ -4,40 +4,39 @@ import type { Business } from '../types/domain';
 
 export function useAdminBusinesses(enabled: boolean) {
   const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!enabled) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+    if (!enabled) return;
     const unsub = businessRepository.observeAll(
       (list) => {
         setBusinesses(list);
-        setLoading(false);
+        setLoaded(true);
         setError(null);
       },
       (err) => {
         setError(err.message);
-        setLoading(false);
+        setLoaded(true);
       }
     );
     return unsub;
   }, [enabled]);
 
+  const visibleBusinesses = useMemo(() => (enabled ? businesses : []), [enabled, businesses]);
+  const loading = enabled && !loaded;
+
   const pendingBusinesses = useMemo(
-    () => businesses.filter((b) => b.status === 'pending'),
-    [businesses]
+    () => visibleBusinesses.filter((b) => b.status === 'pending'),
+    [visibleBusinesses]
   );
   const approvedBusinesses = useMemo(
-    () => businesses.filter((b) => b.status === 'approved'),
-    [businesses]
+    () => visibleBusinesses.filter((b) => b.status === 'approved'),
+    [visibleBusinesses]
   );
   const rejectedBusinesses = useMemo(
-    () => businesses.filter((b) => b.status === 'rejected'),
-    [businesses]
+    () => visibleBusinesses.filter((b) => b.status === 'rejected'),
+    [visibleBusinesses]
   );
 
   const approveBusiness = async (businessId: string) => {
@@ -52,7 +51,7 @@ export function useAdminBusinesses(enabled: boolean) {
   };
 
   return {
-    businesses,
+    businesses: visibleBusinesses,
     pendingBusinesses,
     approvedBusinesses,
     rejectedBusinesses,

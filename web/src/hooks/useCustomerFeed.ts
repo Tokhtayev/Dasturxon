@@ -6,26 +6,24 @@ import type { Business, BusinessTypeKey, Product } from '../types/domain';
 export function useCustomerFeed(enabled: boolean) {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedBiz, setLoadedBiz] = useState(false);
+  const [loadedFeedKey, setLoadedFeedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | BusinessTypeKey>('all');
 
   useEffect(() => {
-    if (!enabled) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+    if (!enabled) return;
     const unsub = businessRepository.observeApproved(
       (data) => {
         setBusinesses(data);
+        setLoadedBiz(true);
         setError(null);
       },
       (err) => {
         setError(err.message);
-        setLoading(false);
+        setLoadedBiz(true);
       }
     );
     return unsub;
@@ -41,26 +39,30 @@ export function useCustomerFeed(enabled: boolean) {
   );
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !loadedBiz) return;
     const ids = approvedIdsKey ? approvedIdsKey.split(',') : [];
     const unsub = productRepository.observeFeedForApprovedBusinesses(
       ids,
       (data) => {
         setProducts(data);
-        setLoading(false);
+        setLoadedFeedKey(approvedIdsKey);
         setError(null);
       },
       (err) => {
         setError(err.message);
-        setLoading(false);
+        setLoadedFeedKey(approvedIdsKey);
       }
     );
     return unsub;
-  }, [enabled, approvedIdsKey]);
+  }, [enabled, loadedBiz, approvedIdsKey]);
+
+  const visibleBusinesses = useMemo(() => (enabled ? businesses : []), [enabled, businesses]);
+  const visibleProducts = useMemo(() => (enabled ? products : []), [enabled, products]);
+  const loading = enabled && (!loadedBiz || loadedFeedKey !== approvedIdsKey);
 
   const filteredProducts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return products.filter((p) => {
+    return visibleProducts.filter((p) => {
       const catOk = categoryFilter === 'all' || p.businessType === categoryFilter;
       const qOk =
         !q ||
@@ -69,18 +71,18 @@ export function useCustomerFeed(enabled: boolean) {
         p.description.toLowerCase().includes(q);
       return catOk && qOk;
     });
-  }, [products, searchQuery, categoryFilter]);
+  }, [visibleProducts, searchQuery, categoryFilter]);
 
   const businessById = useMemo(() => {
     const map = new Map<string, Business>();
-    businesses.forEach((b) => map.set(b.id, b));
+    visibleBusinesses.forEach((b) => map.set(b.id, b));
     return map;
-  }, [businesses]);
+  }, [visibleBusinesses]);
 
   return {
-    businesses,
+    businesses: visibleBusinesses,
     businessById,
-    products,
+    products: visibleProducts,
     filteredProducts,
     loading,
     error,
