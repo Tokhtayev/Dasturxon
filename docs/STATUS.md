@@ -102,6 +102,7 @@
 - **Results**: 34/34 Firestore security rules tests PASSED (`duration_ms 4205.915`).
 
 ### Task 8 (Phase 0.3): Web Foundation, Modular Firebase SDK, Validators & Analytics
+- **Commit Hash**: `9879857`
 - **Changed Files**: `web/package.json`, `web/package-lock.json`, `web/.env.example`, `web/src/config/firebase.ts`, `web/src/types/domain.ts`, `web/src/services/validators.ts`, `web/src/services/analytics.ts`, `web/tests/domain.test.ts`, `docs/STATUS.md`
 - **What Was Done**:
   - Installed `firebase` (Web SDK v12 modular) and `react-router-dom`.
@@ -109,6 +110,14 @@
   - Added Firestore-aligned domain types (`domain.ts`), strict form/auth validators (`validators.ts`), and pure `analytics.ts` matching `firestore.rules` `math.floor` discounting and `Asia/Tashkent` Monday-start periods.
 - **Commands Executed**: `cd web && npm run build && npm run lint && npm test`
 - **Results**: TypeScript/Vite build, oxlint, and all 7 web unit tests PASSED.
+
+### Task 9 (Phase 0.4): Uzbek Migration Report & Student Action Checklist
+- **Changed Files**: `docs/report/00-migratsiya.md`, `docs/STUDENT_TODO.md`, `docs/STATUS.md`
+- **What Was Done**:
+  - Authored `docs/report/00-migratsiya.md` in formal Uzbek (Latin script, no apostrophes between Latin-script names and Uzbek suffixes) documenting migration rationale, reused Firebase assets (`dasturxon-27a6e`, `firestore.rules`, `firestore.indexes.json`), rewritten 3-layer web architecture, and real measured Phase 0 test outputs.
+  - Created `docs/STUDENT_TODO.md` tracking all `[TO'LDIRING]` human placeholders and manual Firebase Console / GitHub Secrets steps.
+- **Commands Executed**: `cd web && npm run build && npm run lint && npm test`
+- **Results**: Build, oxlint (0 errors), and 7/7 web unit tests PASSED.
 
 ---
 
