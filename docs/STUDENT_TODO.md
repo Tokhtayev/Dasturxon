@@ -10,6 +10,8 @@ Ushbu hujjatda avtomatik tarzda to‘ldirib bo‘lmaydigan (inson tomonidan kiri
 | :--- | :--- | :--- |
 | `docs/report/00-migratsiya.md` | Muallif (talaba) | Talabaning to‘liq F.I.Sh. va universitet guruh raqami |
 | `docs/report/00-migratsiya.md` | 1-bo‘lim: shaxsiy izoh va vaqt jurnali | Avvalgi Android ilovada sarflangan real soatlar va telefonda uchragan aniq xatolar |
+| `docs/report/08-sifat-xavfsizlik.md` | Muallif va real foydalanuvchi sinovi izohi | Talaba F.I.Sh./guruhi hamda (agar o‘tkazilsa) real foydalanuvchilar bilan qulaylik sinovi xulosasi |
+| `docs/report/09-test-metrika.md` | Muallif (talaba) | Talabaning to‘liq F.I.Sh. va universitet guruh raqami |
 
 ---
 

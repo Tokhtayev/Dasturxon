@@ -207,12 +207,21 @@
 - **Results**: `tsc -b && vite build` (`757ms`), ESLint + oxlint (`0` warnings/errors on `54` files), Prettier PASS, `4/4` unit tests PASS.
 
 ### Task 20 (Phase 3.1): Vitest Suite (20 Tests & Boundary Coverage)
+- **Commit Hash**: `4b83ed0` (mobile overflow fix `b836501`)
 - **Changed Files**: `web/package.json`, `web/package-lock.json`, `web/tests/orderLogic.test.ts`, `web/tests/validators.test.ts`, `web/tests/analytics.test.ts`, removed `web/tests/domain.test.ts`, `docs/STATUS.md`
 - **What Was Done**:
   - Installed Vitest (`v5.1.1`) and configured `"test": "vitest run"` in `web/package.json`.
   - Wrote 20 automated tests across 3 suites covering order totals, stock decrement and insufficient-stock errors (`stock 0/1`, `qty 0/1/99/100`), order state machine transitions (`customer` & `owner`), profit/COGS/expense analytics (`completed + paid`), validators (`price 0/negative`, `stock -1`, `password 7/8/128/129`, empty/whitespace strings), text sanitization, and token redaction.
 - **Commands Executed**: `cd web && npm run build && npm run lint && npm run format:check && npm test`
 - **Results**: `tsc -b && vite build` (`780ms`), ESLint + oxlint (`0` errors/warnings on `56` files), Prettier PASS, **Vitest 3 files / 20/20 tests PASSED (`337ms`)**.
+
+### Task 21–22 (Phase 2.3 & 3.2): Real Chrome Metrics, Mobile Overflow Fix & Uzbek Quality/Metrics Reports
+- **Changed Files**: `web/src/components/DxLogo.tsx`, `web/src/pages/WelcomePage.tsx`, `docs/report/08-sifat-xavfsizlik.md`, `docs/report/09-test-metrika.md`, `docs/STUDENT_TODO.md`, `docs/STATUS.md`
+- **What Was Done**:
+  - Measured `vite preview` (`http://127.0.0.1:4173/`) at `390x844` using Chrome DevTools & `browser` subagent; fixed a `9.6px` horizontal header overflow (`b836501`) and verified `scrollWidth === 390 === innerWidth`, `localStorageLength === 0`, `sessionStorageLength === 0`, `cspViolations === 0`, `DOMContentLoaded: 2018ms`, `Load: 2022ms`, `FCP: 2268ms`.
+  - Authored `docs/report/08-sifat-xavfsizlik.md` (quality matrix, threat table, real code-review findings) and `docs/report/09-test-metrika.md` (Vitest boundary table + programmatically verified Halstead `V=154.29`, `D=9.43`, `E=1454.71` and Cyclomatic Complexity `V(G)=4` on `computeRemainingStock`).
+- **Commands Executed**: `cd web && npm run build && npm run lint && npm run format:check && npm test`, `npm run test:rules`
+- **Results**: Verified all checks green after final edits.
 
 ---
 
