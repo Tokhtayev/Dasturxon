@@ -1,0 +1,23 @@
+sequenceDiagram
+  actor Customer as Xaridor
+  participant Modal as OrderCheckoutModal
+  participant Hook as useCustomerOrders
+  participant Repo as orderRepository
+  participant Logic as orderLogic.applyStockDecrement
+  participant DB as Cloud Firestore & firestore.rules
+
+  Customer->>Modal: Miqdor, usul (pickup/delivery) tanlab "Tasdiqlash" bosadi
+  Modal->>Hook: placeOrder(params)
+  Hook->>Repo: placeOrderTransaction(params)
+  Repo->>DB: runTransaction(tx) boshlanadi
+  DB-->>Repo: tx.get(businessRef) va tx.get(productRef)
+  Repo->>Logic: applyStockDecrement(currentStock, qty, status)
+  Logic-->>Repo: { nextStock, nextStatus } (yoki xato: zaxira yetarli emas)
+  Repo->>Repo: calculateOrderTotal(unitPrice, qty)
+  Repo->>DB: tx.set(orders/{orderId}, status='pending', paymentStatus='unpaid')
+  Repo->>DB: tx.set(orders/{orderId}/items/{itemId}, unitPrice, qty)
+  Repo->>DB: tx.update(products/{id}, stock=nextStock, lastCheckoutOrderId=orderId)
+  Note over DB: firestore.rules getAfter() orqali stock == oldStock - qty va narxni tekshiradi
+  DB-->>Repo: Tranzaksiya tasdiqlandi
+  DB-->>Hook: onSnapshot orqali yangi buyurtma va zaxira uzatiladi
+  Hook-->>Customer: "Buyurtmalarim" sahifasida buyurtma ID (Kutilmoqda) ko'rinadi

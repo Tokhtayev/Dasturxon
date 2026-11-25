@@ -1,0 +1,96 @@
+classDiagram
+  class UserProfile {
+    +string uid
+    +string fullName
+    +string normalizedNickname
+    +string email
+    +string phone
+    +UserRole role
+    +number createdAtMs
+  }
+
+  class Business {
+    +string id
+    +string ownerId
+    +string name
+    +BusinessTypeKey type
+    +string address
+    +string phone
+    +BusinessStatus status
+    +string rejectionReason
+    +number createdAtMs
+    +number updatedAtMs
+  }
+
+  class Product {
+    +string id
+    +string businessId
+    +string businessName
+    +string name
+    +string description
+    +number price
+    +number costPrice
+    +boolean published
+    +ProductStatus status
+    +number stock
+    +number discountPercent
+    +number updatedAtMs
+  }
+
+  class PrivateProductCost {
+    +number costPrice
+    +Timestamp updatedAt
+  }
+
+  class CustomerOrder {
+    +string id
+    +string customerId
+    +string businessId
+    +string productId
+    +number quantity
+    +number unitPrice
+    +number totalPrice
+    +OrderStatusKey status
+    +PaymentStatus paymentStatus
+    +FulfillmentType fulfillmentType
+    +string deliveryAddress
+    +number pickupTimeMs
+    +number paidAtMs
+  }
+
+  class OrderLineItem {
+    +string id
+    +string productId
+    +string name
+    +number qty
+    +number unitPrice
+    +number unitCost
+  }
+
+  class Expense {
+    +string id
+    +string businessId
+    +string title
+    +number amount
+    +string category
+    +number createdAtMs
+  }
+
+  class AnalyticsReport {
+    +number totalRevenue
+    +number totalExpenses
+    +number cogs
+    +number grossProfit
+    +number netProfit
+    +number completionRate
+  }
+
+  UserProfile "1" --> "0..*" Business : owns
+  UserProfile "1" --> "0..*" CustomerOrder : places
+  Business "1" --> "0..*" Product : publishes
+  Product "1" *-- "0..1" PrivateProductCost : "products/{id}/private/cost"
+  Business "1" --> "0..*" CustomerOrder : receives
+  Business "1" --> "0..*" Expense : records
+  CustomerOrder "1" *-- "1..*" OrderLineItem : "orders/{id}/items"
+  CustomerOrder ..> AnalyticsReport : aggregates completed + paid
+  Expense ..> AnalyticsReport : deducts

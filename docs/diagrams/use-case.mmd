@@ -1,0 +1,47 @@
+flowchart LR
+  Customer(["Xaridor (Customer)"])
+  Owner(["Biznes egasi (Business Owner)"])
+  Admin(["Administrator (Admin)"])
+
+  subgraph Auth ["Autentifikatsiya"]
+    UC1(["Email + Parol bilan ro'yxatdan o'tish va kirish"])
+    UC2(["Parolni tiklash va hisobdan chiqish"])
+  end
+
+  subgraph Marketplace ["Xaridor jarayonlari"]
+    UC3(["Mahsulotlar tasmasini qidirish va toifa bo'yicha filtrlash"])
+    UC4(["Olib ketish / yetkazish tanlab buyurtma berish (zaxira tranzaksiyasi)"])
+    UC5(["Buyurtmalarim tarixini real vaqtda kuzatish (onSnapshot)"])
+    UC6(["Pending holatdagi buyurtmani bekor qilish"])
+  end
+
+  subgraph StoreOps ["Biznes boshqaruvi"]
+    UC7(["Biznes profili yaratish va rad etilganda qayta yuborish"])
+    UC8(["Mahsulot CRUD (sotish narxi, maxfiy tannarx, zaxira)"])
+    UC9(["Kiruvchi buyurtmalarni qabul/tayyor/yakunlash va to'lov tasdiqlash"])
+    UC10(["Xarajatlar kiritish va kunlik/haftalik/oylik foyda analitikasi"])
+  end
+
+  subgraph Governance ["Platforma nazorati"]
+    UC11(["Kutilayotgan biznes arizalarini tasdiqlash"])
+    UC12(["Biznes arizasini sabab ko'rsatib rad etish"])
+  end
+
+  Customer --> UC1
+  Customer --> UC2
+  Customer --> UC3
+  Customer --> UC4
+  Customer --> UC5
+  Customer --> UC6
+
+  Owner --> UC1
+  Owner --> UC2
+  Owner --> UC7
+  Owner --> UC8
+  Owner --> UC9
+  Owner --> UC10
+
+  Admin --> UC1
+  Admin --> UC2
+  Admin --> UC11
+  Admin --> UC12

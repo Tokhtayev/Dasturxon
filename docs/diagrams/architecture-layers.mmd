@@ -1,0 +1,36 @@
+flowchart TB
+  subgraph UI ["Taqdimot qatlami (pages / components)"]
+    Pages["Pages: LoginPage, RegisterPage, CustomerFeedPage, CustomerOrdersPage, OwnerDashboardPage, OwnerProductsPage, OwnerOrdersPage, OwnerAnalyticsPage, AdminDashboardPage"]
+    Modals["Components: OrderCheckoutModal, ProductFormModal, ProductFeedCard, CustomerOrderCard, RejectBusinessModal, Charts"]
+    Guards["Guards: RoleGuard, GuestOnlyGuard"]
+  end
+
+  subgraph Logic ["Mantiq va Kuzatuv qatlami (hooks / context / services)"]
+    Ctx["AuthContext (onAuthStateChanged + users/{uid} Observer)"]
+    Hooks["Hooks: useCustomerFeed, useCustomerOrders, useOwnerDashboard, useAdminBusinesses"]
+    Services["Services: validators, orderLogic, analytics, errors, constants, routing"]
+  end
+
+  subgraph Data ["Ma'lumotlarga kirish qatlami (repositories)"]
+    Repos["Repositories: authRepository, businessRepository, productRepository, orderRepository, expenseRepository"]
+    Config["Config: firebase.ts (indexedDBLocalPersistence)"]
+  end
+
+  subgraph Cloud ["Firebase Bulut xizmatlari"]
+    Auth["Firebase Authentication (Email/Password)"]
+    Firestore["Cloud Firestore + firestore.rules + firestore.indexes.json"]
+  end
+
+  Pages --> Guards
+  Pages --> Modals
+  Pages --> Hooks
+  Pages --> Ctx
+  Pages -. "ESLint: firebase/* import taqiqlangan" .-> Auth
+
+  Hooks --> Repos
+  Hooks --> Services
+  Ctx --> Repos
+  Repos --> Services
+  Repos --> Config
+  Config --> Auth
+  Config --> Firestore
