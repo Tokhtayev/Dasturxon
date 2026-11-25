@@ -143,12 +143,26 @@
 - **Results**: TypeScript/Vite build, oxlint (0 warnings, 0 errors), and 4/4 domain unit tests PASSED.
 
 ### Task 14 (Phase 1.3): Fix Pre-Auth Nickname Read Race in `signUpWithEmail`
+- **Commit Hash**: `c79735e`
 - **Changed Files**: `web/src/repositories/authRepository.ts`, `docs/STATUS.md`
 - **What Was Fixed**:
   - Browser E2E testing against Firebase Emulator exposed a `permission-denied` error during sign-up: `usernames/{normalized}` was queried before `createUserWithEmailAndPassword` when `isSignedIn()` was still `false`.
   - Moved nickname lookup inside the post-Auth `try/catch` block with atomic `deleteUser` rollback if the nickname is already taken or batch write fails, and debounced transient `profile_missing` emissions during batch commit.
 - **Commands Executed**: `cd web && npm run build && npm run lint && npm test`
 - **Results**: Build, oxlint (0 warnings, 0 errors), and 4/4 unit tests PASSED.
+
+### Task 15 (Phase 1.4): Real Firebase Emulator E2E Browser Verification & GitHub Sync
+- **Changed Files**: `docs/STATUS.md`
+- **What Was Verified**:
+  - Ran full 6-stage E2E test in Chromium against live Firebase Auth (`:9099`) and Firestore (`:8080`) Emulators (`demo-dasturxon`):
+    1. Owner sign-up (`owner@dasturxon.test`), show-password toggle, role route guards (`#/admin`, `#/customer` redirected to `#/owner`), business creation (`Baraka novvoyxonasi`), pending approval gate.
+    2. Seeded Admin login (`admin@dasturxon.test`), business rejection (`"Manzil aniqlanmadi"`), Owner resubmission (`rejected -> pending`), Admin approval (`Tasdiqlangan: 1 ta`).
+    3. Owner Product CRUD (`Tandir non` 5 000 / private `costPrice` 2 800 / stock 16; `G'ijduvon Patir Non` 14 000 / private `costPrice` 7 500 / 10% discount).
+    4. Customer sign-up (`customer@dasturxon.test`), feed search & category filter, zero `costPrice` leakage, atomic checkout transaction (qty 3 = 15 000 so'm, stock decremented `16 -> 13`), real-time `"Buyurtmalarim"`.
+    5. Owner order workflow (`accepted -> ready -> completed` with `unitCost` snapshot + `paidAt`), expense entry (`3 000 so'm`), live Firestore analytics (`Daromad: 15 000 so'm`, `Yalpi foyda: 6 600 so'm`, `Sof foyda: 3 600 so'm`, `Bajarilish darajasi: 100%`).
+    6. Mobile responsiveness (`390x844`) with 0 horizontal overflow and 0 uncaught JS errors.
+- **Commands Executed**: `cd web && npm run build && npm run lint && npm test`, `npm run test:rules`
+- **Results**: Web build, oxlint (0 warnings/errors), 4/4 web unit tests, and 34/34 Firestore Rules emulator tests PASSED.
 
 ---
 
@@ -157,9 +171,11 @@
 | Test Suite / Tool | Count | Result | Verification Scope |
 | :--- | :---: | :---: | :--- |
 | **Firestore Security Rules Emulator Tests** (`npm run test:rules`) | **34** | **PASS** | Role escalation prevention, cross-user doc isolation, order privacy, cross-owner product isolation, private cost subcollection isolation (`products/{id}/private/cost`), public costPrice prohibition, business creation forced to `pending`, rejected business resubmission, business ownership immutability, unapproved business order creation block, atomic checkout stock decrement (`lastCheckoutOrderId`), order line item `unitPrice` validation, customer cancellation constraints, owner `unitCost` snapshot, expense isolation, forged analytics event prevention, and real-time snapshot listeners. |
-| **JVM Unit Tests** (`./gradlew testDebugUnitTest`) | **59** | **PASS** | `AnalyticsCalculatorTest` (7), `CustomerOrderModelTest` (3), `ExpenseModelTest` (3), `ProductModelTest` (3), `OrderStatusTest` (3), `AuthRepositoryErrorMappingTest` (4), `BusinessTypeTest` (4), `DomainValidationTest` (10), `OrderHistoryPagingTest` (4), `AuthViewModelTest` (8), `CustomerOrdersViewModelTest` (9), `ExampleUnitTest` (1). |
-| **Android Lint** (`./gradlew lintDebug`) | - | **PASS** | Zero fatal errors; clean resource, accessibility, manifest, and component security checks. |
-| **Debug Build Packaging** (`./gradlew assembleDebug`) | - | **PASS** | Debug APK built successfully with all Kotlin/Java and Hilt dependencies resolved. |
+| **Web Domain Unit Tests** (`cd web && npm test`) | **4** | **PASS** | `validators` (`email`, strong password, nickname, business/product forms), `formatSoM`, `getEffectivePrice` (`math.floor` parity with `firestore.rules`), `getPeriodBounds` (`Asia/Tashkent` Monday week start), `calculateAnalytics` (`completed + paid` revenue, COGS, gross/net profit). |
+| **Web TypeScript & Vite Build** (`cd web && npm run build`) | - | **PASS** | Clean `tsc -b && vite build` static bundle (`web/dist/`). |
+| **Web Linter** (`cd web && npm run lint`) | **41 files** | **PASS** | `oxlint`: 0 warnings, 0 errors. |
+| **Browser E2E Flow (Emulator)** (`http://127.0.0.1:5173`) | **6 stages** | **PASS** | Real Firebase Auth + Firestore Emulator end-to-end flows for Owner, Admin, and Customer roles plus `390x844` mobile layout check. |
+| **Legacy Android JVM Unit Tests** (`android-legacy/`, historical pre-migration) | **59** | **PASS** | Archived Kotlin/Compose unit tests (`AnalyticsCalculatorTest`, `AuthViewModelTest`, etc.) prior to Phase 0 migration. |
 
 ---
 
