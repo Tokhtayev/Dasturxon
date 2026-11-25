@@ -17,9 +17,9 @@ export const isFirebaseConfigured =
   useEmulator ||
   Boolean(
     firebaseConfig.apiKey &&
-      firebaseConfig.projectId &&
-      firebaseConfig.appId &&
-      !firebaseConfig.apiKey.startsWith('demo-')
+    firebaseConfig.projectId &&
+    firebaseConfig.appId &&
+    !firebaseConfig.apiKey.startsWith('demo-')
   );
 
 export const isEmulatorMode = useEmulator;

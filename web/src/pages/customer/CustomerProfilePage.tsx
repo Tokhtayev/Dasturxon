@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { MIN_FULL_NAME_LENGTH } from '../../services/constants';
+import { getReadableErrorMessage } from '../../services/errors';
 
 export const CustomerProfilePage: React.FC = () => {
   const { session, updateFullName, signOut } = useAuth();
@@ -13,7 +15,7 @@ export const CustomerProfilePage: React.FC = () => {
   if (!profile) return null;
 
   const handleSave = async () => {
-    if (nameInput.trim().length < 2) return;
+    if (nameInput.trim().length < MIN_FULL_NAME_LENGTH) return;
     setSaving(true);
     setMsg(null);
     try {
@@ -21,7 +23,7 @@ export const CustomerProfilePage: React.FC = () => {
       setEditing(false);
       setMsg('Profil ismi yangilandi.');
     } catch (err) {
-      setMsg(err instanceof Error ? err.message : 'Xatolik yuz berdi.');
+      setMsg(getReadableErrorMessage(err, 'Xatolik yuz berdi.'));
     } finally {
       setSaving(false);
     }

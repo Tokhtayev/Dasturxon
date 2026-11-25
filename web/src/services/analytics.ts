@@ -1,4 +1,13 @@
 import type { CustomerOrder, Expense, Product } from '../types/domain';
+import {
+  DAYS_IN_WEEK,
+  IN_PROGRESS_ORDER_STATUSES,
+  MAX_DISCOUNT_PERCENT,
+  MILLIS_TO_THOUSANDS,
+  MS_PER_DAY,
+  PERCENT_DIVISOR,
+  TASHKENT_UTC_OFFSET_MS,
+} from './constants.ts';
 
 export function formatSoM(amount: number): string {
   const rounded = Math.round(amount);
@@ -10,7 +19,7 @@ export function formatSoM(amount: number): string {
 export function isDiscountActive(product: Product, nowMs = Date.now()): boolean {
   return (
     product.discountPercent > 0 &&
-    product.discountPercent <= 90 &&
+    product.discountPercent <= MAX_DISCOUNT_PERCENT &&
     (product.discountEndsAtMs === null || product.discountEndsAtMs > nowMs)
   );
 }
@@ -21,7 +30,7 @@ export function isDiscountActive(product: Product, nowMs = Date.now()): boolean 
  */
 export function getEffectivePrice(product: Product, nowMs = Date.now()): number {
   if (!isDiscountActive(product, nowMs)) return product.price;
-  return product.price - Math.floor((product.price * product.discountPercent) / 100);
+  return product.price - Math.floor((product.price * product.discountPercent) / PERCENT_DIVISOR);
 }
 
 export type AnalyticsPeriod = 'today' | 'week' | 'month' | 'all';
@@ -56,32 +65,78 @@ export interface AnalyticsReport {
   trendPoints: number[];
 }
 
-const TASHKENT_OFFSET_MS = 5 * 60 * 60 * 1000;
+export function getPeriodBounds(
+  period: AnalyticsPeriod,
+  nowMs = Date.now()
+): { start: number; end: number } {
+  if (period === 'all') return { start: 0, end: nowMs + MS_PER_DAY };
 
-export function getPeriodBounds(period: AnalyticsPeriod, nowMs = Date.now()): { start: number; end: number } {
-  if (period === 'all') return { start: 0, end: nowMs + 86400000 };
-
-  const tashkentDate = new Date(nowMs + TASHKENT_OFFSET_MS);
+  const tashkentDate = new Date(nowMs + TASHKENT_UTC_OFFSET_MS);
   const y = tashkentDate.getUTCFullYear();
   const m = tashkentDate.getUTCMonth();
   const d = tashkentDate.getUTCDate();
 
   if (period === 'today') {
-    const start = Date.UTC(y, m, d) - TASHKENT_OFFSET_MS;
-    return { start, end: nowMs + 86400000 };
+    const start = Date.UTC(y, m, d) - TASHKENT_UTC_OFFSET_MS;
+    return { start, end: nowMs + MS_PER_DAY };
   }
 
   if (period === 'week') {
     // Monday start in Asia/Tashkent
     const dayOfWeek = tashkentDate.getUTCDay(); // 0=Sun..6=Sat
-    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const start = Date.UTC(y, m, d - diffToMonday) - TASHKENT_OFFSET_MS;
-    return { start, end: nowMs + 86400000 };
+    const diffToMonday = dayOfWeek === 0 ? DAYS_IN_WEEK - 1 : dayOfWeek - 1;
+    const start = Date.UTC(y, m, d - diffToMonday) - TASHKENT_UTC_OFFSET_MS;
+    return { start, end: nowMs + MS_PER_DAY };
   }
 
   // Month start (1st day 00:00 Asia/Tashkent)
-  const start = Date.UTC(y, m, 1) - TASHKENT_OFFSET_MS;
-  return { start, end: nowMs + 86400000 };
+  const start = Date.UTC(y, m, 1) - TASHKENT_UTC_OFFSET_MS;
+  return { start, end: nowMs + MS_PER_DAY };
+}
+
+function buildProductAnalytics(
+  completedList: CustomerOrder[],
+  products: Product[],
+  itemCostOverrides?: Map<string, number>
+): ProductAnalytics[] {
+  const productCostMap = new Map<string, number>();
+  const productPriceMap = new Map<string, number>();
+  products.forEach((p) => {
+    productCostMap.set(p.id, p.costPrice);
+    productPriceMap.set(p.id, p.price);
+  });
+
+  const groups = new Map<string, CustomerOrder[]>();
+  completedList.forEach((order) => {
+    const key = order.productId || order.productName;
+    const arr = groups.get(key) ?? [];
+    arr.push(order);
+    groups.set(key, arr);
+  });
+
+  return Array.from(groups.entries()).map(([key, pOrders]) => {
+    const pName = pOrders[0]?.productName ?? key;
+    const pId = pOrders[0]?.productId ?? key;
+    const qty = pOrders.reduce((s, o) => s + o.quantity, 0);
+    const rev = pOrders.reduce((s, o) => s + o.totalPrice, 0);
+    const cogs = pOrders.reduce((s, o) => {
+      const unitCost = itemCostOverrides?.get(o.id) ?? productCostMap.get(pId) ?? 0;
+      return s + unitCost * o.quantity;
+    }, 0);
+    const costPerUnit = qty > 0 ? Math.round(cogs / qty) : (productCostMap.get(pId) ?? 0);
+    const sellingPerUnit = productPriceMap.get(pId) ?? (qty > 0 ? Math.round(rev / qty) : 0);
+
+    return {
+      productId: pId,
+      productName: pName,
+      quantitySold: qty,
+      revenue: rev,
+      cogs,
+      profit: rev - cogs,
+      costPrice: costPerUnit,
+      sellingPrice: sellingPerUnit,
+    };
+  });
 }
 
 export function calculateAnalytics(
@@ -111,58 +166,15 @@ export function calculateAnalytics(
   const cancelledList = periodOrders.filter(
     (o) => o.status === 'cancelled' || o.status === 'rejected'
   );
-  const inProgressList = periodOrders.filter((o) =>
-    ['pending', 'accepted', 'ready'].includes(o.status)
-  );
+  const inProgressList = periodOrders.filter((o) => IN_PROGRESS_ORDER_STATUSES.includes(o.status));
 
   const completedCount = completedList.length;
-  const cancelledCount = cancelledList.length;
-  const inProgressCount = inProgressList.length;
-
   const totalRevenue = completedList.reduce((acc, o) => acc + o.totalPrice, 0);
   const averageTicket = completedCount > 0 ? Math.round(totalRevenue / completedCount) : 0;
   const completionRate = totalOrders > 0 ? completedCount / totalOrders : 0;
   const totalExpenses = periodExpenses.reduce((acc, e) => acc + e.amount, 0);
 
-  const productCostMap = new Map<string, number>();
-  const productPriceMap = new Map<string, number>();
-  products.forEach((p) => {
-    productCostMap.set(p.id, p.costPrice);
-    productPriceMap.set(p.id, p.price);
-  });
-
-  const groups = new Map<string, CustomerOrder[]>();
-  completedList.forEach((order) => {
-    const key = order.productId || order.productName;
-    const arr = groups.get(key) ?? [];
-    arr.push(order);
-    groups.set(key, arr);
-  });
-
-  const productStats: ProductAnalytics[] = Array.from(groups.entries()).map(([key, pOrders]) => {
-    const pName = pOrders[0]?.productName ?? key;
-    const pId = pOrders[0]?.productId ?? key;
-    const qty = pOrders.reduce((s, o) => s + o.quantity, 0);
-    const rev = pOrders.reduce((s, o) => s + o.totalPrice, 0);
-    const cogs = pOrders.reduce((s, o) => {
-      const unitCost = itemCostOverrides?.get(o.id) ?? productCostMap.get(pId) ?? 0;
-      return s + unitCost * o.quantity;
-    }, 0);
-    const costPerUnit = qty > 0 ? Math.round(cogs / qty) : productCostMap.get(pId) ?? 0;
-    const sellingPerUnit = productPriceMap.get(pId) ?? (qty > 0 ? Math.round(rev / qty) : 0);
-
-    return {
-      productId: pId,
-      productName: pName,
-      quantitySold: qty,
-      revenue: rev,
-      cogs,
-      profit: rev - cogs,
-      costPrice: costPerUnit,
-      sellingPrice: sellingPerUnit,
-    };
-  });
-
+  const productStats = buildProductAnalytics(completedList, products, itemCostOverrides);
   const cogs = productStats.reduce((s, x) => s + x.cogs, 0);
   const grossProfit = totalRevenue - cogs;
   const netProfit = grossProfit - totalExpenses;
@@ -179,15 +191,15 @@ export function calculateAnalytics(
     completedList.length > 0
       ? [...completedList]
           .sort((a, b) => (a.paidAtMs ?? a.createdAtMs) - (b.paidAtMs ?? b.createdAtMs))
-          .map((o) => Math.max(1, Math.round(o.totalPrice / 1000)))
+          .map((o) => Math.max(1, Math.round(o.totalPrice / MILLIS_TO_THOUSANDS)))
       : [0, 0];
 
   return {
     totalRevenue,
     totalOrders,
     completedOrders: completedCount,
-    cancelledOrders: cancelledCount,
-    inProgressOrders: inProgressCount,
+    cancelledOrders: cancelledList.length,
+    inProgressOrders: inProgressList.length,
     averageTicket,
     completionRate,
     totalExpenses,

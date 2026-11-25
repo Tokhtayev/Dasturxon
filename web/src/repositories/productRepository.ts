@@ -15,6 +15,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../config/firebase';
+import { FIRESTORE_IN_CHUNK_SIZE } from '../services/constants';
 import type { Business, BusinessTypeKey, Product, ProductStatus } from '../types/domain';
 
 function toMillis(value: unknown): number {
@@ -69,8 +70,8 @@ export const productRepository = {
 
     const db = getFirebaseDb();
     const chunks: string[][] = [];
-    for (let i = 0; i < approvedBusinessIds.length; i += 10) {
-      chunks.push(approvedBusinessIds.slice(i, i + 10));
+    for (let i = 0; i < approvedBusinessIds.length; i += FIRESTORE_IN_CHUNK_SIZE) {
+      chunks.push(approvedBusinessIds.slice(i, i + FIRESTORE_IN_CHUNK_SIZE));
     }
 
     const chunkResults = new Map<number, Product[]>();

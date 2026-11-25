@@ -4,72 +4,26 @@ import { expenseRepository } from '../repositories/expenseRepository';
 import { orderRepository } from '../repositories/orderRepository';
 import { productRepository } from '../repositories/productRepository';
 import { calculateAnalytics, type AnalyticsPeriod } from '../services/analytics';
-import type {
-  Business,
-  BusinessTypeKey,
-  CustomerOrder,
-  Expense,
-  OrderStatusKey,
-  PaymentStatus,
-  Product,
-  ProductStatus,
-} from '../types/domain';
+import type { Business, CustomerOrder, Expense, Product } from '../types/domain';
+import { buildOwnerActions } from './ownerActions';
 
-export function useOwnerDashboard(ownerId: string | undefined) {
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [loadedOwnerId, setLoadedOwnerId] = useState<string | null>(null);
-
+function useBusinessStreams(businessId: string | undefined, onError: (msg: string) => void) {
   const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [costMap, setCostMap] = useState<Map<string, number>>(new Map());
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [itemCostMap, setItemCostMap] = useState<Map<string, number>>(new Map());
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>('week');
   const [analyticsAnchorMs, setAnalyticsAnchorMs] = useState<number>(() => Date.now());
 
   useEffect(() => {
-    if (!ownerId) return;
-    const unsub = businessRepository.observeForOwner(
-      ownerId,
-      (list) => {
-        setBusinesses(list);
-        setLoadedOwnerId(ownerId);
-        setError(null);
-      },
-      (err) => {
-        setError(err.message);
-        setLoadedOwnerId(ownerId);
-      }
-    );
-    return unsub;
-  }, [ownerId]);
-
-  const ownerBusinesses = useMemo(() => (ownerId ? businesses : []), [ownerId, businesses]);
-  const businessesLoaded = !ownerId || loadedOwnerId === ownerId;
-
-  const business = useMemo(
-    () =>
-      ownerBusinesses.find((b) => b.status === 'approved') ??
-      ownerBusinesses.find((b) => b.status === 'pending') ??
-      ownerBusinesses.find((b) => b.status === 'rejected') ??
-      ownerBusinesses[0] ??
-      null,
-    [ownerBusinesses]
-  );
-
-  const businessId = business?.id;
-
-  useEffect(() => {
     if (!businessId) return;
-
     const unsubProds = productRepository.observeForBusiness(
       businessId,
       (list) => {
         setRawProducts(list);
         setAnalyticsAnchorMs(Date.now());
       },
-      (err) => setError(err.message)
+      (err) => onError(err.message)
     );
     const unsubOrders = orderRepository.observeForBusiness(
       businessId,
@@ -77,7 +31,7 @@ export function useOwnerDashboard(ownerId: string | undefined) {
         setOrders(list);
         setAnalyticsAnchorMs(Date.now());
       },
-      (err) => setError(err.message)
+      (err) => onError(err.message)
     );
     const unsubExpenses = expenseRepository.observeForBusiness(
       businessId,
@@ -85,30 +39,28 @@ export function useOwnerDashboard(ownerId: string | undefined) {
         setExpenses(list);
         setAnalyticsAnchorMs(Date.now());
       },
-      (err) => setError(err.message)
+      (err) => onError(err.message)
     );
-
     return () => {
       unsubProds();
       unsubOrders();
       unsubExpenses();
     };
-  }, [businessId]);
-
-  const scopedProducts = useMemo(() => (businessId ? rawProducts : []), [businessId, rawProducts]);
-  const scopedOrders = useMemo(() => (businessId ? orders : []), [businessId, orders]);
-  const scopedExpenses = useMemo(() => (businessId ? expenses : []), [businessId, expenses]);
+  }, [businessId, onError]);
 
   const productIdsKey = useMemo(
-    () => scopedProducts.map((p) => p.id).sort().join(','),
-    [scopedProducts]
+    () =>
+      (businessId ? rawProducts : [])
+        .map((p) => p.id)
+        .sort()
+        .join(','),
+    [businessId, rawProducts]
   );
 
   useEffect(() => {
     if (!productIdsKey) return;
     let active = true;
-    const ids = productIdsKey.split(',');
-    productRepository.loadPrivateCostPrices(ids).then((map) => {
+    productRepository.loadPrivateCostPrices(productIdsKey.split(',')).then((map) => {
       if (active) setCostMap(map);
     });
     return () => {
@@ -118,12 +70,12 @@ export function useOwnerDashboard(ownerId: string | undefined) {
 
   const completedOrderIdsKey = useMemo(
     () =>
-      scopedOrders
+      (businessId ? orders : [])
         .filter((o) => o.status === 'completed')
         .map((o) => o.id)
         .sort()
         .join(','),
-    [scopedOrders]
+    [businessId, orders]
   );
 
   useEffect(() => {
@@ -137,13 +89,70 @@ export function useOwnerDashboard(ownerId: string | undefined) {
     };
   }, [completedOrderIdsKey]);
 
-  const products = useMemo(
+  return {
+    rawProducts,
+    costMap,
+    setCostMap,
+    orders,
+    itemCostMap,
+    expenses,
+    analyticsAnchorMs,
+    setAnalyticsAnchorMs,
+  };
+}
+
+export function useOwnerDashboard(ownerId: string | undefined) {
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [loadedOwnerId, setLoadedOwnerId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>('week');
+
+  useEffect(() => {
+    if (!ownerId) return;
+    return businessRepository.observeForOwner(
+      ownerId,
+      (list) => {
+        setBusinesses(list);
+        setLoadedOwnerId(ownerId);
+        setError(null);
+      },
+      (err) => {
+        setError(err.message);
+        setLoadedOwnerId(ownerId);
+      }
+    );
+  }, [ownerId]);
+
+  const ownerBusinesses = useMemo(() => (ownerId ? businesses : []), [ownerId, businesses]);
+  const businessesLoaded = !ownerId || loadedOwnerId === ownerId;
+  const business = useMemo(
     () =>
-      scopedProducts.map((p) => ({
-        ...p,
-        costPrice: costMap.get(p.id) ?? 0,
-      })),
-    [scopedProducts, costMap]
+      ownerBusinesses.find((b) => b.status === 'approved') ??
+      ownerBusinesses.find((b) => b.status === 'pending') ??
+      ownerBusinesses.find((b) => b.status === 'rejected') ??
+      ownerBusinesses[0] ??
+      null,
+    [ownerBusinesses]
+  );
+
+  const businessId = business?.id;
+  const streams = useBusinessStreams(businessId, setError);
+  const scopedProducts = useMemo(
+    () => (businessId ? streams.rawProducts : []),
+    [businessId, streams.rawProducts]
+  );
+  const scopedOrders = useMemo(
+    () => (businessId ? streams.orders : []),
+    [businessId, streams.orders]
+  );
+  const scopedExpenses = useMemo(
+    () => (businessId ? streams.expenses : []),
+    [businessId, streams.expenses]
+  );
+
+  const products = useMemo(
+    () => scopedProducts.map((p) => ({ ...p, costPrice: streams.costMap.get(p.id) ?? 0 })),
+    [scopedProducts, streams.costMap]
   );
 
   const report = useMemo(
@@ -153,10 +162,17 @@ export function useOwnerDashboard(ownerId: string | undefined) {
         scopedExpenses,
         products,
         analyticsPeriod,
-        analyticsAnchorMs,
-        itemCostMap
+        streams.analyticsAnchorMs,
+        streams.itemCostMap
       ),
-    [scopedOrders, scopedExpenses, products, analyticsPeriod, analyticsAnchorMs, itemCostMap]
+    [
+      scopedOrders,
+      scopedExpenses,
+      products,
+      analyticsPeriod,
+      streams.analyticsAnchorMs,
+      streams.itemCostMap,
+    ]
   );
 
   return {
@@ -168,110 +184,16 @@ export function useOwnerDashboard(ownerId: string | undefined) {
     report,
     analyticsPeriod,
     setAnalyticsPeriod: (period: AnalyticsPeriod) => {
-      setAnalyticsAnchorMs(Date.now());
+      streams.setAnalyticsAnchorMs(Date.now());
       setAnalyticsPeriod(period);
     },
     error,
     clearError: () => setError(null),
-
-    createBusiness: async (params: {
-      name: string;
-      type: BusinessTypeKey;
-      address: string;
-      phone: string;
-      typeNote?: string;
-    }) => {
-      if (!ownerId) throw new Error('Tizimga kiring.');
-      await businessRepository.create({ ownerId, ...params });
-    },
-
-    updateBusiness: async (params: {
-      name: string;
-      type: BusinessTypeKey;
-      address: string;
-      phone: string;
-      typeNote?: string;
-    }) => {
-      if (!business) return;
-      await businessRepository.updateDetails({ businessId: business.id, ...params });
-    },
-
-    resubmitBusiness: async (params: {
-      name: string;
-      type: BusinessTypeKey;
-      address: string;
-      phone: string;
-      typeNote?: string;
-    }) => {
-      if (!business) return;
-      await businessRepository.resubmit({ businessId: business.id, ...params });
-    },
-
-    createProduct: async (params: {
-      name: string;
-      description: string;
-      price: number;
-      costPrice: number;
-      stock: number | null;
-      discountPercent: number;
-      discountEndsAtMs: number | null;
-      status: ProductStatus;
-      published: boolean;
-    }) => {
-      if (!business) throw new Error('Avval biznes profilini yarating.');
-      const id = await productRepository.create({ business, ...params });
-      setCostMap((prev) => new Map(prev).set(id, params.costPrice));
-    },
-
-    updateProduct: async (params: {
-      productId: string;
-      name: string;
-      description: string;
-      price: number;
-      costPrice: number;
-      stock: number | null;
-      discountPercent: number;
-      discountEndsAtMs: number | null;
-      status: ProductStatus;
-      published: boolean;
-    }) => {
-      await productRepository.update(params);
-      setCostMap((prev) => new Map(prev).set(params.productId, params.costPrice));
-    },
-
-    setProductStatus: async (productId: string, status: ProductStatus) => {
-      await productRepository.setStatus(productId, status);
-    },
-
-    deleteProduct: async (productId: string) => {
-      await productRepository.delete(productId);
-    },
-
-    advanceOrder: async (orderId: string, productId: string, nextStatus: OrderStatusKey) => {
-      if (nextStatus === 'completed') {
-        const unitCost =
-          costMap.get(productId) ?? (await productRepository.getPrivateCostPrice(productId));
-        await orderRepository.completeOrderWithUnitCost(orderId, unitCost);
-        return;
-      }
-      await orderRepository.updateStatus(orderId, nextStatus);
-    },
-
-    rejectOrder: async (orderId: string) => {
-      await orderRepository.rejectOrderAndRestoreStock(orderId);
-    },
-
-    setPaymentStatus: async (orderId: string, status: PaymentStatus) => {
-      await orderRepository.setPaymentStatus(orderId, status);
-    },
-
-    addExpense: async (params: { title: string; amount: number; category: string }) => {
-      if (!business) throw new Error('Biznes topilmadi.');
-      await expenseRepository.create({ businessId: business.id, ...params });
-    },
-
-    deleteExpense: async (expenseId: string) => {
-      await expenseRepository.delete(expenseId);
-    },
+    ...buildOwnerActions({
+      ownerId,
+      business,
+      costMap: streams.costMap,
+      setCostMap: streams.setCostMap,
+    }),
   };
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { orderRepository } from '../repositories/orderRepository';
+import { IN_PROGRESS_ORDER_STATUSES, TERMINAL_ORDER_STATUSES } from '../services/constants';
 import type { Business, CustomerOrder, FulfillmentType, Product } from '../types/domain';
 
 export function useCustomerOrders(customerId: string | undefined) {
@@ -28,11 +29,11 @@ export function useCustomerOrders(customerId: string | undefined) {
   const loading = Boolean(customerId && loadedForUid !== customerId);
 
   const activeOrders = useMemo(
-    () => visibleOrders.filter((o) => ['pending', 'accepted', 'ready'].includes(o.status)),
+    () => visibleOrders.filter((o) => IN_PROGRESS_ORDER_STATUSES.includes(o.status)),
     [visibleOrders]
   );
   const historyOrders = useMemo(
-    () => visibleOrders.filter((o) => ['completed', 'rejected', 'cancelled'].includes(o.status)),
+    () => visibleOrders.filter((o) => TERMINAL_ORDER_STATUSES.includes(o.status)),
     [visibleOrders]
   );
 

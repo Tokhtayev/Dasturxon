@@ -58,7 +58,14 @@ export const RevenueLineChart: React.FC<LineChartProps> = ({ data }) => {
         />
         {points.map((p, idx) => (
           <g key={idx}>
-            <circle cx={p.x} cy={p.y} r="5" fill="var(--dx-surface)" stroke="var(--dx-primary)" strokeWidth="2.5" />
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r="5"
+              fill="var(--dx-surface)"
+              stroke="var(--dx-primary)"
+              strokeWidth="2.5"
+            />
             <text
               x={p.x}
               y={p.y - 10}

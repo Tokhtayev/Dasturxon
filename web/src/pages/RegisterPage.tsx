@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff, ShoppingBag, Store } from 'lucide-react';
 import { DxLogo } from '../components/DxLogo';
 import { useAuth } from '../hooks/useAuth';
+import { getReadableErrorMessage } from '../services/errors';
 import { validateSignUpForm } from '../services/validators';
 import type { RegisterableRole } from '../types/domain';
 
@@ -22,28 +23,15 @@ export const RegisterPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    const validation = validateSignUpForm({
-      fullName,
-      nickname,
-      email,
-      password,
-      confirmPassword,
-    });
-    if (!validation.valid) {
-      setError(validation.error ?? "Ma'lumotlarni tekshiring.");
-      return;
-    }
-    if (!firebaseReady) {
-      setError('Firebase Web SDK sozlanmagan (.env faylini tekshiring).');
-      return;
-    }
+    const check = validateSignUpForm({ fullName, nickname, email, password, confirmPassword });
+    if (!check.valid) return setError(check.error ?? "Ma'lumotlarni tekshiring.");
+    if (!firebaseReady) return setError('Firebase Web SDK sozlanmagan (.env faylini tekshiring).');
 
     setSubmitting(true);
     try {
       await signUp({ fullName, nickname, email, password, role, phone });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ro'yxatdan o'tishda xatolik yuz berdi.");
+      setError(getReadableErrorMessage(err, "Ro'yxatdan o'tishda xatolik yuz berdi."));
     } finally {
       setSubmitting(false);
     }
@@ -75,147 +63,25 @@ export const RegisterPage: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Role selection (only customer or owner) */}
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => setRole('customer')}
-                className="p-3 rounded-2xl border text-left space-y-1 cursor-pointer transition-colors"
-                style={{
-                  backgroundColor:
-                    role === 'customer' ? 'var(--dx-primary-container)' : 'var(--dx-bg)',
-                  borderColor: role === 'customer' ? 'var(--dx-primary)' : 'var(--dx-border)',
-                }}
-              >
-                <ShoppingBag className="w-4 h-4" style={{ color: 'var(--dx-primary)' }} />
-                <div className="text-xs font-extrabold">Xaridor</div>
-                <div className="text-[11px]" style={{ color: 'var(--dx-muted)' }}>
-                  Buyurtma berish
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setRole('owner')}
-                className="p-3 rounded-2xl border text-left space-y-1 cursor-pointer transition-colors"
-                style={{
-                  backgroundColor:
-                    role === 'owner' ? 'var(--dx-secondary-container)' : 'var(--dx-bg)',
-                  borderColor: role === 'owner' ? 'var(--dx-secondary)' : 'var(--dx-border)',
-                }}
-              >
-                <Store className="w-4 h-4" style={{ color: 'var(--dx-secondary)' }} />
-                <div className="text-xs font-extrabold">Biznes egasi</div>
-                <div className="text-[11px]" style={{ color: 'var(--dx-muted)' }}>
-                  Do‘kon boshqarish
-                </div>
-              </button>
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="reg-fullname" className="text-xs font-bold block">
-                To‘liq ism
-              </label>
-              <input
-                id="reg-fullname"
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Masalan: Azizbek Karimov"
-                className="w-full px-3.5 py-2.5 rounded-2xl border text-sm"
-                style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label htmlFor="reg-nick" className="text-xs font-bold block">
-                  Nickname (unikal)
-                </label>
-                <input
-                  id="reg-nick"
-                  type="text"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  placeholder="azizbek_01"
-                  className="w-full px-3.5 py-2.5 rounded-2xl border text-sm"
-                  style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
-                />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="reg-phone" className="text-xs font-bold block">
-                  Telefon (ixtiyoriy)
-                </label>
-                <input
-                  id="reg-phone"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+998 90 123 45 67"
-                  className="w-full px-3.5 py-2.5 rounded-2xl border text-sm"
-                  style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="reg-email" className="text-xs font-bold block">
-                Email manzil
-              </label>
-              <input
-                id="reg-email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="azizbek@gmail.com"
-                className="w-full px-3.5 py-2.5 rounded-2xl border text-sm"
-                style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="reg-password" className="text-xs font-bold block">
-                Parol (kamida 8 belgi, harf + raqam)
-              </label>
-              <div className="relative">
-                <input
-                  id="reg-password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-3.5 pr-11 py-2.5 rounded-2xl border text-sm"
-                  style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? 'Parolni yashirish' : "Parolni ko'rsatish"}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 cursor-pointer"
-                  style={{ color: 'var(--dx-muted)' }}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="reg-confirm" className="text-xs font-bold block">
-                Parolni tasdiqlang
-              </label>
-              <input
-                id="reg-confirm"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3.5 py-2.5 rounded-2xl border text-sm"
-                style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
-              />
-            </div>
+            <RoleSelector role={role} onChange={setRole} />
+            <ProfileFields
+              fullName={fullName}
+              onFullNameChange={setFullName}
+              nickname={nickname}
+              onNicknameChange={setNickname}
+              phone={phone}
+              onPhoneChange={setPhone}
+              email={email}
+              onEmailChange={setEmail}
+            />
+            <PasswordFields
+              password={password}
+              onPasswordChange={setPassword}
+              confirmPassword={confirmPassword}
+              onConfirmChange={setConfirmPassword}
+              showPassword={showPassword}
+              onToggleShow={() => setShowPassword((v) => !v)}
+            />
 
             {error && (
               <div
@@ -242,7 +108,11 @@ export const RegisterPage: React.FC = () => {
 
           <p className="text-center text-xs" style={{ color: 'var(--dx-muted)' }}>
             Allaqachon hisobingiz bormi?{' '}
-            <Link to="/login" className="font-bold underline" style={{ color: 'var(--dx-primary)' }}>
+            <Link
+              to="/login"
+              className="font-bold underline"
+              style={{ color: 'var(--dx-primary)' }}
+            >
               Kirish
             </Link>
           </p>
@@ -251,3 +121,184 @@ export const RegisterPage: React.FC = () => {
     </div>
   );
 };
+
+const RoleSelector: React.FC<{
+  role: RegisterableRole;
+  onChange: (r: RegisterableRole) => void;
+}> = ({ role, onChange }) => (
+  <div className="grid grid-cols-2 gap-2.5">
+    <button
+      type="button"
+      onClick={() => onChange('customer')}
+      className="p-3 rounded-2xl border text-left space-y-1 cursor-pointer transition-colors"
+      style={{
+        backgroundColor: role === 'customer' ? 'var(--dx-primary-container)' : 'var(--dx-bg)',
+        borderColor: role === 'customer' ? 'var(--dx-primary)' : 'var(--dx-border)',
+      }}
+    >
+      <ShoppingBag className="w-4 h-4" style={{ color: 'var(--dx-primary)' }} />
+      <div className="text-xs font-extrabold">Xaridor</div>
+      <div className="text-[11px]" style={{ color: 'var(--dx-muted)' }}>
+        Buyurtma berish
+      </div>
+    </button>
+
+    <button
+      type="button"
+      onClick={() => onChange('owner')}
+      className="p-3 rounded-2xl border text-left space-y-1 cursor-pointer transition-colors"
+      style={{
+        backgroundColor: role === 'owner' ? 'var(--dx-secondary-container)' : 'var(--dx-bg)',
+        borderColor: role === 'owner' ? 'var(--dx-secondary)' : 'var(--dx-border)',
+      }}
+    >
+      <Store className="w-4 h-4" style={{ color: 'var(--dx-secondary)' }} />
+      <div className="text-xs font-extrabold">Biznes egasi</div>
+      <div className="text-[11px]" style={{ color: 'var(--dx-muted)' }}>
+        Do‘kon boshqarish
+      </div>
+    </button>
+  </div>
+);
+
+const ProfileFields: React.FC<{
+  fullName: string;
+  onFullNameChange: (v: string) => void;
+  nickname: string;
+  onNicknameChange: (v: string) => void;
+  phone: string;
+  onPhoneChange: (v: string) => void;
+  email: string;
+  onEmailChange: (v: string) => void;
+}> = ({
+  fullName,
+  onFullNameChange,
+  nickname,
+  onNicknameChange,
+  phone,
+  onPhoneChange,
+  email,
+  onEmailChange,
+}) => (
+  <>
+    <div className="space-y-1">
+      <label htmlFor="reg-fullname" className="text-xs font-bold block">
+        To‘liq ism
+      </label>
+      <input
+        id="reg-fullname"
+        type="text"
+        value={fullName}
+        onChange={(e) => onFullNameChange(e.target.value)}
+        placeholder="Masalan: Azizbek Karimov"
+        className="w-full px-3.5 py-2.5 rounded-2xl border text-sm"
+        style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+      />
+    </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="space-y-1">
+        <label htmlFor="reg-nick" className="text-xs font-bold block">
+          Nickname (unikal)
+        </label>
+        <input
+          id="reg-nick"
+          type="text"
+          value={nickname}
+          onChange={(e) => onNicknameChange(e.target.value)}
+          placeholder="azizbek_01"
+          className="w-full px-3.5 py-2.5 rounded-2xl border text-sm"
+          style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+        />
+      </div>
+      <div className="space-y-1">
+        <label htmlFor="reg-phone" className="text-xs font-bold block">
+          Telefon (ixtiyoriy)
+        </label>
+        <input
+          id="reg-phone"
+          type="tel"
+          value={phone}
+          onChange={(e) => onPhoneChange(e.target.value)}
+          placeholder="+998 90 123 45 67"
+          className="w-full px-3.5 py-2.5 rounded-2xl border text-sm"
+          style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+        />
+      </div>
+    </div>
+    <div className="space-y-1">
+      <label htmlFor="reg-email" className="text-xs font-bold block">
+        Email manzil
+      </label>
+      <input
+        id="reg-email"
+        type="email"
+        autoComplete="email"
+        value={email}
+        onChange={(e) => onEmailChange(e.target.value)}
+        placeholder="azizbek@gmail.com"
+        className="w-full px-3.5 py-2.5 rounded-2xl border text-sm"
+        style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+      />
+    </div>
+  </>
+);
+
+const PasswordFields: React.FC<{
+  password: string;
+  onPasswordChange: (v: string) => void;
+  confirmPassword: string;
+  onConfirmChange: (v: string) => void;
+  showPassword: boolean;
+  onToggleShow: () => void;
+}> = ({
+  password,
+  onPasswordChange,
+  confirmPassword,
+  onConfirmChange,
+  showPassword,
+  onToggleShow,
+}) => (
+  <>
+    <div className="space-y-1">
+      <label htmlFor="reg-password" className="text-xs font-bold block">
+        Parol (kamida 8 belgi, harf + raqam)
+      </label>
+      <div className="relative">
+        <input
+          id="reg-password"
+          type={showPassword ? 'text' : 'password'}
+          autoComplete="new-password"
+          value={password}
+          onChange={(e) => onPasswordChange(e.target.value)}
+          placeholder="••••••••"
+          className="w-full pl-3.5 pr-11 py-2.5 rounded-2xl border text-sm"
+          style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+        />
+        <button
+          type="button"
+          onClick={onToggleShow}
+          aria-label={showPassword ? 'Parolni yashirish' : "Parolni ko'rsatish"}
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 cursor-pointer"
+          style={{ color: 'var(--dx-muted)' }}
+        >
+          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
+    </div>
+    <div className="space-y-1">
+      <label htmlFor="reg-confirm" className="text-xs font-bold block">
+        Parolni tasdiqlang
+      </label>
+      <input
+        id="reg-confirm"
+        type={showPassword ? 'text' : 'password'}
+        autoComplete="new-password"
+        value={confirmPassword}
+        onChange={(e) => onConfirmChange(e.target.value)}
+        placeholder="••••••••"
+        className="w-full px-3.5 py-2.5 rounded-2xl border text-sm"
+        style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+      />
+    </div>
+  </>
+);

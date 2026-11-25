@@ -157,7 +157,14 @@ test('calculateAnalytics requires completed + paid orders and separates gross/ne
     },
   ];
   const expenses: Expense[] = [
-    { id: 'e1', businessId: 'b1', title: 'Un', amount: 8000, category: 'Xomashyo', createdAtMs: now },
+    {
+      id: 'e1',
+      businessId: 'b1',
+      title: 'Un',
+      amount: 8000,
+      category: 'Xomashyo',
+      createdAtMs: now,
+    },
   ];
 
   const report = calculateAnalytics(orders, expenses, products, 'today', now);

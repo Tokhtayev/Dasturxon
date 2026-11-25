@@ -18,6 +18,8 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseDb, isFirebaseConfigured } from '../config/firebase';
+import { REGISTRATION_PROFILE_DEBOUNCE_MS } from '../services/constants';
+import { getReadableErrorMessage } from '../services/errors';
 import { normalizeNickname } from '../services/validators';
 import type { AuthSessionState, RegisterableRole, UserProfile, UserRole } from '../types/domain';
 
@@ -34,8 +36,7 @@ function mapUserDoc(uid: string, data: Record<string, unknown>): UserProfile {
   return {
     uid,
     fullName: typeof data.fullName === 'string' ? data.fullName : '',
-    normalizedNickname:
-      typeof data.normalizedNickname === 'string' ? data.normalizedNickname : '',
+    normalizedNickname: typeof data.normalizedNickname === 'string' ? data.normalizedNickname : '',
     email: typeof data.email === 'string' ? data.email : '',
     phone: typeof data.phone === 'string' ? data.phone : '',
     role,
@@ -65,11 +66,10 @@ export function mapAuthErrorMessage(err: unknown): string {
       case 'permission-denied':
         return "Ruxsat cheklangan yoki hisob ma'lumotlariga kirish taqiqlangan.";
       default:
-        return err.message || "Tizimda xatolik yuz berdi. Qayta urinib ko'ring.";
+        return getReadableErrorMessage(err, "Tizimda xatolik yuz berdi. Qayta urinib ko'ring.");
     }
   }
-  if (err instanceof Error) return err.message;
-  return "Tizimda kutilmagan xatolik yuz berdi.";
+  return getReadableErrorMessage(err, 'Tizimda kutilmagan xatolik yuz berdi.');
 }
 
 export const authRepository = {
@@ -123,7 +123,7 @@ export const authRepository = {
                 uid: firebaseUser.uid,
                 email: firebaseUser.email ?? '',
               });
-            }, 1500);
+            }, REGISTRATION_PROFILE_DEBOUNCE_MS);
           }
         },
         (error) => {

@@ -28,9 +28,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 }) => {
   const { session, emulatorMode, signOut } = useAuth();
   const displayName =
-    session.status === 'ready'
-      ? session.profile.fullName || session.profile.email
-      : '';
+    session.status === 'ready' ? session.profile.fullName || session.profile.email : '';
 
   return (
     <div className="min-h-screen flex flex-col pb-20 md:pb-0">
@@ -114,9 +112,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         </div>
       </header>
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-7">
-        {children}
-      </main>
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-7">{children}</main>
 
       {/* Mobile Bottom Navigation */}
       <nav

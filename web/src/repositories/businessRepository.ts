@@ -66,9 +66,7 @@ export const businessRepository = {
     return onSnapshot(
       q,
       (snap) => {
-        onData(
-          snap.docs.map((d) => mapBusinessDoc(d.id, d.data() as Record<string, unknown>))
-        );
+        onData(snap.docs.map((d) => mapBusinessDoc(d.id, d.data() as Record<string, unknown>)));
       },
       (err) => onError(new Error(err.message))
     );
@@ -84,18 +82,13 @@ export const businessRepository = {
     return onSnapshot(
       q,
       (snap) => {
-        onData(
-          snap.docs.map((d) => mapBusinessDoc(d.id, d.data() as Record<string, unknown>))
-        );
+        onData(snap.docs.map((d) => mapBusinessDoc(d.id, d.data() as Record<string, unknown>)));
       },
       (err) => onError(new Error(err.message))
     );
   },
 
-  observeAll(
-    onData: (businesses: Business[]) => void,
-    onError: (err: Error) => void
-  ): Unsubscribe {
+  observeAll(onData: (businesses: Business[]) => void, onError: (err: Error) => void): Unsubscribe {
     const db = getFirebaseDb();
     return onSnapshot(
       collection(db, 'businesses'),

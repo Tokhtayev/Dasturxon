@@ -1,27 +1,34 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { OrderStatusDonutChart, RevenueLineChart } from '../../components/Charts';
+import { ExpenseModal } from '../../components/owner/ExpenseModal';
 import { formatSoM } from '../../services/analytics';
+import { PERCENT_DIVISOR } from '../../services/constants';
+import { getReadableErrorMessage } from '../../services/errors';
+import type { Expense } from '../../types/domain';
 import type { OwnerContextType } from './OwnerLayout';
+
+const PERIOD_TABS = [
+  ['today', 'Bugun'],
+  ['week', 'Bu hafta'],
+  ['month', 'Bu oy'],
+  ['all', 'Barchasi'],
+] as const;
 
 export const OwnerAnalyticsPage: React.FC = () => {
   const { report, expenses, analyticsPeriod, setAnalyticsPeriod, addExpense, deleteExpense } =
     useOutletContext<OwnerContextType>();
-
   const [expOpen, setExpOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('Xomashyo');
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const handleAddExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const num = Number(amount);
-    if (!title.trim() || !Number.isFinite(num) || num <= 0) return;
-    await addExpense({ title, amount: num, category });
-    setTitle('');
-    setAmount('');
-    setExpOpen(false);
+  const handleDeleteExpense = async (expenseId: string) => {
+    setActionError(null);
+    try {
+      await deleteExpense(expenseId);
+    } catch (err) {
+      setActionError(getReadableErrorMessage(err, "Xarajatni o'chirib bo'lmadi."));
+    }
   };
 
   return (
@@ -29,21 +36,15 @@ export const OwnerAnalyticsPage: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-extrabold">Biznes Analitikasi</h1>
         <div className="flex gap-1.5">
-          {(
-            [
-              ['today', 'Bugun'],
-              ['week', 'Bu hafta'],
-              ['month', 'Bu oy'],
-              ['all', 'Barchasi'],
-            ] as const
-          ).map(([key, label]) => (
+          {PERIOD_TABS.map(([key, label]) => (
             <button
               key={key}
               type="button"
               onClick={() => setAnalyticsPeriod(key)}
               className="px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer"
               style={{
-                backgroundColor: analyticsPeriod === key ? 'var(--dx-primary)' : 'var(--dx-surface)',
+                backgroundColor:
+                  analyticsPeriod === key ? 'var(--dx-primary)' : 'var(--dx-surface)',
                 color: analyticsPeriod === key ? 'var(--dx-on-primary)' : 'var(--dx-text)',
                 borderColor: 'var(--dx-border)',
               }}
@@ -54,18 +55,26 @@ export const OwnerAnalyticsPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
-        <Kpi title="Daromad (completed + paid)" value={formatSoM(report.totalRevenue)} color="var(--dx-primary)" />
-        <Kpi title="Xarajatlar" value={formatSoM(report.totalExpenses)} />
-        <Kpi title="Yalpi foyda (Rev − COGS)" value={formatSoM(report.grossProfit)} color="var(--dx-secondary)" />
-        <Kpi
-          title="Sof foyda (Gross − Exp)"
-          value={formatSoM(report.netProfit)}
-          color={report.netProfit >= 0 ? 'var(--dx-tertiary)' : 'var(--dx-error)'}
-        />
-        <Kpi title="O‘rtacha chek" value={formatSoM(report.averageTicket)} />
-        <Kpi title="Bajarilish darajasi" value={`${Math.round(report.completionRate * 100)}%`} />
-      </div>
+      {actionError && (
+        <div
+          className="p-3 rounded-2xl text-xs font-bold"
+          style={{
+            backgroundColor: 'var(--dx-error-container)',
+            color: 'var(--dx-on-error-container)',
+          }}
+        >
+          {actionError}
+        </div>
+      )}
+
+      <AnalyticsKpiGrid
+        revenue={report.totalRevenue}
+        expenses={report.totalExpenses}
+        gross={report.grossProfit}
+        net={report.netProfit}
+        avgTicket={report.averageTicket}
+        completionRate={report.completionRate}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <div
@@ -88,112 +97,97 @@ export const OwnerAnalyticsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Expenses Section */}
-      <div
-        className="p-5 rounded-2xl border space-y-3.5"
-        style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold text-base">Xarajatlar ({expenses.length})</h2>
-          <button
-            type="button"
-            onClick={() => setExpOpen(true)}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
-            style={{
-              backgroundColor: 'var(--dx-primary-container)',
-              color: 'var(--dx-on-primary-container)',
-            }}
-          >
-            <Plus className="w-3.5 h-3.5" /> Xarajat qo‘shish
-          </button>
-        </div>
+      <ExpensesSection
+        expenses={expenses}
+        onOpenAdd={() => setExpOpen(true)}
+        onDelete={(id) => void handleDeleteExpense(id)}
+      />
 
-        {expenses.length === 0 ? (
-          <p className="text-xs" style={{ color: 'var(--dx-muted)' }}>
-            Hozircha xarajatlar kiritilmagan.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {expenses.map((exp) => (
-              <div
-                key={exp.id}
-                className="p-3 rounded-xl border flex items-center justify-between gap-2 text-xs"
-                style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
-              >
-                <div>
-                  <div className="font-bold">{exp.title}</div>
-                  <div style={{ color: 'var(--dx-muted)' }}>{exp.category}</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-extrabold">{formatSoM(exp.amount)}</span>
-                  <button
-                    type="button"
-                    onClick={() => void deleteExpense(exp.id)}
-                    className="p-1 cursor-pointer"
-                    style={{ color: 'var(--dx-error)' }}
-                    aria-label="Xarajatni o'chirish"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {expOpen && (
-        <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-xs flex items-center justify-center p-4">
-          <form
-            onSubmit={handleAddExpense}
-            className="w-full max-w-sm rounded-3xl border p-6 space-y-3.5"
-            style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-lg font-bold">Xarajat kiritish</h2>
-              <button type="button" onClick={() => setExpOpen(false)} className="cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Xarajat nomi (masalan: Bug'doy uni)"
-              className="w-full px-3.5 py-2.5 rounded-xl border text-sm"
-              style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
-            />
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Summa (so'm)"
-              className="w-full px-3.5 py-2.5 rounded-xl border text-sm"
-              style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
-            />
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border text-sm"
-              style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
-            >
-              <option value="Xomashyo">Xomashyo</option>
-              <option value="Kommunal">Kommunal</option>
-              <option value="Ish haqi">Ish haqi</option>
-              <option value="Boshqa">Boshqa</option>
-            </select>
-            <button
-              type="submit"
-              className="w-full py-3 rounded-2xl text-sm font-bold cursor-pointer"
-              style={{ backgroundColor: 'var(--dx-primary)', color: 'var(--dx-on-primary)' }}
-            >
-              Saqlash
-            </button>
-          </form>
-        </div>
-      )}
+      {expOpen && <ExpenseModal onClose={() => setExpOpen(false)} onAdd={addExpense} />}
     </div>
   );
 };
+
+const AnalyticsKpiGrid: React.FC<{
+  revenue: number;
+  expenses: number;
+  gross: number;
+  net: number;
+  avgTicket: number;
+  completionRate: number;
+}> = ({ revenue, expenses, gross, net, avgTicket, completionRate }) => (
+  <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
+    <Kpi title="Daromad (completed + paid)" value={formatSoM(revenue)} color="var(--dx-primary)" />
+    <Kpi title="Xarajatlar" value={formatSoM(expenses)} />
+    <Kpi title="Yalpi foyda (Rev − COGS)" value={formatSoM(gross)} color="var(--dx-secondary)" />
+    <Kpi
+      title="Sof foyda (Gross − Exp)"
+      value={formatSoM(net)}
+      color={net >= 0 ? 'var(--dx-tertiary)' : 'var(--dx-error)'}
+    />
+    <Kpi title="O‘rtacha chek" value={formatSoM(avgTicket)} />
+    <Kpi title="Bajarilish darajasi" value={`${Math.round(completionRate * PERCENT_DIVISOR)}%`} />
+  </div>
+);
+
+const ExpensesSection: React.FC<{
+  expenses: Expense[];
+  onOpenAdd: () => void;
+  onDelete: (id: string) => void;
+}> = ({ expenses, onOpenAdd, onDelete }) => (
+  <div
+    className="p-5 rounded-2xl border space-y-3.5"
+    style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
+  >
+    <div className="flex items-center justify-between">
+      <h2 className="font-bold text-base">Xarajatlar ({expenses.length})</h2>
+      <button
+        type="button"
+        onClick={onOpenAdd}
+        className="px-3.5 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
+        style={{
+          backgroundColor: 'var(--dx-primary-container)',
+          color: 'var(--dx-on-primary-container)',
+        }}
+      >
+        <Plus className="w-3.5 h-3.5" /> Xarajat qo‘shish
+      </button>
+    </div>
+
+    {expenses.length === 0 ? (
+      <p className="text-xs" style={{ color: 'var(--dx-muted)' }}>
+        Hozircha xarajatlar kiritilmagan.
+      </p>
+    ) : (
+      <div className="space-y-2">
+        {expenses.map((exp) => (
+          <div
+            key={exp.id}
+            className="p-3 rounded-xl border flex items-center justify-between gap-2 text-xs"
+            style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+          >
+            <div>
+              <div className="font-bold">{exp.title}</div>
+              <div style={{ color: 'var(--dx-muted)' }}>{exp.category}</div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-extrabold">{formatSoM(exp.amount)}</span>
+              <button
+                type="button"
+                onClick={() => onDelete(exp.id)}
+                className="p-1 cursor-pointer"
+                style={{ color: 'var(--dx-error)' }}
+                aria-label="Xarajatni o'chirish"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
 
 const Kpi: React.FC<{ title: string; value: string; color?: string }> = ({
   title,

@@ -164,6 +164,15 @@
 - **Commands Executed**: `cd web && npm run build && npm run lint && npm test`, `npm run test:rules`
 - **Results**: Web build, oxlint (0 warnings/errors), 4/4 web unit tests, and 34/34 Firestore Rules emulator tests PASSED.
 
+### Task 16 (Phase 2.1): Code Conventions, ESLint, Prettier & Component Modularization
+- **Changed Files**: `docs/CODE_CONVENTIONS.md`, `web/eslint.config.js`, `web/.prettierrc`, `web/.prettierignore`, `web/package.json`, `web/package-lock.json`, `web/src/services/constants.ts`, `web/src/services/errors.ts`, `web/src/components/{customer,owner,admin}/*`, refactored `web/src/{pages,hooks,repositories,services}/*`, `docs/STATUS.md`
+- **What Was Done**:
+  - Created `docs/CODE_CONVENTIONS.md` defining 6 enforced rules: naming (`PascalCase`/`camelCase`/`UPPER_CASE`), layered imports (forbidding `firebase/*` in `pages`/`components`), zero magic numbers/strings (`services/constants.ts`), function length & nesting depth limits (`max-lines-per-function`, `max-depth`), safe error handling (`getReadableErrorMessage`, `no-console`, `react/no-danger`, `no-empty`), and Prettier formatting.
+  - Installed and configured ESLint (`eslint.config.js` + `typescript-eslint` + `eslint-plugin-react` + `eslint-plugin-react-hooks` + `eslint-config-prettier`) alongside Prettier (`.prettierrc`).
+  - Extracted large page modals/cards into dedicated UI components (`OrderCheckoutModal`, `ProductDetailModal`, `ProductFeedCard`, `CustomerOrderCard`, `ProductFormModal`, `BusinessEditModal`, `ExpenseModal`, `RejectBusinessModal`) and `ownerActions.ts`.
+- **Commands Executed**: `cd web && npm run build && npm run lint && npm run format:check && npm test`
+- **Results**: `tsc -b && vite build` (`1.02s`), ESLint + oxlint (`0` errors, `0` warnings on `53` files), Prettier (`All matched files use Prettier code style`), and `4/4` unit tests PASSED.
+
 ---
 
 ## 3. VERIFIED BY AUTOMATED TEST
@@ -173,7 +182,8 @@
 | **Firestore Security Rules Emulator Tests** (`npm run test:rules`) | **34** | **PASS** | Role escalation prevention, cross-user doc isolation, order privacy, cross-owner product isolation, private cost subcollection isolation (`products/{id}/private/cost`), public costPrice prohibition, business creation forced to `pending`, rejected business resubmission, business ownership immutability, unapproved business order creation block, atomic checkout stock decrement (`lastCheckoutOrderId`), order line item `unitPrice` validation, customer cancellation constraints, owner `unitCost` snapshot, expense isolation, forged analytics event prevention, and real-time snapshot listeners. |
 | **Web Domain Unit Tests** (`cd web && npm test`) | **4** | **PASS** | `validators` (`email`, strong password, nickname, business/product forms), `formatSoM`, `getEffectivePrice` (`math.floor` parity with `firestore.rules`), `getPeriodBounds` (`Asia/Tashkent` Monday week start), `calculateAnalytics` (`completed + paid` revenue, COGS, gross/net profit). |
 | **Web TypeScript & Vite Build** (`cd web && npm run build`) | - | **PASS** | Clean `tsc -b && vite build` static bundle (`web/dist/`). |
-| **Web Linter** (`cd web && npm run lint`) | **41 files** | **PASS** | `oxlint`: 0 warnings, 0 errors. |
+| **Web Linter** (`cd web && npm run lint`) | **53 files** | **PASS** | ESLint (`@typescript-eslint`, `react`, `react-hooks`, `no-console`, `no-magic-numbers`, `max-lines-per-function`, `no-restricted-imports`, `no-restricted-globals`) + `oxlint`: 0 warnings, 0 errors. |
+| **Web Formatter** (`cd web && npm run format:check`) | **53 files** | **PASS** | Prettier style check passed across all TypeScript/TSX sources and tests. |
 | **Browser E2E Flow (Emulator)** (`http://127.0.0.1:5173`) | **6 stages** | **PASS** | Real Firebase Auth + Firestore Emulator end-to-end flows for Owner, Admin, and Customer roles plus `390x844` mobile layout check. |
 | **Legacy Android JVM Unit Tests** (`android-legacy/`, historical pre-migration) | **59** | **PASS** | Archived Kotlin/Compose unit tests (`AnalyticsCalculatorTest`, `AuthViewModelTest`, etc.) prior to Phase 0 migration. |
 

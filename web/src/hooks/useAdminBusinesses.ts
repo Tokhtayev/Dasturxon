@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { businessRepository } from '../repositories/businessRepository';
+import { MIN_REJECTION_REASON_LENGTH } from '../services/constants';
 import type { Business } from '../types/domain';
 
 export function useAdminBusinesses(enabled: boolean) {
@@ -44,7 +45,7 @@ export function useAdminBusinesses(enabled: boolean) {
   };
 
   const rejectBusiness = async (businessId: string, reason: string) => {
-    if (reason.trim().length < 3) {
+    if (reason.trim().length < MIN_REJECTION_REASON_LENGTH) {
       throw new Error('Rad etish sababi kamida 3 belgidan iborat bo‘lishi kerak.');
     }
     await businessRepository.setStatus(businessId, 'rejected', reason.trim());

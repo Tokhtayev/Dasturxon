@@ -20,13 +20,7 @@ export type AuthSessionState =
   | { status: 'error'; message: string };
 
 export type BusinessTypeKey =
-  | 'bakery'
-  | 'confectionery'
-  | 'pastry'
-  | 'teahouse'
-  | 'kitchen'
-  | 'cafe'
-  | 'other';
+  'bakery' | 'confectionery' | 'pastry' | 'teahouse' | 'kitchen' | 'cafe' | 'other';
 
 export interface BusinessTypeMeta {
   storedValue: BusinessTypeKey;
@@ -83,12 +77,7 @@ export interface Product {
 }
 
 export type OrderStatusKey =
-  | 'pending'
-  | 'accepted'
-  | 'ready'
-  | 'completed'
-  | 'rejected'
-  | 'cancelled';
+  'pending' | 'accepted' | 'ready' | 'completed' | 'rejected' | 'cancelled';
 
 export type PaymentStatus = 'unpaid' | 'paid';
 export type FulfillmentType = 'pickup' | 'delivery';

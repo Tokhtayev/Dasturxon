@@ -28,12 +28,34 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({ isDark, onToggleTheme 
       navItems={
         isApproved
           ? [
-              { to: '/owner/dashboard', label: 'Boshqaruv', icon: <LayoutDashboard className="w-4 h-4" /> },
-              { to: '/owner/products', label: 'Mahsulotlar', icon: <Package className="w-4 h-4" /> },
-              { to: '/owner/orders', label: 'Buyurtmalar', icon: <ClipboardList className="w-4 h-4" /> },
-              { to: '/owner/analytics', label: 'Analitika', icon: <TrendingUp className="w-4 h-4" /> },
+              {
+                to: '/owner/dashboard',
+                label: 'Boshqaruv',
+                icon: <LayoutDashboard className="w-4 h-4" />,
+              },
+              {
+                to: '/owner/products',
+                label: 'Mahsulotlar',
+                icon: <Package className="w-4 h-4" />,
+              },
+              {
+                to: '/owner/orders',
+                label: 'Buyurtmalar',
+                icon: <ClipboardList className="w-4 h-4" />,
+              },
+              {
+                to: '/owner/analytics',
+                label: 'Analitika',
+                icon: <TrendingUp className="w-4 h-4" />,
+              },
             ]
-          : [{ to: '/owner/dashboard', label: 'Biznes profili', icon: <LayoutDashboard className="w-4 h-4" /> }]
+          : [
+              {
+                to: '/owner/dashboard',
+                label: 'Biznes profili',
+                icon: <LayoutDashboard className="w-4 h-4" />,
+              },
+            ]
       }
     >
       {!ownerState.businessesLoaded ? (

@@ -37,7 +37,10 @@ export function App() {
           </Route>
 
           <Route element={<RoleGuard allowedRole="customer" />}>
-            <Route path="/customer" element={<CustomerLayout isDark={isDark} onToggleTheme={toggleTheme} />}>
+            <Route
+              path="/customer"
+              element={<CustomerLayout isDark={isDark} onToggleTheme={toggleTheme} />}
+            >
               <Route index element={<Navigate to="/customer/feed" replace />} />
               <Route path="feed" element={<CustomerFeedPage />} />
               <Route path="orders" element={<CustomerOrdersPage />} />
@@ -46,7 +49,10 @@ export function App() {
           </Route>
 
           <Route element={<RoleGuard allowedRole="owner" />}>
-            <Route path="/owner" element={<OwnerLayout isDark={isDark} onToggleTheme={toggleTheme} />}>
+            <Route
+              path="/owner"
+              element={<OwnerLayout isDark={isDark} onToggleTheme={toggleTheme} />}
+            >
               <Route index element={<Navigate to="/owner/dashboard" replace />} />
               <Route path="dashboard" element={<OwnerDashboardPage />} />
               <Route path="products" element={<OwnerProductsPage />} />
@@ -56,7 +62,10 @@ export function App() {
           </Route>
 
           <Route element={<RoleGuard allowedRole="admin" />}>
-            <Route path="/admin" element={<AdminLayout isDark={isDark} onToggleTheme={toggleTheme} />}>
+            <Route
+              path="/admin"
+              element={<AdminLayout isDark={isDark} onToggleTheme={toggleTheme} />}
+            >
               <Route index element={<Navigate to="/admin/approvals" replace />} />
               <Route path="approvals" element={<AdminDashboardPage />} />
             </Route>

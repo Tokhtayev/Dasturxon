@@ -13,6 +13,13 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../config/firebase';
+import {
+  MAX_DISCOUNT_PERCENT,
+  MAX_ORDER_QUANTITY,
+  MIN_ORDER_QUANTITY,
+  PERCENT_DIVISOR,
+  TERMINAL_ORDER_STATUSES,
+} from '../services/constants';
 import type {
   Business,
   CustomerOrder,
@@ -35,16 +42,13 @@ export function mapOrderDoc(id: string, data: Record<string, unknown>): Customer
       ? 'pending'
       : rawStatus === 'done'
         ? 'completed'
-        : (['pending', 'accepted', 'ready', 'completed', 'rejected', 'cancelled'].includes(
-              rawStatus
-            )
-            ? (rawStatus as OrderStatusKey)
-            : 'pending');
+        : ['pending', 'accepted', 'ready', 'completed', 'rejected', 'cancelled'].includes(rawStatus)
+          ? (rawStatus as OrderStatusKey)
+          : 'pending';
 
   const quantity = typeof data.quantity === 'number' ? data.quantity : 0;
   const unitPrice = typeof data.unitPrice === 'number' ? data.unitPrice : 0;
-  const totalPrice =
-    typeof data.totalPrice === 'number' ? data.totalPrice : unitPrice * quantity;
+  const totalPrice = typeof data.totalPrice === 'number' ? data.totalPrice : unitPrice * quantity;
 
   return {
     id,
@@ -147,14 +151,14 @@ export const orderRepository = {
       const status = typeof pData.status === 'string' ? pData.status : 'sold_out';
       const currentStock = typeof pData.stock === 'number' ? pData.stock : null;
       const price = typeof pData.price === 'number' ? pData.price : 0;
-      const discountPercent =
-        typeof pData.discountPercent === 'number' ? pData.discountPercent : 0;
-      const discountEndsAt = pData.discountEndsAt instanceof Timestamp ? pData.discountEndsAt : null;
+      const discountPercent = typeof pData.discountPercent === 'number' ? pData.discountPercent : 0;
+      const discountEndsAt =
+        pData.discountEndsAt instanceof Timestamp ? pData.discountEndsAt : null;
 
       if (!['available', 'hot_ready'].includes(status)) {
         throw new Error('Mahsulot hozir mavjud emas.');
       }
-      if (params.quantity <= 0 || params.quantity > 99) {
+      if (params.quantity < MIN_ORDER_QUANTITY || params.quantity > MAX_ORDER_QUANTITY) {
         throw new Error("Buyurtma miqdori 1 dan 99 gacha bo'lishi kerak.");
       }
       if (currentStock !== null && params.quantity > currentStock) {
@@ -163,10 +167,10 @@ export const orderRepository = {
 
       const discountActive =
         discountPercent > 0 &&
-        discountPercent <= 90 &&
+        discountPercent <= MAX_DISCOUNT_PERCENT &&
         (discountEndsAt === null || discountEndsAt.toMillis() > Date.now());
       const unitPrice = discountActive
-        ? price - Math.floor((price * discountPercent) / 100)
+        ? price - Math.floor((price * discountPercent) / PERCENT_DIVISOR)
         : price;
 
       const productName = typeof pData.name === 'string' ? pData.name : params.product.name;
@@ -185,8 +189,7 @@ export const orderRepository = {
         status: 'pending',
         paymentStatus: 'unpaid',
         fulfillmentType: params.fulfillmentType,
-        deliveryAddress:
-          params.fulfillmentType === 'delivery' ? params.deliveryAddress.trim() : '',
+        deliveryAddress: params.fulfillmentType === 'delivery' ? params.deliveryAddress.trim() : '',
         pickupTime: Timestamp.fromMillis(params.pickupTimeMs),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -236,7 +239,7 @@ export const orderRepository = {
       const orderSnap = await tx.get(orderRef);
       if (!orderSnap.exists()) throw new Error('Buyurtma topilmadi.');
       const oData = orderSnap.data();
-      if (['completed', 'cancelled', 'rejected'].includes(String(oData.status))) {
+      if (TERMINAL_ORDER_STATUSES.includes(String(oData.status) as OrderStatusKey)) {
         throw new Error("Ushbu buyurtmani rad etib bo'lmaydi.");
       }
 
@@ -246,19 +249,17 @@ export const orderRepository = {
       if (productId && qty > 0) {
         const productRef = doc(db, 'products', productId);
         const prodSnap = await tx.get(productRef);
-        if (prodSnap.exists()) {
-          const pData = prodSnap.data();
-          if (typeof pData.stock === 'number') {
-            const restored = pData.stock + qty;
-            const updates: Record<string, unknown> = {
-              stock: restored,
-              updatedAt: serverTimestamp(),
-            };
-            if (pData.status === 'sold_out' && restored > 0) {
-              updates.status = 'available';
-            }
-            tx.update(productRef, updates);
+        const pData = prodSnap.exists() ? prodSnap.data() : null;
+        if (pData && typeof pData.stock === 'number') {
+          const restored = pData.stock + qty;
+          const updates: Record<string, unknown> = {
+            stock: restored,
+            updatedAt: serverTimestamp(),
+          };
+          if (pData.status === 'sold_out' && restored > 0) {
+            updates.status = 'available';
           }
+          tx.update(productRef, updates);
         }
       }
 

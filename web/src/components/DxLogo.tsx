@@ -10,11 +10,7 @@ interface DxLogoProps {
  * Exact web SVG recreation of app/src/main/res/drawable/ic_logo_mark.xml
  * paired with the DxLogo.kt typography lockup.
  */
-export const DxLogo: React.FC<DxLogoProps> = ({
-  size = 40,
-  showWordmark = true,
-  subtitle,
-}) => {
+export const DxLogo: React.FC<DxLogoProps> = ({ size = 40, showWordmark = true, subtitle }) => {
   return (
     <div className="inline-flex items-center gap-2.5 select-none">
       <svg
@@ -27,7 +23,14 @@ export const DxLogo: React.FC<DxLogoProps> = ({
         className="shrink-0 drop-shadow-sm"
       >
         <defs>
-          <linearGradient id="dxBreadGrad" x1="20" y1="20" x2="88" y2="88" gradientUnits="userSpaceOnUse">
+          <linearGradient
+            id="dxBreadGrad"
+            x1="20"
+            y1="20"
+            x2="88"
+            y2="88"
+            gradientUnits="userSpaceOnUse"
+          >
             <stop offset="0" stopColor="#F2B24C" />
             <stop offset="1" stopColor="#B7500A" />
           </linearGradient>
