@@ -92,6 +92,7 @@
 - **Results**: Web build, lint, and unit tests passed prior to commit.
 
 ### Task 7 (Phase 0.2): Firebase Emulator Suite & Security Rules Test Expansion
+- **Commit Hash**: `a104d76`
 - **Changed Files**: `firebase.json`, `firestore.rules`, `test/firestore.rules.test.mjs`, `docs/STATUS.md`
 - **What Was Done**:
   - Enabled Firebase Auth Emulator (`port: 9099`) alongside Firestore Emulator (`port: 8080`) in `firebase.json` for isolated web E2E testing.
@@ -99,6 +100,15 @@
   - Added tests 33–34 in `test/firestore.rules.test.mjs`.
 - **Commands Executed**: `npm run test:rules`
 - **Results**: 34/34 Firestore security rules tests PASSED (`duration_ms 4205.915`).
+
+### Task 8 (Phase 0.3): Web Foundation, Modular Firebase SDK, Validators & Analytics
+- **Changed Files**: `web/package.json`, `web/package-lock.json`, `web/.env.example`, `web/src/config/firebase.ts`, `web/src/types/domain.ts`, `web/src/services/validators.ts`, `web/src/services/analytics.ts`, `web/tests/domain.test.ts`, `docs/STATUS.md`
+- **What Was Done**:
+  - Installed `firebase` (Web SDK v12 modular) and `react-router-dom`.
+  - Added `web/.env.example` (no secrets committed; local `web/.env` remains gitignored) and modular `getFirebaseAuth()` / `getFirebaseDb()` with Auth + Firestore Emulator support.
+  - Added Firestore-aligned domain types (`domain.ts`), strict form/auth validators (`validators.ts`), and pure `analytics.ts` matching `firestore.rules` `math.floor` discounting and `Asia/Tashkent` Monday-start periods.
+- **Commands Executed**: `cd web && npm run build && npm run lint && npm test`
+- **Results**: TypeScript/Vite build, oxlint, and all 7 web unit tests PASSED.
 
 ---
 
