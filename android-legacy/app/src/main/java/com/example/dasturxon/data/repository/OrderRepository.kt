@@ -66,6 +66,10 @@ open class OrderRepository {
             val currentStock = productSnapshot.getLong("stock")
             val price = productSnapshot.getLong("price")
                 ?: throw IllegalStateException("Mahsulot narxi topilmadi.")
+            val discountPercent = productSnapshot.getLong("discountPercent") ?: 0L
+            val discountEndsAt = productSnapshot.getTimestamp("discountEndsAt")
+            val isDiscountActive = discountPercent in 1L..90L &&
+                (discountEndsAt == null || discountEndsAt.toDate().after(Date()))
 
             if (businessSnapshot.getString("status") != "approved") {
                 throw IllegalStateException("Bu biznes hozir buyurtma olmayapti.")
@@ -78,8 +82,12 @@ open class OrderRepository {
             }
 
             // In accordance with PRD AMENDMENTS:
-            // "unitPrice == product.sellingPrice; max ~15 lines per order. Customer never writes totals."
-            val unitPrice = price
+            // "unitPrice == product.sellingPrice (or active discount); max ~15 lines per order."
+            val unitPrice = if (isDiscountActive) {
+                price - (price * discountPercent / 100L)
+            } else {
+                price
+            }
 
             val order = mapOf(
                 "customerId" to customerId,
@@ -264,6 +272,50 @@ open class OrderRepository {
                 )
             )
             .addOnSuccessListener { onComplete(Result.success(Unit)) }
+            .addOnFailureListener { onComplete(Result.failure(it)) }
+    }
+
+    /**
+     * Rejects an order as the business owner and atomically restores reserved stock when applicable.
+     */
+    fun rejectOrder(
+        orderId: String,
+        onComplete: (Result<Unit>) -> Unit
+    ) {
+        val orderRef = db().collection("orders").document(orderId)
+        db().runTransaction { transaction ->
+            val orderSnap = transaction.get(orderRef)
+            val currentStatus = orderSnap.getString("status") ?: "pending"
+            if (currentStatus in listOf("completed", "done", "cancelled", "rejected")) {
+                throw IllegalStateException("Ushbu buyurtmani rad etib bo'lmaydi.")
+            }
+            val productId = orderSnap.getString("productId").orEmpty()
+            val qty = orderSnap.getLong("quantity") ?: 0L
+            if (productId.isNotBlank() && qty > 0L) {
+                val productRef = db().collection("products").document(productId)
+                val productSnap = transaction.get(productRef)
+                val currentStock = productSnap.getLong("stock")
+                if (productSnap.exists() && currentStock != null) {
+                    val restoredStock = currentStock + qty
+                    val productUpdates = mutableMapOf<String, Any>(
+                        "stock" to restoredStock,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                    if (productSnap.getString("status") == "sold_out" && restoredStock > 0L) {
+                        productUpdates["status"] = "available"
+                    }
+                    transaction.update(productRef, productUpdates)
+                }
+            }
+            transaction.update(
+                orderRef,
+                mapOf(
+                    "status" to "rejected",
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            )
+            null
+        }.addOnSuccessListener { onComplete(Result.success(Unit)) }
             .addOnFailureListener { onComplete(Result.failure(it)) }
     }
 

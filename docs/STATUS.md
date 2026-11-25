@@ -1,8 +1,9 @@
 # Dasturxon Project Status & Engineering Report
 
 ## 1. Overview
-- **Project**: Dasturxon (`com.example.dasturxon`)
-- **Platform**: Android (Kotlin, Jetpack Compose, Material 3, Firebase)
+- **Project**: Dasturxon ("Mahalla Bozori")
+- **Legacy Android Package**: `com.example.dasturxon` (archived under `android-legacy/`)
+- **Current Web Platform**: React + Vite + TypeScript + React Router + Firebase Web SDK (modular) under `web/`
 - **Branch**: `ai-night`
 - **Notice**: In accordance with project policy, this application is **NOT** claimed to be "pentested" or "fully tested". This report details what was completed, verified by automated testing, what remains unverified, and known technical risks.
 
@@ -80,6 +81,14 @@
   - Removed all synthetic email fallbacks (`@dasturxon.uz`) and completed password visibility toggles with icons.
 - **Commands Executed**: `./gradlew testDebugUnitTest assembleDebug`
 - **Results**: BUILD SUCCESSFUL (25s), all unit tests passed.
+
+### Task 6 (Phase 0.1): Archive Android Codebase to `android-legacy/`
+- **Changed Files**: `android-legacy/**`, `.gitignore`, `docs/STATUS.md`
+- **What Was Done**:
+  - Moved the entire Kotlin/Compose Android project (`app/`, `gradle/`, Gradle wrapper, build scripts, `google-services.json`) into `android-legacy/` without deleting any source files.
+  - Updated `.gitignore` to ignore `android-legacy/` build caches and `.env` secret files while keeping `.env.example` tracked.
+- **Commands Executed**: `cd web && npm run build && npm run lint && node --test tests/analytics.test.ts`
+- **Results**: Web build, lint, and unit tests passed prior to commit.
 
 ---
 

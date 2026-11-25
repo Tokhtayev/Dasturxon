@@ -6,9 +6,13 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
 
 class ProductRepository(private val firestore: FirebaseFirestore) {
     fun create(
@@ -76,6 +80,31 @@ class ProductRepository(private val firestore: FirebaseFirestore) {
             .addOnFailureListener {
                 onComplete(Result.failure(it))
             }
+    }
+
+    /**
+     * Loads private cost prices (`products/{id}/private/cost`) for the given product IDs.
+     * Intended strictly for the owning business.
+     */
+    suspend fun loadCostPrices(productIds: List<String>): Map<String, Long> = coroutineScope {
+        productIds.distinct()
+            .filter { it.isNotBlank() }
+            .map { id ->
+                async {
+                    try {
+                        val doc = firestore.collection("products").document(id)
+                            .collection("private").document("cost")
+                            .get()
+                            .await()
+                        val cost = doc.getLong("costPrice") ?: 0L
+                        id to cost
+                    } catch (_: Exception) {
+                        id to 0L
+                    }
+                }
+            }
+            .awaitAll()
+            .toMap()
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -172,12 +201,12 @@ class ProductRepository(private val firestore: FirebaseFirestore) {
         // Note: costPrice is strictly omitted from public product updates
         firestore.collection("products").document(product.id).update(updates)
             .addOnSuccessListener {
-                if (costPrice > 0L) {
+                if (costPrice > 0L || product.costPrice > 0L) {
                     firestore.collection("products").document(product.id)
                         .collection("private").document("cost")
                         .set(
                             mapOf(
-                                "costPrice" to costPrice,
+                                "costPrice" to costPrice.coerceAtLeast(0L),
                                 "updatedAt" to FieldValue.serverTimestamp()
                             )
                         )

@@ -1,7 +1,5 @@
 package com.example.dasturxon.core.designsystem
 
-import android.graphics.BitmapFactory
-import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,11 +24,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.dasturxon.core.common.ProductImageHelper
 import com.example.dasturxon.core.designsystem.charts.Sparkline
 import com.example.dasturxon.data.model.Business
 import com.example.dasturxon.data.model.Product
@@ -61,14 +59,7 @@ fun ProductCard(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 val imageBitmap = remember(product.image) {
-                    if (product.image.isNotBlank()) {
-                        try {
-                            val bytes = Base64.decode(product.image, Base64.DEFAULT)
-                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                        } catch (_: Exception) {
-                            null
-                        }
-                    } else null
+                    ProductImageHelper.decodeBase64ToImageBitmap(product.image)
                 }
 
                 if (imageBitmap != null) {

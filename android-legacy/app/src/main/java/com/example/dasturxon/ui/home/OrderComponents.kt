@@ -4,13 +4,22 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -20,8 +29,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.KeyboardType
+import com.example.dasturxon.core.common.ProductImageHelper
+import kotlinx.coroutines.launch
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -134,10 +148,11 @@ internal fun PlaceOrderDialog(
 internal fun ProductEditDialog(
     product: Product,
     onDismiss: () -> Unit,
-    onSave: (String, String, Long, Long?, Long, Timestamp?, Long) -> Unit,
+    onSave: (String, String, Long, Long?, Long, Timestamp?, Long, String) -> Unit,
     onDelete: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var name by rememberSaveable(product.id) { mutableStateOf(product.name) }
     var description by rememberSaveable(product.id) { mutableStateOf(product.description) }
     var price by rememberSaveable(product.id) { mutableStateOf(product.price.toString()) }
@@ -147,19 +162,73 @@ internal fun ProductEditDialog(
     var expiryMillis by rememberSaveable(product.id) {
         mutableStateOf(product.discountEndsAt?.toDate()?.time)
     }
+    var imageBase64 by rememberSaveable(product.id) { mutableStateOf(product.image) }
+    var isEncodingImage by remember { mutableStateOf(false) }
     var validation by remember { mutableStateOf<String?>(null) }
+
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            isEncodingImage = true
+            validation = null
+            coroutineScope.launch {
+                ProductImageHelper.encodeUriToBase64(context, uri)
+                    .onSuccess { encoded -> imageBase64 = encoded }
+                    .onFailure { validation = it.localizedMessage ?: "Rasmni yuklab bo'lmadi." }
+                isEncodingImage = false
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Mahsulotni tahrirlash") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val previewBitmap = remember(imageBase64) {
+                    ProductImageHelper.decodeBase64ToImageBitmap(imageBase64)
+                }
+                if (previewBitmap != null) {
+                    Image(
+                        bitmap = previewBitmap,
+                        contentDescription = name,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    TextButton(
+                        onClick = { imageBase64 = "" },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Rasmni olib tashlash", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                OutlinedButton(
+                    onClick = {
+                        imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    },
+                    enabled = !isEncodingImage,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (isEncodingImage) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Text("  Rasm tayyorlanmoqda...")
+                    } else {
+                        Text(if (imageBase64.isBlank()) "📷 Rasm yuklash" else "📷 Boshqa rasm tanlash")
+                    }
+                }
                 OutlinedTextField(name, { name = it }, label = { Text("Nomi") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(description, { description = it }, label = { Text("Tavsif") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(price, { price = it.filter(Char::isDigit) }, label = { Text("Sotish narxi (so'm)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(costPrice, { costPrice = it.filter(Char::isDigit) }, label = { Text("Tannarxi (so'm, ixtiyoriy)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(stock, { stock = it.filter(Char::isDigit) }, label = { Text("Zaxira (ixtiyoriy)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(discount, { discount = it.filter(Char::isDigit) }, label = { Text("Chegirma (0–90%)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(price, { price = it.filter(Char::isDigit) }, label = { Text("Sotish narxi (so'm)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                OutlinedTextField(costPrice, { costPrice = it.filter(Char::isDigit) }, label = { Text("Tannarxi (so'm, ixtiyoriy)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                OutlinedTextField(stock, { stock = it.filter(Char::isDigit) }, label = { Text("Zaxira (ixtiyoriy)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                OutlinedTextField(discount, { discount = it.filter(Char::isDigit) }, label = { Text("Chegirma (0–90%)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 OutlinedButton(onClick = {
                     val calendar = Calendar.getInstance().apply {
                         timeInMillis = expiryMillis ?: System.currentTimeMillis()
@@ -197,27 +266,31 @@ internal fun ProductEditDialog(
             }
         },
         confirmButton = {
-            Button(onClick = {
-                val parsedPrice = price.toLongOrNull()
-                val parsedCostPrice = costPrice.toLongOrNull() ?: 0L
-                val parsedStock = stock.takeIf(String::isNotBlank)?.toLongOrNull()
-                val parsedDiscount = discount.toLongOrNull()
-                when {
-                    name.isBlank() -> validation = "Mahsulot nomini kiriting."
-                    parsedPrice == null || parsedPrice <= 0L -> validation = "Narxni tekshiring."
-                    stock.isNotBlank() && (parsedStock == null || parsedStock < 0L) -> validation = "Zaxirani tekshiring."
-                    parsedDiscount == null || parsedDiscount !in 0L..90L -> validation = "Chegirma 0–90 oralig'ida bo'lsin."
-                    else -> onSave(
-                        name.trim(),
-                        description.trim(),
-                        parsedPrice,
-                        parsedStock,
-                        parsedDiscount,
-                        expiryMillis?.let { Timestamp(Date(it)) },
-                        parsedCostPrice
-                    )
+            Button(
+                enabled = !isEncodingImage,
+                onClick = {
+                    val parsedPrice = price.toLongOrNull()
+                    val parsedCostPrice = costPrice.toLongOrNull() ?: 0L
+                    val parsedStock = stock.takeIf(String::isNotBlank)?.toLongOrNull()
+                    val parsedDiscount = discount.toLongOrNull()
+                    when {
+                        name.isBlank() -> validation = "Mahsulot nomini kiriting."
+                        parsedPrice == null || parsedPrice <= 0L -> validation = "Narxni tekshiring."
+                        stock.isNotBlank() && (parsedStock == null || parsedStock < 0L) -> validation = "Zaxirani tekshiring."
+                        parsedDiscount == null || parsedDiscount !in 0L..90L -> validation = "Chegirma 0–90 oralig'ida bo'lsin."
+                        else -> onSave(
+                            name.trim(),
+                            description.trim(),
+                            parsedPrice,
+                            parsedStock,
+                            parsedDiscount,
+                            expiryMillis?.let { Timestamp(Date(it)) },
+                            parsedCostPrice,
+                            imageBase64
+                        )
+                    }
                 }
-            }) { Text("Saqlash") }
+            ) { Text("Saqlash") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Bekor qilish") } }
     )

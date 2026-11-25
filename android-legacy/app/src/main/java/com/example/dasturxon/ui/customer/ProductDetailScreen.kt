@@ -1,9 +1,7 @@
 package com.example.dasturxon.ui.customer
 
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Base64
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -25,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -33,6 +30,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.dasturxon.core.common.MoneyFormatter
+import com.example.dasturxon.core.common.ProductImageHelper
 import com.example.dasturxon.core.designsystem.DiscountBadge
 import com.example.dasturxon.core.designsystem.LiveBadge
 import com.example.dasturxon.data.model.Business
@@ -157,14 +155,7 @@ fun ProductDetailScreen(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 val imageBitmap = remember(product.image) {
-                    if (product.image.isNotBlank()) {
-                        try {
-                            val bytes = Base64.decode(product.image, Base64.DEFAULT)
-                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                        } catch (_: Exception) {
-                            null
-                        }
-                    } else null
+                    ProductImageHelper.decodeBase64ToImageBitmap(product.image)
                 }
 
                 if (imageBitmap != null) {

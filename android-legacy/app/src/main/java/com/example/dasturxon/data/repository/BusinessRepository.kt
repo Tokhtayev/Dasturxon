@@ -46,6 +46,31 @@ open class BusinessRepository {
             .addOnFailureListener { onComplete(Result.failure(it)) }
     }
 
+    fun updateDetails(
+        businessId: String,
+        name: String,
+        type: String,
+        address: String,
+        phone: String,
+        onComplete: (Result<Unit>) -> Unit,
+        typeNote: String? = null
+    ) {
+        val updates = mutableMapOf<String, Any>(
+            "name" to name,
+            "type" to type,
+            "address" to address,
+            "phone" to phone,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        updates["typeNote"] = typeNote?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?: FieldValue.delete()
+        db().collection("businesses").document(businessId)
+            .update(updates)
+            .addOnSuccessListener { onComplete(Result.success(Unit)) }
+            .addOnFailureListener { onComplete(Result.failure(it)) }
+    }
+
     fun resubmit(
         businessId: String,
         name: String,

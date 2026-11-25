@@ -34,14 +34,13 @@ class ExpenseRepository(private val firestore: FirebaseFirestore) {
     fun observeForBusiness(businessId: String): Flow<Result<List<Expense>>> = callbackFlow {
         val registration = firestore.collection("expenses")
             .whereEqualTo("businessId", businessId)
-            .orderBy("createdAt", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     trySend(Result.failure(error))
                 } else {
-                    val expenses = snapshot?.documents.orEmpty().map { doc ->
-                        Expense.fromDocument(doc.id, doc.data.orEmpty())
-                    }
+                    val expenses = snapshot?.documents.orEmpty()
+                        .map { doc -> Expense.fromDocument(doc.id, doc.data.orEmpty()) }
+                        .sortedByDescending { it.createdAt.toDate().time }
                     trySend(Result.success(expenses))
                 }
             }

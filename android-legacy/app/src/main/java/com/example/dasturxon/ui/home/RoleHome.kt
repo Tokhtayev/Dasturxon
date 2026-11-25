@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -57,6 +59,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -68,11 +71,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.io.ByteArrayOutputStream
 import com.example.dasturxon.R
 import com.example.dasturxon.core.common.MoneyFormatter
+import com.example.dasturxon.core.common.ProductImageHelper
 import com.example.dasturxon.core.designsystem.DxScaffold
 import com.example.dasturxon.core.designsystem.DxTopBar
 import com.example.dasturxon.core.designsystem.EmptyState
@@ -83,6 +88,7 @@ import com.example.dasturxon.core.designsystem.ShopAvatar
 import com.example.dasturxon.core.designsystem.charts.DonutChart
 import com.example.dasturxon.core.designsystem.charts.LineChart
 import com.example.dasturxon.core.model.AnalyticsCalculator
+import com.example.dasturxon.core.model.OrderStatus
 import com.example.dasturxon.data.model.Business
 import com.example.dasturxon.data.model.CustomerOrder
 import com.example.dasturxon.data.model.Expense
@@ -98,6 +104,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import java.time.Instant
 import java.util.Calendar
 import java.util.Date
+import kotlinx.coroutines.launch
 
 @Composable
 fun RoleHome(
@@ -155,6 +162,7 @@ private fun OwnerHome(
     var businesses by remember { mutableStateOf(emptyList<Business>()) }
     var businessesLoaded by remember { mutableStateOf(false) }
     var products by remember { mutableStateOf(emptyList<Product>()) }
+    var productCostPrices by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
     var productsLoaded by remember { mutableStateOf(false) }
     var ordersLoaded by remember { mutableStateOf(false) }
     var editingProduct by remember { mutableStateOf<Product?>(null) }
@@ -177,156 +185,203 @@ private fun OwnerHome(
         onDispose { registration.remove() }
     }
 
-    val business = businesses.firstOrNull { it.status == "approved" }
+    val business: Business? = businesses.firstOrNull { it.status == "approved" }
         ?: businesses.firstOrNull { it.status == "pending" }
         ?: businesses.firstOrNull { it.status == "rejected" }
-        ?: com.example.dasturxon.data.demo.DemoData.businesses.first().copy(
-            id = if (uid.isNotBlank() && !uid.startsWith("guest")) "biz_${uid.take(12)}" else "demo_bakery_baraka",
-            ownerId = uid,
-            status = "approved"
-        )
-
-    val effectiveProducts = remember(products, business.id, uid) {
-        if (uid.startsWith("guest") || products.isEmpty()) {
-            val demoProds = com.example.dasturxon.data.demo.DemoData.products.filter { it.businessId == business.id }
-            (demoProds + products).distinctBy { it.id }
-        } else products
-    }
-
-    val effectiveOrders = remember(orders, uid) {
-        if (uid.startsWith("guest") || orders.isEmpty()) {
-            listOf(
-                CustomerOrder(
-                    id = "demo_order_2715",
-                    customerId = "demo_customer_1",
-                    businessId = business.id,
-                    businessName = business.name,
-                    productName = "Tandir non va somsa",
-                    productId = "demo_prod_tandir_non",
-                    quantity = 4,
-                    totalPrice = 36000,
-                    status = "preparing",
-                    pickupTime = Timestamp(Date(System.currentTimeMillis() + 1800000)),
-                    createdAt = Timestamp(Date(System.currentTimeMillis() - 900000))
-                ),
-                CustomerOrder(
-                    id = "demo_order_2698",
-                    customerId = "demo_customer_1",
-                    businessId = business.id,
-                    businessName = business.name,
-                    productName = "Tandir non - 2 dona",
-                    productId = "demo_prod_tandir_non",
-                    quantity = 2,
-                    totalPrice = 25000,
-                    status = "done",
-                    pickupTime = Timestamp(Date(System.currentTimeMillis() - 86400000)),
-                    createdAt = Timestamp(Date(System.currentTimeMillis() - 86400000 - 3600000))
-                )
-            ) + orders
-        } else orders
-    }
-
-    DisposableEffect(business.id, productRepository) {
-        productsLoaded = false
-        val registration = productRepository.listenForBusiness(business.id) { result ->
-            result.onSuccess { products = it; productsLoaded = true }
-                .onFailure { errorMessage = "Mahsulotlarni yuklab bo'lmadi."; productsLoaded = true }
-        }
-        onDispose { registration.remove() }
-    }
-
-    DisposableEffect(business.id, orderRepository) {
-        ordersLoaded = false
-        val registration = orderRepository.listenForBusiness(business.id) { result ->
-            result.onSuccess { orders = it; ordersLoaded = true }
-                .onFailure { errorMessage = "Buyurtmalarni yuklab bo'lmadi."; ordersLoaded = true }
-        }
-        onDispose { registration.remove() }
-    }
-
-    LaunchedEffect(businessesLoaded, businesses.size, uid) {
-        if (businessesLoaded && businesses.isEmpty() && uid.isNotBlank() && !uid.startsWith("guest")) {
-            val template = com.example.dasturxon.data.demo.DemoData.businesses.first()
-            val newBusinessId = "biz_${uid.take(12)}"
-            val data = mapOf(
-                "ownerId" to uid,
-                "name" to template.name,
-                "type" to template.type,
-                "address" to template.address,
-                "phone" to template.phone,
-                "status" to "approved",
-                "typeNote" to (template.typeNote ?: ""),
-                "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+        ?: if (uid.startsWith("guest")) {
+            com.example.dasturxon.data.demo.DemoData.businesses.first().copy(
+                id = "demo_bakery_baraka",
+                ownerId = uid,
+                status = "approved"
             )
-            firestore.collection("businesses").document(newBusinessId)
-                .set(data, com.google.firebase.firestore.SetOptions.merge())
-                .addOnSuccessListener {
-                    val batch = firestore.batch()
-                    com.example.dasturxon.data.demo.DemoData.products
-                        .filter { it.businessId == "demo_bakery_baraka" }
-                        .forEach { p ->
-                            val pRef = firestore.collection("products").document("prod_${p.id}_${uid.take(8)}")
-                            val pData = mapOf(
-                                "businessId" to newBusinessId,
-                                "businessName" to template.name,
-                                "businessType" to template.type,
-                                "businessAddress" to template.address,
-                                "businessPhone" to template.phone,
-                                "name" to p.name,
-                                "description" to p.description,
-                                "price" to p.price,
-                                "status" to p.status,
-                                "stock" to (p.stock ?: 20L),
-                                "discountPercent" to p.discountPercent,
-                                "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-                            )
-                            batch.set(pRef, pData, com.google.firebase.firestore.SetOptions.merge())
-                        }
-                    batch.commit()
-                }
+        } else null
+
+    val effectiveProducts = remember(products, productCostPrices, business?.id, uid) {
+        val hydrated = products.map { p ->
+            val loadedCost = productCostPrices[p.id]
+            if (loadedCost != null) p.copy(costPrice = loadedCost) else p
+        }
+        if (uid.startsWith("guest") && hydrated.isEmpty() && business != null) {
+            com.example.dasturxon.data.demo.DemoData.products.filter { it.businessId == business.id }
+        } else {
+            hydrated
         }
     }
 
-    LaunchedEffect(business.id, currentTab) {
-        val bId = business.id
-        analyticsRepository.getViewCount(bId) { result ->
-            result.onSuccess { count ->
-                viewCount = if (count > 0) count else 142
-            }.onFailure {
-                if (viewCount == 0) viewCount = 142
+    val effectiveOrders = orders
+
+    val businessId = business?.id
+
+    DisposableEffect(businessId, productRepository) {
+        if (businessId == null) {
+            products = emptyList()
+            productCostPrices = emptyMap()
+            productsLoaded = true
+            onDispose { }
+        } else {
+            productsLoaded = false
+            val registration = productRepository.listenForBusiness(businessId) { result ->
+                result.onSuccess { products = it; productsLoaded = true }
+                    .onFailure { errorMessage = "Mahsulotlarni yuklab bo'lmadi."; productsLoaded = true }
+            }
+            onDispose { registration.remove() }
+        }
+    }
+
+    LaunchedEffect(products, businessId, uid) {
+        if (businessId != null && !uid.startsWith("guest") && products.isNotEmpty()) {
+            productCostPrices = productRepository.loadCostPrices(products.map { it.id })
+        }
+    }
+
+    DisposableEffect(businessId, orderRepository) {
+        if (businessId == null) {
+            orders = emptyList()
+            ordersLoaded = true
+            onDispose { }
+        } else {
+            ordersLoaded = false
+            val registration = orderRepository.listenForBusiness(businessId) { result ->
+                result.onSuccess { orders = it; ordersLoaded = true }
+                    .onFailure { errorMessage = "Buyurtmalarni yuklab bo'lmadi."; ordersLoaded = true }
+            }
+            onDispose { registration.remove() }
+        }
+    }
+
+    LaunchedEffect(businessId, expenseRepository, uid) {
+        if (businessId == null || uid.startsWith("guest")) {
+            expenses = emptyList()
+        } else {
+            expenseRepository.observeForBusiness(businessId).collect { result ->
+                result.onSuccess { expenses = it }
+                    .onFailure { errorMessage = it.localizedMessage ?: "Xarajatlarni yuklab bo'lmadi." }
             }
         }
-        if (!uid.startsWith("guest")) {
-            firestore.collection("expenses")
-                .whereEqualTo("businessId", bId)
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    expenses = snapshot.documents.map { Expense.fromDocument(it.id, it.data.orEmpty()) }
-                }
+    }
+
+    LaunchedEffect(businessId, currentTab) {
+        if (businessId != null && !uid.startsWith("guest")) {
+            analyticsRepository.getViewCount(businessId) { result ->
+                result.onSuccess { count -> viewCount = count }
+            }
         }
     }
 
-    val effectiveExpenses = remember(expenses, business.id, uid) {
-        if (expenses.isEmpty()) {
-            listOf(
-                Expense(
-                    id = "demo_exp_1",
-                    businessId = business.id,
-                    title = "Oliy navli bug'doy uni (10 qop)",
-                    amount = 3500000L,
-                    category = "Xomashyo",
-                    createdAt = Timestamp(Date(System.currentTimeMillis() - 86400000L * 2))
-                ),
-                Expense(
-                    id = "demo_exp_2",
-                    businessId = business.id,
-                    title = "Elektr va gaz to'lovi",
-                    amount = 850000L,
-                    category = "Kommunal",
-                    createdAt = Timestamp(Date(System.currentTimeMillis() - 86400000L * 5))
+    val effectiveExpenses = expenses
+
+    fun handleOrderStatusAction(order: CustomerOrder, nextStatus: String) {
+        errorMessage = null
+        when (nextStatus) {
+            "completed" -> {
+                val cachedCost = productCostPrices[order.productId]
+                if (cachedCost != null) {
+                    orderRepository.completeOrder(order.id, cachedCost) { result ->
+                        result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma yakunlanmadi." }
+                    }
+                } else {
+                    productRepository.getCostPrice(order.productId) { costResult ->
+                        val cost = costResult.getOrNull() ?: 0L
+                        orderRepository.completeOrder(order.id, cost) { result ->
+                            result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma yakunlanmadi." }
+                        }
+                    }
+                }
+            }
+            "rejected" -> {
+                orderRepository.rejectOrder(order.id) { result ->
+                    result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma rad etilmadi." }
+                }
+            }
+            else -> {
+                orderRepository.updateStatus(order.id, nextStatus) { result ->
+                    result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma yangilanmadi." }
+                }
+            }
+        }
+    }
+
+    // Loading state before knowing if owner has a registered business
+    if (!businessesLoaded) {
+        DxScaffold(
+            topBar = { DxTopBar(showLogo = true) }
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+        return
+    }
+
+    // Owner has not created a business yet: clean business creation onboarding
+    if (business == null) {
+        DxScaffold(
+            topBar = {
+                DxTopBar(
+                    showLogo = true,
+                    actions = {
+                        Surface(
+                            onClick = onSwitchToCustomer,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.padding(end = 12.dp)
+                        ) {
+                            Text(
+                                text = "🛒 Xaridor",
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
                 )
-            )
-        } else expenses
+            }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SectionHeader(title = "Biznesingizni ro'yxatdan o'tkazing")
+                Text(
+                    text = "Mahsulotlaringizni joylashtirish va buyurtmalarni boshqarish uchun do'kon yoki novvoyxonangiz ma'lumotlarini kiriting.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                errorMessage?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                BusinessEditor(
+                    ownerId = uid,
+                    existingBusiness = null,
+                    repository = businessRepository,
+                    onError = { errorMessage = it },
+                    onSuccess = { errorMessage = null }
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onSwitchToCustomer,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("🛒  Xaridor rejimiga o'tish")
+                }
+                TextButton(
+                    onClick = onSignOut,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Chiqish", color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+        return
     }
 
     // Direct access to 5-tab owner interface (no blocking on admin approval)
@@ -409,16 +464,21 @@ private fun OwnerHome(
                 // TAB 0: Boshqaruv (Dashboard)
                 0 -> {
                     val completedRevenue = remember(effectiveOrders) {
-                        effectiveOrders.filter { it.status == "done" }.sumOf { it.totalPrice }
+                        effectiveOrders
+                            .filter {
+                                OrderStatus.fromStoredValue(it.status) == OrderStatus.COMPLETED &&
+                                    (it.paymentStatus == "paid" || it.status == "done")
+                            }
+                            .sumOf { it.totalPrice }
                     }
                     val activeOrdersCount = remember(effectiveOrders) {
-                        effectiveOrders.count { it.status in listOf("new", "accepted", "ready") }
+                        effectiveOrders.count { OrderStatus.fromStoredValue(it.status).isActive }
                     }
                     val lowStockCount = remember(effectiveProducts) {
                         effectiveProducts.count { (it.stock ?: Long.MAX_VALUE) < 5 }
                     }
                     val pendingOrders = remember(effectiveOrders) {
-                        effectiveOrders.filter { it.status == "new" }
+                        effectiveOrders.filter { OrderStatus.fromStoredValue(it.status) == OrderStatus.PENDING }
                     }
 
                     Column(
@@ -508,18 +568,7 @@ private fun OwnerHome(
                                         }
                                     }
                                 ) { nextStatus ->
-                                    if (nextStatus == "completed") {
-                                        productRepository.getCostPrice(order.productId) { costResult ->
-                                            val cost = costResult.getOrNull() ?: 0L
-                                            orderRepository.completeOrder(order.id, cost) { result ->
-                                                result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma yakunlanmadi." }
-                                            }
-                                        }
-                                    } else {
-                                        orderRepository.updateStatus(order.id, nextStatus) { result ->
-                                            result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma yangilanmadi." }
-                                        }
-                                    }
+                                    handleOrderStatusAction(order, nextStatus)
                                 }
                             }
                         }
@@ -642,11 +691,36 @@ private fun OwnerHome(
 
                 // TAB 2: Buyurtmalar (Orders)
                 2 -> {
+                    val newOrdersCount = remember(effectiveOrders) {
+                        effectiveOrders.count { OrderStatus.fromStoredValue(it.status) == OrderStatus.PENDING }
+                    }
+                    val inProgressCount = remember(effectiveOrders) {
+                        effectiveOrders.count {
+                            OrderStatus.fromStoredValue(it.status) in listOf(OrderStatus.ACCEPTED, OrderStatus.READY)
+                        }
+                    }
+                    val historyCount = remember(effectiveOrders) {
+                        effectiveOrders.count {
+                            OrderStatus.fromStoredValue(it.status) in listOf(
+                                OrderStatus.COMPLETED,
+                                OrderStatus.CANCELLED,
+                                OrderStatus.REJECTED
+                            )
+                        }
+                    }
                     val filteredOrders = remember(effectiveOrders, orderTabSelected) {
                         when (orderTabSelected) {
-                            0 -> effectiveOrders.filter { it.status == "new" }
-                            1 -> effectiveOrders.filter { it.status in listOf("accepted", "ready") }
-                            else -> effectiveOrders.filter { it.status in listOf("done", "cancelled", "rejected") }
+                            0 -> effectiveOrders.filter { OrderStatus.fromStoredValue(it.status) == OrderStatus.PENDING }
+                            1 -> effectiveOrders.filter {
+                                OrderStatus.fromStoredValue(it.status) in listOf(OrderStatus.ACCEPTED, OrderStatus.READY)
+                            }
+                            else -> effectiveOrders.filter {
+                                OrderStatus.fromStoredValue(it.status) in listOf(
+                                    OrderStatus.COMPLETED,
+                                    OrderStatus.CANCELLED,
+                                    OrderStatus.REJECTED
+                                )
+                            }
                         }
                     }
 
@@ -662,17 +736,17 @@ private fun OwnerHome(
                             Tab(
                                 selected = orderTabSelected == 0,
                                 onClick = { orderTabSelected = 0 },
-                                text = { Text("Yangi (${effectiveOrders.count { it.status == "new" }})") }
+                                text = { Text("Yangi ($newOrdersCount)") }
                             )
                             Tab(
                                 selected = orderTabSelected == 1,
                                 onClick = { orderTabSelected = 1 },
-                                text = { Text("Jarayonda (${effectiveOrders.count { it.status in listOf("accepted", "ready") }})") }
+                                text = { Text("Jarayonda ($inProgressCount)") }
                             )
                             Tab(
                                 selected = orderTabSelected == 2,
                                 onClick = { orderTabSelected = 2 },
-                                text = { Text("Tarix (${effectiveOrders.count { it.status in listOf("done", "cancelled", "rejected") }})") }
+                                text = { Text("Tarix ($historyCount)") }
                             )
                         }
 
@@ -704,18 +778,7 @@ private fun OwnerHome(
                                         }
                                     }
                                 ) { nextStatus ->
-                                    if (nextStatus == "completed") {
-                                        productRepository.getCostPrice(order.productId) { costResult ->
-                                            val cost = costResult.getOrNull() ?: 0L
-                                            orderRepository.completeOrder(order.id, cost) { result ->
-                                                result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma yakunlanmadi." }
-                                            }
-                                        }
-                                    } else {
-                                        orderRepository.updateStatus(order.id, nextStatus) { result ->
-                                            result.onFailure { errorMessage = it.localizedMessage ?: "Buyurtma yangilanmadi." }
-                                        }
-                                    }
+                                    handleOrderStatusAction(order, nextStatus)
                                 }
                             }
                         }
@@ -1026,15 +1089,34 @@ private fun OwnerHome(
                                 Text("📍 Manzil: ${business.address}")
                                 Text("📞 Telefon: ${business.phone}")
                                 Surface(
-                                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                                    color = when (business.status) {
+                                        "approved" -> MaterialTheme.colorScheme.tertiaryContainer
+                                        "rejected" -> MaterialTheme.colorScheme.errorContainer
+                                        else -> MaterialTheme.colorScheme.primaryContainer
+                                    },
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text(
-                                        text = "✓ Tasdiqlangan biznes",
-                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                        text = when (business.status) {
+                                            "approved" -> "✓ Tasdiqlangan biznes"
+                                            "rejected" -> "❌ Rad etilgan — tahrirlab qayta yuboring"
+                                            else -> "⏳ Tasdiqlash kutilmoqda"
+                                        },
+                                        color = when (business.status) {
+                                            "approved" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                            "rejected" -> MaterialTheme.colorScheme.onErrorContainer
+                                            else -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        },
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                                if (business.status == "rejected" && !business.rejectionReason.isNullOrBlank()) {
+                                    Text(
+                                        text = "Sabab: ${business.rejectionReason}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error
                                     )
                                 }
                             }
@@ -1045,7 +1127,10 @@ private fun OwnerHome(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Biznes ma'lumotlarini tahrirlash")
+                            Text(
+                                if (business.status == "rejected") "Ma'lumotlarni tahrirlab qayta yuborish"
+                                else "Biznes ma'lumotlarini tahrirlash"
+                            )
                         }
 
                         OutlinedButton(
@@ -1177,10 +1262,22 @@ private fun OwnerHome(
         ProductEditDialog(
             product = product,
             onDismiss = { editingProduct = null },
-            onSave = { name, description, price, stock, discount, endAt, costPrice ->
-                productRepository.updateProduct(product, name, description, price, stock, discount, endAt, costPrice) { result ->
-                    result.onSuccess { editingProduct = null }
-                        .onFailure { errorMessage = it.localizedMessage ?: "Mahsulotni yangilab bo'lmadi." }
+            onSave = { name, description, price, stock, discount, endAt, costPrice, imageBase64 ->
+                productRepository.updateProduct(
+                    product = product,
+                    name = name,
+                    description = description,
+                    price = price,
+                    stock = stock,
+                    discountPercent = discount,
+                    discountEndsAt = endAt,
+                    costPrice = costPrice,
+                    image = imageBase64
+                ) { result ->
+                    result.onSuccess {
+                        productCostPrices = productCostPrices + (product.id to costPrice)
+                        editingProduct = null
+                    }.onFailure { errorMessage = it.localizedMessage ?: "Mahsulotni yangilab bo'lmadi." }
                 }
             },
             onDelete = {
@@ -1688,7 +1785,7 @@ private fun BusinessEditor(
                             completed,
                             typeNote = noteToSave
                         )
-                    } else {
+                    } else if (existingBusiness.status == "rejected") {
                         repository.resubmit(
                             existingBusiness.id,
                             name.trim(),
@@ -1698,6 +1795,16 @@ private fun BusinessEditor(
                             completed,
                             typeNote = noteToSave,
                             ownerId = ownerId
+                        )
+                    } else {
+                        repository.updateDetails(
+                            existingBusiness.id,
+                            name.trim(),
+                            typeToSave,
+                            address.trim(),
+                            phone.trim(),
+                            completed,
+                            typeNote = noteToSave
                         )
                     }
                 }
@@ -1728,32 +1835,69 @@ private fun ProductEditor(
     var stockText by rememberSaveable(business.id) { mutableStateOf("") }
     var discountText by rememberSaveable(business.id) { mutableStateOf("0") }
     var discountEndMillis by rememberSaveable(business.id) { mutableStateOf<Long?>(null) }
+    var imageBase64 by rememberSaveable(business.id) { mutableStateOf("") }
+    var isEncodingImage by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            onError("Rasm yuklash bepul Spark tarifida bloklangan (Firebase Storage talab qilinadi). Avtomatik taom belgilari ishlatiladi.")
+            isEncodingImage = true
+            coroutineScope.launch {
+                ProductImageHelper.encodeUriToBase64(context, uri)
+                    .onSuccess { encoded -> imageBase64 = encoded }
+                    .onFailure { onError(it.localizedMessage ?: "Rasmni yuklab bo'lmadi.") }
+                isEncodingImage = false
+            }
         }
     }
 
-    OutlinedTextField(name, { name = it }, label = { Text("Mahsulot nomi") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-    OutlinedTextField(description, { description = it }, label = { Text("Tavsif (ixtiyoriy)") }, modifier = Modifier.fillMaxWidth())
-    OutlinedTextField(priceText, { priceText = it.filter(Char::isDigit) }, label = { Text("Sotish narxi (so'm)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-    OutlinedTextField(costPriceText, { costPriceText = it.filter(Char::isDigit) }, label = { Text("Tannarxi (so'm, ixtiyoriy)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-    OutlinedTextField(stockText, { stockText = it.filter(Char::isDigit) }, label = { Text("Mavjud zaxira (dona)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-    OutlinedTextField(discountText, { discountText = it.filter(Char::isDigit) }, label = { Text("Chegirma foizi (0–90)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+    val previewBitmap = remember(imageBase64) {
+        ProductImageHelper.decodeBase64ToImageBitmap(imageBase64)
+    }
+    if (previewBitmap != null) {
+        Image(
+            bitmap = previewBitmap,
+            contentDescription = name.ifBlank { "Mahsulot rasmi" },
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(12.dp)),
+            contentScale = ContentScale.Crop
+        )
+        TextButton(
+            onClick = { imageBase64 = "" },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Rasmni olib tashlash", color = MaterialTheme.colorScheme.error)
+        }
+    }
 
     OutlinedButton(
         onClick = {
             imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         },
+        enabled = !isEncodingImage && !saving,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Text("📷 Rasm yuklash (Spark tarifida bloklangan)")
+        if (isEncodingImage) {
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.width(8.dp))
+            Text("Rasm tayyorlanmoqda...")
+        } else {
+            Text(if (imageBase64.isBlank()) "📷 Mahsulot rasmini tanlash" else "📷 Boshqa rasm tanlash")
+        }
     }
+
+    OutlinedTextField(name, { name = it }, label = { Text("Mahsulot nomi") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+    OutlinedTextField(description, { description = it }, label = { Text("Tavsif (ixtiyoriy)") }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(priceText, { priceText = it.filter(Char::isDigit) }, label = { Text("Sotish narxi (so'm)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+    OutlinedTextField(costPriceText, { costPriceText = it.filter(Char::isDigit) }, label = { Text("Tannarxi (so'm, ixtiyoriy)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+    OutlinedTextField(stockText, { stockText = it.filter(Char::isDigit) }, label = { Text("Mavjud zaxira (dona)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+    OutlinedTextField(discountText, { discountText = it.filter(Char::isDigit) }, label = { Text("Chegirma foizi (0–90)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
 
     OutlinedButton(
         onClick = {
@@ -1802,7 +1946,7 @@ private fun ProductEditor(
                         discountPercent = discount,
                         discountEndsAt = discountEndMillis?.let { Timestamp(Date(it)) },
                         costPrice = costPrice,
-                        image = ""
+                        image = imageBase64
                     ) { result ->
                         saving = false
                         result.onSuccess {
@@ -1813,13 +1957,14 @@ private fun ProductEditor(
                             stockText = ""
                             discountText = "0"
                             discountEndMillis = null
+                            imageBase64 = ""
                             onSuccess()
                         }.onFailure { onError(it.localizedMessage ?: "Mahsulotni saqlab bo'lmadi.") }
                     }
                 }
             }
         },
-        enabled = !saving,
+        enabled = !saving && !isEncodingImage,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp)
     ) {
