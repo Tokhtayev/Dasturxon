@@ -1,9 +1,19 @@
 {
-  "name": "dasturxon-firestore-rules-tests",
+  "name": "dasturxon-workspace",
   "private": true,
   "type": "module",
   "scripts": {
-    "test:rules": "npx -y firebase-tools@latest emulators:exec --project demo-dasturxon --only firestore \"node --test test/firestore.rules.test.mjs\""
+    "dev": "npm --prefix web run dev",
+    "build:web": "npm --prefix web run build",
+    "lint:web": "npm --prefix web run lint",
+    "format:check": "npm --prefix web run format:check",
+    "test:web": "npm --prefix web test",
+    "test:rules": "npx --no-install firebase emulators:exec --project demo-dasturxon --only firestore \"node --test test/firestore.rules.test.mjs\"",
+    "test:all": "npm run test:web && npm run test:rules",
+    "emulators": "npx --no-install firebase emulators:start --project demo-dasturxon --only auth,firestore",
+    "deploy:hosting": "npm run build:web && npx --no-install firebase deploy --only hosting",
+    "deploy:rules": "npx --no-install firebase deploy --only firestore:rules,firestore:indexes",
+    "deploy:all": "npm run build:web && npx --no-install firebase deploy"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
