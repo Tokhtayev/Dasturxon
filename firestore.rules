@@ -45,13 +45,18 @@ service cloud.firestore {
       allow create: if isOwner(userId)
         && request.resource.data.role in ['customer', 'owner']
         && request.resource.data.email is string
-        && request.resource.data.fullName is string;
+        && request.resource.data.fullName is string
+        && request.resource.data.fullName.size() >= 2
+        && request.resource.data.fullName.size() <= 100;
 
       // Update profile: User can update their own doc, but CANNOT alter their role or email
       allow update: if (
         isOwner(userId) &&
         request.resource.data.role == resource.data.role &&
-        request.resource.data.email == resource.data.email
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.fullName is string &&
+        request.resource.data.fullName.size() >= 2 &&
+        request.resource.data.fullName.size() <= 100
       ) || isAdmin();
 
       // Deletion allowed by owner or admin
@@ -92,11 +97,14 @@ service cloud.firestore {
         isAdmin()
       );
 
-      // Create: Owner can create their business, MUST start with 'pending' status
+      // Create: Verified owner (role == 'owner' or 'admin') can create their business with 'pending' status
       allow create: if isSignedIn()
+        && getUserData().role in ['owner', 'admin']
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.status == 'pending'
-        && request.resource.data.name is string;
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 100;
 
       // Update: Owner can update business info, CANNOT transfer ownerId or self-approve.
       // Rejected businesses may be resubmitted back to 'pending'.
@@ -133,13 +141,24 @@ service cloud.firestore {
         isAdmin()
       ) && !('costPrice' in request.resource.data)
         && request.resource.data.price is int
-        && request.resource.data.price >= 0;
+        && request.resource.data.price > 0
+        && (!('stock' in request.resource.data) ||
+            request.resource.data.stock == null ||
+            (request.resource.data.stock is int && request.resource.data.stock >= 0))
+        && (!('discountPercent' in request.resource.data) ||
+            (request.resource.data.discountPercent is int &&
+             request.resource.data.discountPercent >= 0 &&
+             request.resource.data.discountPercent <= 90));
 
       // Update & Delete:
-      // - Business owner or admin can update/delete products (businessId immutable, no costPrice).
+      // - Business owner or admin can update/delete products (businessId immutable, no costPrice, valid bounds).
       // - Customer checkout transaction may ONLY decrement stock via a verified matching pending order.
       allow update: if isSignedIn() && !('costPrice' in request.resource.data) && (
-        (isBusinessOwner(resource.data.businessId) && request.resource.data.businessId == resource.data.businessId) ||
+        (isBusinessOwner(resource.data.businessId) &&
+         request.resource.data.businessId == resource.data.businessId &&
+         (!('price' in request.resource.data) || (request.resource.data.price is int && request.resource.data.price > 0)) &&
+         (!('stock' in request.resource.data) || request.resource.data.stock == null || (request.resource.data.stock is int && request.resource.data.stock >= 0)) &&
+         (!('discountPercent' in request.resource.data) || (request.resource.data.discountPercent is int && request.resource.data.discountPercent >= 0 && request.resource.data.discountPercent <= 90))) ||
         isAdmin() ||
         (
           isBusinessApproved(resource.data.businessId) &&
@@ -189,26 +208,31 @@ service cloud.firestore {
       );
 
       // Create: Signed-in customer creates order for themselves with initial status 'pending' (or legacy 'new')
-      // for an approved business
+      // for an approved business with bounded quantity (1..99)
       allow create: if isSignedIn()
         && request.resource.data.customerId == request.auth.uid
         && request.resource.data.status in ['pending', 'new']
+        && request.resource.data.quantity is int
+        && request.resource.data.quantity > 0
+        && request.resource.data.quantity <= 99
+        && (!('totalPrice' in request.resource.data) || (request.resource.data.totalPrice is int && request.resource.data.totalPrice > 0))
         && (!('paymentStatus' in request.resource.data) || request.resource.data.paymentStatus in ['unpaid', 'pending'])
         && isBusinessApproved(request.resource.data.businessId);
 
       // Update:
-      // - Customer can ONLY change status pending/new -> cancelled (ownership immutable)
-      // - Business owner can update order status and paymentStatus for their own business (customerId/businessId immutable)
+      // - Customer can ONLY change status pending/new -> cancelled (cannot alter paymentStatus, totalPrice, quantity)
+      // - Business owner can update order status and paymentStatus for their own business (ownership & amounts immutable)
       // - Admin can update any order
       allow update: if isSignedIn() && (
         (resource.data.customerId == request.auth.uid &&
          (resource.data.status in ['pending', 'new']) &&
          request.resource.data.status == 'cancelled' &&
-         request.resource.data.customerId == resource.data.customerId &&
-         request.resource.data.businessId == resource.data.businessId) ||
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
         (isBusinessOwner(resource.data.businessId) &&
          request.resource.data.customerId == resource.data.customerId &&
-         request.resource.data.businessId == resource.data.businessId) ||
+         request.resource.data.businessId == resource.data.businessId &&
+         (!('totalPrice' in resource.data) || request.resource.data.totalPrice == resource.data.totalPrice) &&
+         (!('quantity' in resource.data) || request.resource.data.quantity == resource.data.quantity)) ||
         isAdmin()
       );
 

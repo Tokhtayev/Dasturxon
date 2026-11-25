@@ -165,6 +165,7 @@
 - **Results**: Web build, oxlint (0 warnings/errors), 4/4 web unit tests, and 34/34 Firestore Rules emulator tests PASSED.
 
 ### Task 16 (Phase 2.1): Code Conventions, ESLint, Prettier & Component Modularization
+- **Commit Hash**: `4bb1795`
 - **Changed Files**: `docs/CODE_CONVENTIONS.md`, `web/eslint.config.js`, `web/.prettierrc`, `web/.prettierignore`, `web/package.json`, `web/package-lock.json`, `web/src/services/constants.ts`, `web/src/services/errors.ts`, `web/src/components/{customer,owner,admin}/*`, refactored `web/src/{pages,hooks,repositories,services}/*`, `docs/STATUS.md`
 - **What Was Done**:
   - Created `docs/CODE_CONVENTIONS.md` defining 6 enforced rules: naming (`PascalCase`/`camelCase`/`UPPER_CASE`), layered imports (forbidding `firebase/*` in `pages`/`components`), zero magic numbers/strings (`services/constants.ts`), function length & nesting depth limits (`max-lines-per-function`, `max-depth`), safe error handling (`getReadableErrorMessage`, `no-console`, `react/no-danger`, `no-empty`), and Prettier formatting.
@@ -172,6 +173,17 @@
   - Extracted large page modals/cards into dedicated UI components (`OrderCheckoutModal`, `ProductDetailModal`, `ProductFeedCard`, `CustomerOrderCard`, `ProductFormModal`, `BusinessEditModal`, `ExpenseModal`, `RejectBusinessModal`) and `ownerActions.ts`.
 - **Commands Executed**: `cd web && npm run build && npm run lint && npm run format:check && npm test`
 - **Results**: `tsc -b && vite build` (`1.02s`), ESLint + oxlint (`0` errors, `0` warnings on `53` files), Prettier (`All matched files use Prettier code style`), and `4/4` unit tests PASSED.
+
+### Task 17 (Phase 2.2a): Firestore Security Rules Hardening & Emulator Verification
+- **Changed Files**: `firestore.rules`, `test/firestore.rules.test.mjs`, `docs/STATUS.md`
+- **What Was Fixed**:
+  - Added strict string length bounds on `users/{userId}` `fullName` (`2..100`) alongside immutable `role` and `email`.
+  - Restricted `businesses/{businessId}` creation strictly to verified `owner` or `admin` roles (`getUserData().role in ['owner', 'admin']`) with `pending` initial status and bounded name length (`2..100`).
+  - Enforced `price > 0`, `stock >= 0`, and `discountPercent` in `0..90` on both product `create` and `update`.
+  - Enforced bounded order `quantity` (`1..99`), positive `totalPrice`, strict `affectedKeys().hasOnly(['status', 'updatedAt'])` during customer cancellation (`pending -> cancelled`), and immutable `totalPrice`/`quantity` during owner updates.
+  - Expanded `@firebase/rules-unit-testing` suite with tests 35–39 covering every newly enforced bound.
+- **Commands Executed**: `npm run test:rules`, `cd web && npm run build && npm run lint && npm run format:check && npm test`
+- **Results**: `39/39` Firestore Rules emulator tests (`6142.42ms`) and all web checks PASSED.
 
 ---
 

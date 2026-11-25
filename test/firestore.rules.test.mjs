@@ -739,6 +739,86 @@ test("34. Owner can resubmit rejected business to pending without self-approval"
   }));
 });
 
+// 35. Customer cannot alter paymentStatus or totalPrice when cancelling an order
+test("35. Customer cannot tamper with paymentStatus or totalPrice while cancelling", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const orderRef = doc(dbCust, "orders/order-tamper-cancel");
+
+  await assertSucceeds(setDoc(orderRef, {
+    customerId: "customer-1",
+    businessId: "business-1",
+    businessName: "Nonvoyxona 1",
+    productId: "product-approved",
+    productName: "Patir Non",
+    quantity: 1,
+    totalPrice: 8000,
+    status: "pending",
+    paymentStatus: "unpaid",
+    createdAt: Timestamp.now()
+  }));
+
+  await assertFails(updateDoc(orderRef, {
+    status: "cancelled",
+    paymentStatus: "paid",
+    totalPrice: 0
+  }));
+
+  await assertSucceeds(updateDoc(orderRef, { status: "cancelled" }));
+});
+
+// 36. Customer role cannot create a business
+test("36. Customer account cannot create a business", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  await assertFails(setDoc(doc(dbCust, "businesses/biz-by-customer"), {
+    ownerId: "customer-1",
+    name: "Unauthorized Shop",
+    type: "bakery",
+    address: "Yunusobod",
+    phone: "+998901112233",
+    status: "pending",
+    createdAt: Timestamp.now()
+  }));
+});
+
+// 37. Owner cannot create or update product with invalid price, stock, or discount bounds
+test("37. Product price <= 0, negative stock, and discount > 90 are rejected by rules", async () => {
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  await assertFails(setDoc(doc(dbOwner, "products/prod-zero-price"), validProduct({ price: 0 })));
+  await assertFails(setDoc(doc(dbOwner, "products/prod-neg-stock"), validProduct({ stock: -1 })));
+  await assertFails(setDoc(doc(dbOwner, "products/prod-bad-disc"), validProduct({ discountPercent: 95 })));
+  await assertFails(updateDoc(doc(dbOwner, "products/product-approved"), { price: -500 }));
+});
+
+// 38. Order creation enforces quantity limits (1..99)
+test("38. Order quantity outside 1..99 is rejected by rules", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  await assertFails(setDoc(doc(dbCust, "orders/order-qty-0"), {
+    customerId: "customer-1",
+    businessId: "business-1",
+    productId: "product-approved",
+    quantity: 0,
+    status: "pending",
+    createdAt: Timestamp.now()
+  }));
+  await assertFails(setDoc(doc(dbCust, "orders/order-qty-100"), {
+    customerId: "customer-1",
+    businessId: "business-1",
+    productId: "product-approved",
+    quantity: 100,
+    status: "pending",
+    createdAt: Timestamp.now()
+  }));
+});
+
+// 39. Owner cannot tamper with customer totalPrice or quantity when updating order status
+test("39. Owner cannot alter order totalPrice or quantity", async () => {
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  await assertFails(updateDoc(doc(dbOwner, "orders/order-1"), {
+    status: "accepted",
+    totalPrice: 999999
+  }));
+});
+
 
 
 
