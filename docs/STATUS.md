@@ -221,7 +221,37 @@
   - Measured `vite preview` (`http://127.0.0.1:4173/`) at `390x844` using Chrome DevTools & `browser` subagent; fixed a `9.6px` horizontal header overflow (`b836501`) and verified `scrollWidth === 390 === innerWidth`, `localStorageLength === 0`, `sessionStorageLength === 0`, `cspViolations === 0`, `DOMContentLoaded: 2018ms`, `Load: 2022ms`, `FCP: 2268ms`.
   - Authored `docs/report/08-sifat-xavfsizlik.md` (quality matrix, threat table, real code-review findings) and `docs/report/09-test-metrika.md` (Vitest boundary table + programmatically verified Halstead `V=154.29`, `D=9.43`, `E=1454.71` and Cyclomatic Complexity `V(G)=4` on `computeRemainingStock`).
 - **Commands Executed**: `cd web && npm run build && npm run lint && npm run format:check && npm test`, `npm run test:rules`
-- **Results**: Verified all checks green after final edits.
+- **Results**: Verified all checks green after final edits (`b3e74e8`).
+
+### Task 23 (Phase 4.1): Mermaid Architecture/UML Diagrams & Live App Screenshots
+- **Commit Hash**: `406df9a`
+- **Changed Files**: `docs/diagrams/{use-case,class-diagram,architecture-layers,order-sequence}.{mmd,png}`, `docs/screenshots/{customer_feed,customer_orders,owner_analytics,admin_approvals}.png`
+- **What Was Done**:
+  - Created 4 Mermaid source diagrams matching real repository, hook, service, and domain identifiers (`UserProfile`, `Business`, `Product`, `PrivateProductCost`, `CustomerOrder`, `OrderLineItem`, `Expense`, `AnalyticsReport`, `orderRepository`, `orderLogic.applyStockDecrement`).
+  - Exported all 4 diagrams to crisp PNG assets using headless Chrome + local Mermaid v11.
+  - Seeded clean Uzbek demo accounts on Firebase Auth + Firestore Emulators and captured 4 real `1280x800` screenshots across Customer, Business Owner, and Admin roles using the built-in browser.
+
+### Task 24 (Phase 4.2): Uzbek Academic Report Chapters 01–07 & 10
+- **Commit Hash**: `0d15a44`
+- **Changed Files**: `docs/report/01-muammo.md`, `02-jarayon-modeli.md`, `03-reja.md`, `04-talablar.md`, `05-loyihalash.md`, `06-ux.md`, `07-amalga-oshirish.md`, `10-xavflar.md`
+- **What Was Done**:
+  - Completed formal Uzbek (Latin script) academic chapters with zero Latin-name apostrophe-suffix errors and zero fabricated human data (all time logs, interview answers, UX test participants, and 3-question survey results left as `[TO'LDIRING]` templates).
+  - Embedded all 4 diagram PNGs and 4 live screenshots with captions; documented the real Android-to-Web migration and `390x844` overflow fix in `10-xavflar.md` alongside 4 code-grounded 1-year improvement plans.
+
+### Task 25 (Phase 5): Repository Guide, Web README, Firebase Hosting Config & Unified `.docx`
+- **Commit Hash**: `8d0a237`, `40ed2de`
+- **Changed Files**: `docs/GIT_GUIDE.md`, `.firebaserc`, `firebase.json`, `package.json`, `README.md`, `docs/report/Dasturxon_Yakuniy_Hisobot.docx`, `docs/STUDENT_TODO.md`, `docs/STATUS.md`
+- **What Was Done**:
+  - Authored `docs/GIT_GUIDE.md` referencing real commit hashes (`0d15a44`..`92145db`) for `git log`, `git checkout`, `git revert`, and `git restore`.
+  - Rewrote root `README.md` for the web platform with setup, `.env` variables, run/test/build commands, and exact folder structure.
+  - Configured `.firebaserc` (`dasturxon-27a6e`), SPA rewrites + strict CSP headers in `firebase.json`, and root scripts (`build:web`, `lint:web`, `format:check`, `test:web`, `test:rules`, `test:all`, `emulators`, `deploy:hosting`, `deploy:rules`, `deploy:all`) without executing `firebase login` or `firebase deploy`.
+  - Assembled unified `docs/report/Dasturxon_Yakuniy_Hisobot.docx` (2,387,619 bytes) via `docx@9.16.0` with Title Page (`Titul varag'i`), TOC field (`Mundarija`), `Kirish`, Chapters `00`–`10` (with 8 embedded PNG figures & 24 captioned tables), 1-page `Xulosa` (`[TO'LDIRING]`), all 5 required academic `Adabiyotlar` entries, and `Ilovalar`, formatted in Times New Roman 14 pt with 1.0 line spacing (`w:line="240"`).
+- **Final Verification Commands Executed**:
+  - `cd web && npm run build` -> `dist/index.html` (`1.89 kB`), CSS (`30.23 kB` / gzip `6.34 kB`), JS (`969.62 kB` / gzip `285.21 kB`) built in `558ms`.
+  - `cd web && npm run lint` -> ESLint + `oxlint`: `0 warnings and 0 errors` on `56 files` (`52ms`).
+  - `npm run format:check` -> Prettier: `All matched files use Prettier code style!`.
+  - `cd web && npm test` -> Vitest v5.1.1: `Test Files 3 passed (3)`, `Tests 20 passed (20)` (`151ms`).
+  - `npm run test:rules` -> `@firebase/rules-unit-testing`: `39/39 passed, 0 failed` (`3228.51ms`).
 
 ---
 
@@ -233,18 +263,45 @@
 | **Web Domain & Security Unit Tests (Vitest)** (`cd web && npm test`) | **20** | **PASS** | `orderLogic` (`computeRemainingStock`, `applyStockDecrement`, `calculateOrderTotal`, `isValidOrderTransition` with boundary cases `stock 0/1`, `qty 0/1/99/100`), `validators` (`email`, password `7/8/128/129`, `price 0/-5000`, `stock -1`, empty strings, `sanitizeUserText`, `escapeHtml`, `redactSensitiveTokens`), and `analytics` (`math.floor` discounts, `Asia/Tashkent` bounds, `completed + paid` revenue, COGS, profit, lossMakers). |
 | **Web TypeScript & Vite Build** (`cd web && npm run build`) | - | **PASS** | Clean `tsc -b && vite build` static bundle (`web/dist/`). |
 | **Web Linter** (`cd web && npm run lint`) | **56 files** | **PASS** | ESLint (`@typescript-eslint`, `react`, `react-hooks`, `no-console`, `no-magic-numbers`, `max-lines-per-function`, `no-restricted-imports`, `no-restricted-globals`) + `oxlint`: 0 warnings, 0 errors. |
-| **Web Formatter** (`cd web && npm run format:check`) | **56 files** | **PASS** | Prettier style check passed across all TypeScript/TSX sources and tests. |
-| **Browser E2E Flow (Emulator)** (`http://127.0.0.1:5173`) | **6 stages** | **PASS** | Real Firebase Auth + Firestore Emulator end-to-end flows for Owner, Admin, and Customer roles plus `390x844` mobile layout check. |
+| **Web Formatter** (`npm run format:check`) | **56 files** | **PASS** | Prettier style check passed across all TypeScript/TSX sources and tests. |
+| **Browser E2E Flow (Emulator)** (`http://127.0.0.1:5173`) | **6 stages + 4 captures** | **PASS** | Real Firebase Auth + Firestore Emulator end-to-end flows for Owner, Admin, and Customer roles, `390x844` mobile layout check (`0px` horizontal overflow), plus 4 `1280x800` screenshots. |
 | **Legacy Android JVM Unit Tests** (`android-legacy/`, historical pre-migration) | **59** | **PASS** | Archived Kotlin/Compose unit tests (`AnalyticsCalculatorTest`, `AuthViewModelTest`, etc.) prior to Phase 0 migration. |
 
 ---
 
-## 4. NOT VERIFIED (Manual / Hardware Verification Required)
+## 4. DONE, PARTIAL, STUDENT TODO & EXACT COMMANDS
 
-- **Physical Device Push Notifications**: Firebase Cloud Messaging (FCM) is not deployed (serverless Spark tier without external push server).
-- **Physical Device Doze Mode / Deep Sleep**: Background lifecycle behavior was verified via ViewModel test scopes and Compose lifecycle flows, but not on physical battery-saving hardware modes.
-- **Production Firebase Deployment**: Live Firebase deployment (`firebase deploy`) was intentionally not performed in compliance with project safety rules (only the local Firebase Emulator was used).
-- **Physical In-Person Cash / QR Payments**: Payments occur in person upon pickup or delivery; no external card gateway SDK is integrated into the client.
+### Done
+- Full Android -> Web migration preserving `dasturxon-27a6e` Firebase schema and `firestore.rules`.
+- Three-role MVP (`customer`, `owner`, `admin`) with Repository + Observer (`onSnapshot`) architecture and `RoleGuard` route guards.
+- Three distinct security layers (`008996b`, `ff826ba`, `633fff0`) verified by 39 Firestore Rules tests, 20 Vitest tests, ESLint/oxlint, Prettier, and Chrome CSP/storage checks.
+- Complete Uzbek report modules `00`–`10`, 4 Mermaid diagrams + PNG exports, 4 live running-app screenshots, `docs/GIT_GUIDE.md`, updated `README.md`, `firebase.json` + `.firebaserc` + deploy scripts, and assembled Word report `docs/report/Dasturxon_Yakuniy_Hisobot.docx`.
+
+### Partial / Blocked By Rules or Host Tooling
+- **Human-supplied report sections (`[TO'LDIRING]`)**: Time-log hours (`Amalda` column), interview answers, UX participant test timings, 3-question survey summaries, and personal conclusion paragraphs intentionally contain `[TO'LDIRING]` placeholders and were NOT fabricated.
+- **Live Production Deployment (`firebase deploy`)**: Intentionally not run per instructions; deploy configs and npm scripts are prepared for student execution.
+- **Word TOC Page Number Field Population**: `libreoffice` and MS Word binaries are absent on this build host, so `TableOfContents` field page numbers populate automatically when opened in Microsoft Word via `F9` / *Update Table*.
+- **Lighthouse CLI Audit**: Performance/Security/Usability metrics were measured directly on `vite preview` via Chrome DevTools (`FCP`, `DOMContentLoaded`, `Load`, bundle sizes, CSP headers, `390x844` overflow) instead of external Lighthouse CLI.
+
+### Student TODO (Summary — full checklist in `docs/STUDENT_TODO.md`)
+1. Open `docs/report/Dasturxon_Yakuniy_Hisobot.docx`, fill Title Page & Xulosa `[TO'LDIRING]` blanks, and run `F9` (*Update entire table*) on `Mundarija`.
+2. Fill real personal observations, time-log hours (`Amalda`), interview answers, UX participant table, and survey summaries across `docs/report/00..10` (or directly in `.docx`).
+3. Create `web/.env` with production `dasturxon-27a6e` Firebase Web keys (`VITE_USE_FIREBASE_EMULATOR=false`), authenticate `npx firebase login`, run `npm run deploy:rules` and `npm run deploy:hosting`, and assign initial `admin` role in Firestore Console.
+
+### Exact Commands to Run, Test, Build, and Deploy
+```bash
+# Run locally with Firebase Emulators (set VITE_USE_FIREBASE_EMULATOR=true in web/.env)
+npm run emulators
+cd web && npm run dev
+
+# Build, Lint, Format Check, Vitest, and Firestore Rules Tests
+cd web && npm run build && npm run lint && npm run format:check && npm test
+cd .. && npm run test:rules
+
+# Deploy to Firebase Hosting (after firebase login & production web/.env)
+npm run deploy:rules
+npm run deploy:hosting
+```
 
 ---
 
@@ -252,4 +309,4 @@
 
 1. **Client-Side Stock Race Conditions**: Because Cloud Functions are unavailable under the Firebase Spark plan, stock decrements occur via client-side multi-document Firestore transactions. While security rules prevent negative stock, high concurrent orders on a single product could experience transaction retries.
 2. **Client-Side Search Limitations**: Search and filtering are executed locally over active products in memory. When the product catalog expands past thousands of items, server-side indexing (e.g. Algolia or Elasticsearch) will be required.
-3. **Data Loss on Device Migration**: Because backups are explicitly disabled (`allowBackup="false"`), users must sign in afresh when switching devices.
+3. **Production Firebase Setup Dependency**: Live deployment requires the student to populate `web/.env` from Firebase Console, add hosting domains to Firebase Auth Authorized Domains, and manually grant `admin` role in `users/{uid}`.
