@@ -112,12 +112,22 @@
 - **Results**: TypeScript/Vite build, oxlint, and all 7 web unit tests PASSED.
 
 ### Task 9 (Phase 0.4): Uzbek Migration Report & Student Action Checklist
+- **Commit Hash**: `5c69739`
 - **Changed Files**: `docs/report/00-migratsiya.md`, `docs/STUDENT_TODO.md`, `docs/STATUS.md`
 - **What Was Done**:
   - Authored `docs/report/00-migratsiya.md` in formal Uzbek (Latin script, no apostrophes between Latin-script names and Uzbek suffixes) documenting migration rationale, reused Firebase assets (`dasturxon-27a6e`, `firestore.rules`, `firestore.indexes.json`), rewritten 3-layer web architecture, and real measured Phase 0 test outputs.
   - Created `docs/STUDENT_TODO.md` tracking all `[TO'LDIRING]` human placeholders and manual Firebase Console / GitHub Secrets steps.
 - **Commands Executed**: `cd web && npm run build && npm run lint && npm test`
 - **Results**: Build, oxlint (0 errors), and 7/7 web unit tests PASSED.
+
+### Task 10 (Phase 1.1): Modular Firestore Repositories & Observer Hooks
+- **Changed Files**: `web/src/repositories/*.ts`, `web/src/context/AuthContext.tsx`, `web/src/hooks/*.ts`, `docs/STATUS.md`
+- **What Was Done**:
+  - Implemented Repository pattern across `authRepository`, `businessRepository`, `productRepository`, `orderRepository`, and `expenseRepository` with zero Firestore imports allowed in UI components.
+  - Applied Observer pattern (`onSnapshot` / `onAuthStateChanged` unsubscribes) exposed via `AuthContext`, `useCustomerFeed`, `useCustomerOrders`, `useOwnerDashboard`, and `useAdminBusinesses`.
+  - Implemented atomic customer checkout transaction (`lastCheckoutOrderId` + `items` subcollection + stock decrement), owner rejection stock restoration, private `products/{id}/private/cost` isolation, and auth rollback on registration batch failure.
+- **Commands Executed**: `cd web && npm run build && npm run lint && npm test`
+- **Results**: TypeScript/Vite build, oxlint (0 errors), and 7/7 web unit tests PASSED.
 
 ---
 
