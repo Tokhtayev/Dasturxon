@@ -121,13 +121,25 @@
 - **Results**: Build, oxlint (0 errors), and 7/7 web unit tests PASSED.
 
 ### Task 10 (Phase 1.1): Modular Firestore Repositories & Observer Hooks
-- **Changed Files**: `web/src/repositories/*.ts`, `web/src/context/AuthContext.tsx`, `web/src/hooks/*.ts`, `docs/STATUS.md`
+- **Commit Hash**: `4fbba71` (cleanup `c1bbe13`)
+- **Changed Files**: `web/src/repositories/*.ts`, `web/src/context/*`, `web/src/hooks/*.ts`, `docs/STATUS.md`
 - **What Was Done**:
   - Implemented Repository pattern across `authRepository`, `businessRepository`, `productRepository`, `orderRepository`, and `expenseRepository` with zero Firestore imports allowed in UI components.
   - Applied Observer pattern (`onSnapshot` / `onAuthStateChanged` unsubscribes) exposed via `AuthContext`, `useCustomerFeed`, `useCustomerOrders`, `useOwnerDashboard`, and `useAdminBusinesses`.
   - Implemented atomic customer checkout transaction (`lastCheckoutOrderId` + `items` subcollection + stock decrement), owner rejection stock restoration, private `products/{id}/private/cost` isolation, and auth rollback on registration batch failure.
 - **Commands Executed**: `cd web && npm run build && npm run lint && npm test`
-- **Results**: TypeScript/Vite build, oxlint (0 errors), and 7/7 web unit tests PASSED.
+- **Results**: TypeScript/Vite build, oxlint (0 warnings, 0 errors), and 7/7 web unit tests PASSED.
+
+### Task 11–13 (Phase 1.2): Role-Guarded React Router App (Auth, Customer, Owner, Admin)
+- **Changed Files**: `web/src/App.tsx`, `web/src/components/AppShell.tsx`, `web/src/components/RouteGuards.tsx`, `web/src/services/routing.ts`, `web/src/pages/**`, `web/README.md`, `docs/STATUS.md`
+- **What Was Done**:
+  - Built mobile-first responsive pages using React Router (`HashRouter`) and strict `RoleGuard` / `GuestOnlyGuard` route protection (`customer`, `owner`, `admin`).
+  - Implemented Auth pages (`/`, `/login`, `/register` with show-password toggle, password reset, strict email+password login, `customer`/`owner` registration).
+  - Implemented Customer pages (`CustomerFeedPage` with category filter/search + Firestore checkout transaction + pickup/delivery choice, real-time `CustomerOrdersPage` `"Buyurtmalarim"`, `CustomerProfilePage`).
+  - Implemented Owner pages (`OwnerBusinessGate` for creation/pending/rejected-resubmit, `OwnerDashboardPage`, `OwnerProductsPage` CRUD with private `costPrice` + selling `price` + stock + availability, `OwnerOrdersPage`, `OwnerAnalyticsPage` with daily/weekly/monthly revenue, COGS, expenses, and profit).
+  - Implemented Admin approval dashboard (`AdminDashboardPage`) to approve or reject pending businesses with a required reason.
+- **Commands Executed**: `cd web && npm run build && npm run lint && npm test`
+- **Results**: TypeScript/Vite build, oxlint (0 warnings, 0 errors), and 4/4 domain unit tests PASSED.
 
 ---
 

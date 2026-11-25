@@ -1,5 +1,5 @@
 import React from 'react';
-import type { OrderStatusKey } from '../types/dasturxon';
+import type { OrderStatusKey } from '../types/domain';
 
 interface StatusChipProps {
   status: OrderStatusKey;
