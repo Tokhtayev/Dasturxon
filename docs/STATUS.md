@@ -131,6 +131,7 @@
 - **Results**: TypeScript/Vite build, oxlint (0 warnings, 0 errors), and 7/7 web unit tests PASSED.
 
 ### Task 11–13 (Phase 1.2): Role-Guarded React Router App (Auth, Customer, Owner, Admin)
+- **Commit Hash**: `92145db`
 - **Changed Files**: `web/src/App.tsx`, `web/src/components/AppShell.tsx`, `web/src/components/RouteGuards.tsx`, `web/src/services/routing.ts`, `web/src/pages/**`, `web/README.md`, `docs/STATUS.md`
 - **What Was Done**:
   - Built mobile-first responsive pages using React Router (`HashRouter`) and strict `RoleGuard` / `GuestOnlyGuard` route protection (`customer`, `owner`, `admin`).
@@ -140,6 +141,14 @@
   - Implemented Admin approval dashboard (`AdminDashboardPage`) to approve or reject pending businesses with a required reason.
 - **Commands Executed**: `cd web && npm run build && npm run lint && npm test`
 - **Results**: TypeScript/Vite build, oxlint (0 warnings, 0 errors), and 4/4 domain unit tests PASSED.
+
+### Task 14 (Phase 1.3): Fix Pre-Auth Nickname Read Race in `signUpWithEmail`
+- **Changed Files**: `web/src/repositories/authRepository.ts`, `docs/STATUS.md`
+- **What Was Fixed**:
+  - Browser E2E testing against Firebase Emulator exposed a `permission-denied` error during sign-up: `usernames/{normalized}` was queried before `createUserWithEmailAndPassword` when `isSignedIn()` was still `false`.
+  - Moved nickname lookup inside the post-Auth `try/catch` block with atomic `deleteUser` rollback if the nickname is already taken or batch write fails, and debounced transient `profile_missing` emissions during batch commit.
+- **Commands Executed**: `cd web && npm run build && npm run lint && npm test`
+- **Results**: Build, oxlint (0 warnings, 0 errors), and 4/4 unit tests PASSED.
 
 ---
 

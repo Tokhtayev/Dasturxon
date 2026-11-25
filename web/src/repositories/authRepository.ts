@@ -82,11 +82,16 @@ export const authRepository = {
     const auth = getFirebaseAuth();
     const db = getFirebaseDb();
     let profileUnsub: Unsubscribe | null = null;
+    let missingTimer: ReturnType<typeof setTimeout> | null = null;
 
     const authUnsub = onAuthStateChanged(auth, (firebaseUser) => {
       if (profileUnsub) {
         profileUnsub();
         profileUnsub = null;
+      }
+      if (missingTimer) {
+        clearTimeout(missingTimer);
+        missingTimer = null;
       }
 
       if (!firebaseUser) {
@@ -101,26 +106,38 @@ export const authRepository = {
       profileUnsub = onSnapshot(
         userRef,
         (snap) => {
+          if (missingTimer) {
+            clearTimeout(missingTimer);
+            missingTimer = null;
+          }
           if (snap.exists()) {
             onState({
               status: 'ready',
               profile: mapUserDoc(firebaseUser.uid, snap.data() as Record<string, unknown>),
             });
           } else {
-            onState({
-              status: 'profile_missing',
-              uid: firebaseUser.uid,
-              email: firebaseUser.email ?? '',
-            });
+            // Avoid flashing profile_missing during the brief window between Auth creation and batch commit
+            missingTimer = setTimeout(() => {
+              onState({
+                status: 'profile_missing',
+                uid: firebaseUser.uid,
+                email: firebaseUser.email ?? '',
+              });
+            }, 1500);
           }
         },
         (error) => {
+          if (missingTimer) {
+            clearTimeout(missingTimer);
+            missingTimer = null;
+          }
           onState({ status: 'error', message: mapAuthErrorMessage(error) });
         }
       );
     });
 
     return () => {
+      if (missingTimer) clearTimeout(missingTimer);
       if (profileUnsub) profileUnsub();
       authUnsub();
     };
@@ -154,34 +171,37 @@ export const authRepository = {
     const normalized = normalizeNickname(params.nickname);
 
     try {
-      const usernameRef = doc(db, 'usernames', normalized);
-      const existingHandle = await getDoc(usernameRef);
-      if (existingHandle.exists()) {
-        throw new Error('Ushbu nickname allaqachon band. Boshqa nom tanlang.');
-      }
-
+      // 1. Create Auth user first so Firestore security rules see isSignedIn() == true
       const cred = await createUserWithEmailAndPassword(auth, params.email.trim(), params.password);
       const uid = cred.user.uid;
+      const usernameRef = doc(db, 'usernames', normalized);
       const userRef = doc(db, 'users', uid);
 
-      const batch = writeBatch(db);
-      batch.set(userRef, {
-        fullName: params.fullName.trim(),
-        normalizedNickname: normalized,
-        email: params.email.trim(),
-        phone: (params.phone ?? '').trim(),
-        role: params.role,
-        createdAt: serverTimestamp(),
-      });
-      batch.set(usernameRef, {
-        uid,
-        createdAt: serverTimestamp(),
-      });
-
       try {
+        // 2. Check atomic nickname uniqueness while authenticated
+        const existingHandle = await getDoc(usernameRef);
+        if (existingHandle.exists()) {
+          throw new Error('Ushbu nickname allaqachon band. Boshqa nom tanlang.');
+        }
+
+        // 3. Atomic WriteBatch to users/{uid} and usernames/{normalized}
+        const batch = writeBatch(db);
+        batch.set(userRef, {
+          fullName: params.fullName.trim(),
+          normalizedNickname: normalized,
+          email: params.email.trim(),
+          phone: (params.phone ?? '').trim(),
+          role: params.role,
+          createdAt: serverTimestamp(),
+        });
+        batch.set(usernameRef, {
+          uid,
+          createdAt: serverTimestamp(),
+        });
+
         await batch.commit();
       } catch (firestoreErr) {
-        // Atomic rollback of Auth user if Firestore batch fails
+        // Atomic rollback of Auth user if nickname is taken or Firestore batch fails
         try {
           await deleteUser(cred.user);
         } catch {
