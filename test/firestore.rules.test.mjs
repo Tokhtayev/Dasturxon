@@ -6,7 +6,7 @@ import {
   assertFails,
   assertSucceeds
 } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, collection, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, collection, Timestamp, runTransaction } from "firebase/firestore";
 
 const projectId = "demo-dasturxon";
 let testEnv;
@@ -663,6 +663,82 @@ test("32. Owner cannot change product businessId on update", async () => {
     businessId: "business-2"
   }));
 });
+
+// 33. Customer checkout transaction creates order + item and decrements product stock safely
+test("33. Customer checkout transaction decrements stock safely and rejects unauthorized stock edits", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const prodRef = doc(dbCust, "products/product-approved");
+  const orderRef = doc(dbCust, "orders/order-tx-1");
+  const itemRef = doc(dbCust, "orders/order-tx-1/items/item-1");
+
+  // Direct stock tamper without matching transaction order must fail
+  await assertFails(updateDoc(prodRef, { stock: 1 }));
+
+  await assertSucceeds(runTransaction(dbCust, async (tx) => {
+    const prodSnap = await tx.get(prodRef);
+    const currentStock = prodSnap.data().stock;
+    const price = prodSnap.data().price;
+    const qty = 3;
+
+    tx.set(orderRef, {
+      customerId: "customer-1",
+      businessId: "business-1",
+      businessName: "Nonvoyxona 1",
+      productId: "product-approved",
+      productName: "Patir Non",
+      quantity: qty,
+      unitPrice: price,
+      totalPrice: price * qty,
+      status: "pending",
+      paymentStatus: "unpaid",
+      fulfillmentType: "pickup",
+      createdAt: Timestamp.now()
+    });
+
+    tx.set(itemRef, {
+      productId: "product-approved",
+      name: "Patir Non",
+      qty,
+      unitPrice: price
+    });
+
+    tx.update(prodRef, {
+      stock: currentStock - qty,
+      status: currentStock - qty === 0 ? "sold_out" : "available",
+      lastCheckoutOrderId: "order-tx-1",
+      updatedAt: Timestamp.now()
+    });
+  }));
+
+  const updatedProd = await getDoc(prodRef);
+  assert.equal(updatedProd.data().stock, 47);
+});
+
+// 34. Owner can resubmit a rejected business back to pending, but cannot self-approve
+test("34. Owner can resubmit rejected business to pending without self-approval", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "businesses/biz-rejected"), {
+      ownerId: "owner-1",
+      name: "Rejected Shop",
+      type: "bakery",
+      address: "Yunusobod",
+      phone: "+998901234567",
+      status: "rejected",
+      rejectionReason: "Manzil noaniq",
+      createdAt: Timestamp.now()
+    });
+  });
+
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  const bizRef = doc(dbOwner, "businesses/biz-rejected");
+
+  await assertFails(updateDoc(bizRef, { status: "approved" }));
+  await assertSucceeds(updateDoc(bizRef, {
+    name: "Corrected Shop",
+    status: "pending"
+  }));
+});
+
 
 
 

@@ -98,12 +98,14 @@ service cloud.firestore {
         && request.resource.data.status == 'pending'
         && request.resource.data.name is string;
 
-      // Update: Owner can update business info, but CANNOT change status (no self-approval) and cannot transfer ownerId
-      // Only admin can change status (e.g. approve/reject)
+      // Update: Owner can update business info, CANNOT transfer ownerId or self-approve.
+      // Rejected businesses may be resubmitted back to 'pending'.
+      // Only admin can approve or reject.
       allow update: if isSignedIn() && (
         (resource.data.ownerId == request.auth.uid &&
          request.resource.data.ownerId == resource.data.ownerId &&
-         request.resource.data.status == resource.data.status) ||
+         (request.resource.data.status == resource.data.status ||
+          (resource.data.status == 'rejected' && request.resource.data.status == 'pending'))) ||
         isAdmin()
       );
 
@@ -133,12 +135,32 @@ service cloud.firestore {
         && request.resource.data.price is int
         && request.resource.data.price >= 0;
 
-      // Update & Delete: Only the owner of that business (or admin) can update/delete products.
-      // Cannot change businessId and cannot store costPrice in public doc.
-      allow update: if isSignedIn() && (
+      // Update & Delete:
+      // - Business owner or admin can update/delete products (businessId immutable, no costPrice).
+      // - Customer checkout transaction may ONLY decrement stock via a verified matching pending order.
+      allow update: if isSignedIn() && !('costPrice' in request.resource.data) && (
         (isBusinessOwner(resource.data.businessId) && request.resource.data.businessId == resource.data.businessId) ||
-        isAdmin()
-      ) && !('costPrice' in request.resource.data);
+        isAdmin() ||
+        (
+          isBusinessApproved(resource.data.businessId) &&
+          resource.data.status in ['available', 'hot_ready'] &&
+          resource.data.stock is int &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'status', 'lastCheckoutOrderId', 'updatedAt']) &&
+          request.resource.data.lastCheckoutOrderId is string &&
+          !exists(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)) &&
+          getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.customerId == request.auth.uid &&
+          getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.businessId == resource.data.businessId &&
+          getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.productId == productId &&
+          getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.status in ['pending', 'new'] &&
+          getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.quantity is int &&
+          getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.quantity > 0 &&
+          getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.quantity <= 99 &&
+          request.resource.data.stock == resource.data.stock - getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.quantity &&
+          request.resource.data.stock >= 0 &&
+          ((request.resource.data.stock == 0 && request.resource.data.status == 'sold_out') ||
+           (request.resource.data.stock > 0 && request.resource.data.status in ['available', 'hot_ready']))
+        )
+      );
 
       allow delete: if isSignedIn() && (
         isBusinessOwner(resource.data.businessId) ||
@@ -195,18 +217,31 @@ service cloud.firestore {
 
       // Order lines subcollection: orders/{orderId}/items/{itemId}
       match /items/{itemId} {
+        function expectedLineItemPrice(prod) {
+          return ('discountPercent' in prod &&
+                  prod.discountPercent is int &&
+                  prod.discountPercent > 0 &&
+                  prod.discountPercent <= 90 &&
+                  (!('discountEndsAt' in prod) || prod.discountEndsAt == null || prod.discountEndsAt > request.time))
+            ? (prod.price - int(math.floor((prod.price * prod.discountPercent) / 100.0)))
+            : prod.price;
+        }
+
         allow read: if isSignedIn() && (
           get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid ||
           isBusinessOwner(get(/databases/$(database)/documents/orders/$(orderId)).data.businessId) ||
           isAdmin()
         );
 
-        // Customer creates line item: unitPrice must match product sellingPrice
+        // Customer creates line item (standalone or inside checkout transaction):
+        // unitPrice must match product sellingPrice (or active discounted price)
         allow create: if isSignedIn() && (
-          get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid &&
-          request.resource.data.unitPrice == get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.price &&
-          request.resource.data.qty > 0 && request.resource.data.qty <= 99
-        );
+          (exists(/databases/$(database)/documents/orders/$(orderId)) &&
+           get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid) ||
+          getAfter(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid
+        ) &&
+          request.resource.data.unitPrice == expectedLineItemPrice(get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data) &&
+          request.resource.data.qty > 0 && request.resource.data.qty <= 99;
 
         // When completing, the owner writes unitCost per item snapshot
         allow update: if isSignedIn() && (

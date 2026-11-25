@@ -83,6 +83,7 @@
 - **Results**: BUILD SUCCESSFUL (25s), all unit tests passed.
 
 ### Task 6 (Phase 0.1): Archive Android Codebase to `android-legacy/`
+- **Commit Hash**: `99d6606`
 - **Changed Files**: `android-legacy/**`, `.gitignore`, `docs/STATUS.md`
 - **What Was Done**:
   - Moved the entire Kotlin/Compose Android project (`app/`, `gradle/`, Gradle wrapper, build scripts, `google-services.json`) into `android-legacy/` without deleting any source files.
@@ -90,13 +91,22 @@
 - **Commands Executed**: `cd web && npm run build && npm run lint && node --test tests/analytics.test.ts`
 - **Results**: Web build, lint, and unit tests passed prior to commit.
 
+### Task 7 (Phase 0.2): Firebase Emulator Suite & Security Rules Test Expansion
+- **Changed Files**: `firebase.json`, `firestore.rules`, `test/firestore.rules.test.mjs`, `docs/STATUS.md`
+- **What Was Done**:
+  - Enabled Firebase Auth Emulator (`port: 9099`) alongside Firestore Emulator (`port: 8080`) in `firebase.json` for isolated web E2E testing.
+  - Committed hardened `firestore.rules` supporting atomic customer checkout stock decrement (`lastCheckoutOrderId` + `getAfter` validation), discounted line item price matching (`math.floor`), and rejected-business resubmission (`rejected -> pending`).
+  - Added tests 33–34 in `test/firestore.rules.test.mjs`.
+- **Commands Executed**: `npm run test:rules`
+- **Results**: 34/34 Firestore security rules tests PASSED (`duration_ms 4205.915`).
+
 ---
 
 ## 3. VERIFIED BY AUTOMATED TEST
 
 | Test Suite / Tool | Count | Result | Verification Scope |
 | :--- | :---: | :---: | :--- |
-| **Firestore Security Rules Emulator Tests** (`npm run test:rules`) | **32** | **PASS** | Role escalation prevention, cross-user doc isolation, order privacy, cross-owner product isolation, private cost subcollection isolation (`products/{id}/private/cost`), public costPrice prohibition, business creation forced to `pending`, business ownership immutability, unapproved business order creation block, order line item `unitPrice` validation, customer cancellation constraints, owner `unitCost` snapshot, expense isolation, forged analytics event prevention, and real-time snapshot listeners. |
+| **Firestore Security Rules Emulator Tests** (`npm run test:rules`) | **34** | **PASS** | Role escalation prevention, cross-user doc isolation, order privacy, cross-owner product isolation, private cost subcollection isolation (`products/{id}/private/cost`), public costPrice prohibition, business creation forced to `pending`, rejected business resubmission, business ownership immutability, unapproved business order creation block, atomic checkout stock decrement (`lastCheckoutOrderId`), order line item `unitPrice` validation, customer cancellation constraints, owner `unitCost` snapshot, expense isolation, forged analytics event prevention, and real-time snapshot listeners. |
 | **JVM Unit Tests** (`./gradlew testDebugUnitTest`) | **59** | **PASS** | `AnalyticsCalculatorTest` (7), `CustomerOrderModelTest` (3), `ExpenseModelTest` (3), `ProductModelTest` (3), `OrderStatusTest` (3), `AuthRepositoryErrorMappingTest` (4), `BusinessTypeTest` (4), `DomainValidationTest` (10), `OrderHistoryPagingTest` (4), `AuthViewModelTest` (8), `CustomerOrdersViewModelTest` (9), `ExampleUnitTest` (1). |
 | **Android Lint** (`./gradlew lintDebug`) | - | **PASS** | Zero fatal errors; clean resource, accessibility, manifest, and component security checks. |
 | **Debug Build Packaging** (`./gradlew assembleDebug`) | - | **PASS** | Debug APK built successfully with all Kotlin/Java and Hilt dependencies resolved. |
