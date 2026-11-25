@@ -12,7 +12,7 @@ interface DxLogoProps {
  */
 export const DxLogo: React.FC<DxLogoProps> = ({ size = 40, showWordmark = true, subtitle }) => {
   return (
-    <div className="inline-flex items-center gap-2.5 select-none">
+    <div className="inline-flex items-center gap-2 sm:gap-2.5 select-none min-w-0">
       <svg
         width={size}
         height={size}
@@ -84,7 +84,7 @@ export const DxLogo: React.FC<DxLogoProps> = ({ size = 40, showWordmark = true, 
           </span>
           {subtitle && (
             <span
-              className="text-[11px] font-semibold tracking-wide uppercase mt-0.5"
+              className="hidden sm:block text-[11px] font-semibold tracking-wide uppercase mt-0.5 truncate"
               style={{ color: 'var(--dx-secondary)' }}
             >
               {subtitle}

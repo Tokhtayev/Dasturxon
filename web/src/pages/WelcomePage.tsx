@@ -106,9 +106,9 @@ const WelcomeHeader: React.FC<{ isDark: boolean; onToggleTheme: () => void }> = 
       borderColor: 'var(--dx-border)',
     }}
   >
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-      <DxLogo size={36} subtitle="Mahalla Bozori" />
-      <div className="flex items-center gap-2">
+    <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-3">
+      <DxLogo size={32} subtitle="Mahalla Bozori" />
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         <button
           type="button"
           onClick={onToggleTheme}
@@ -124,7 +124,7 @@ const WelcomeHeader: React.FC<{ isDark: boolean; onToggleTheme: () => void }> = 
         </button>
         <Link
           to="/login"
-          className="px-4 py-2 rounded-xl border text-xs sm:text-sm font-bold"
+          className="px-2.5 sm:px-4 py-2 rounded-xl border text-xs sm:text-sm font-bold whitespace-nowrap"
           style={{
             backgroundColor: 'var(--dx-surface)',
             borderColor: 'var(--dx-border)',
@@ -135,7 +135,7 @@ const WelcomeHeader: React.FC<{ isDark: boolean; onToggleTheme: () => void }> = 
         </Link>
         <Link
           to="/register"
-          className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold"
+          className="px-2.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap"
           style={{ backgroundColor: 'var(--dx-primary)', color: 'var(--dx-on-primary)' }}
         >
           Ro‘yxatdan o‘tish
