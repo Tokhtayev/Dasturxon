@@ -15,7 +15,12 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../config/firebase';
-import { FIRESTORE_IN_CHUNK_SIZE } from '../services/constants';
+import {
+  FIRESTORE_IN_CHUNK_SIZE,
+  MAX_PRODUCT_DESCRIPTION_LENGTH,
+  MAX_PRODUCT_NAME_LENGTH,
+} from '../services/constants';
+import { sanitizeUserText, validateProductForm } from '../services/validators';
 import type { Business, BusinessTypeKey, Product, ProductStatus } from '../types/domain';
 
 function toMillis(value: unknown): number {
@@ -159,6 +164,15 @@ export const productRepository = {
     status: ProductStatus;
     published: boolean;
   }): Promise<string> {
+    const check = validateProductForm({
+      name: params.name,
+      priceText: String(params.price),
+      costPriceText: String(params.costPrice),
+      stockText: params.stock !== null ? String(params.stock) : '',
+      discountText: String(params.discountPercent),
+    });
+    if (!check.valid) throw new Error(check.error);
+
     const db = getFirebaseDb();
     const publicPayload: Record<string, unknown> = {
       businessId: params.business.id,
@@ -166,8 +180,8 @@ export const productRepository = {
       businessType: params.business.type,
       businessAddress: params.business.address,
       businessPhone: params.business.phone,
-      name: params.name.trim(),
-      description: params.description.trim(),
+      name: sanitizeUserText(params.name, MAX_PRODUCT_NAME_LENGTH),
+      description: sanitizeUserText(params.description, MAX_PRODUCT_DESCRIPTION_LENGTH),
       price: Math.round(params.price),
       published: params.published,
       imageUrl: '',
@@ -203,10 +217,19 @@ export const productRepository = {
     status: ProductStatus;
     published: boolean;
   }): Promise<void> {
+    const check = validateProductForm({
+      name: params.name,
+      priceText: String(params.price),
+      costPriceText: String(params.costPrice),
+      stockText: params.stock !== null ? String(params.stock) : '',
+      discountText: String(params.discountPercent),
+    });
+    if (!check.valid) throw new Error(check.error);
+
     const db = getFirebaseDb();
     await updateDoc(doc(db, 'products', params.productId), {
-      name: params.name.trim(),
-      description: params.description.trim(),
+      name: sanitizeUserText(params.name, MAX_PRODUCT_NAME_LENGTH),
+      description: sanitizeUserText(params.description, MAX_PRODUCT_DESCRIPTION_LENGTH),
       price: Math.round(params.price),
       published: params.published,
       status: params.status,

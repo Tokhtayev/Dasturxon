@@ -175,6 +175,7 @@
 - **Results**: `tsc -b && vite build` (`1.02s`), ESLint + oxlint (`0` errors, `0` warnings on `53` files), Prettier (`All matched files use Prettier code style`), and `4/4` unit tests PASSED.
 
 ### Task 17 (Phase 2.2a): Firestore Security Rules Hardening & Emulator Verification
+- **Commit Hash**: `008996b`
 - **Changed Files**: `firestore.rules`, `test/firestore.rules.test.mjs`, `docs/STATUS.md`
 - **What Was Fixed**:
   - Added strict string length bounds on `users/{userId}` `fullName` (`2..100`) alongside immutable `role` and `email`.
@@ -185,17 +186,26 @@
 - **Commands Executed**: `npm run test:rules`, `cd web && npm run build && npm run lint && npm run format:check && npm test`
 - **Results**: `39/39` Firestore Rules emulator tests (`6142.42ms`) and all web checks PASSED.
 
+### Task 18 (Phase 2.2b): Service-Layer Input Validation & User-Text Sanitization
+- **Changed Files**: `web/src/services/validators.ts`, `web/src/services/orderLogic.ts`, `web/src/repositories/*.ts`, `web/src/components/owner/ExpenseModal.tsx`, `docs/STATUS.md`
+- **What Was Fixed**:
+  - Added `sanitizeUserText` (strips ASCII control characters, Unicode bidi overrides, and `<`/`>` brackets with max lengths) and `escapeHtml` in `validators.ts`, backed by ESLint `react/no-danger` (`dangerouslySetInnerHTML` forbidden).
+  - Enforced strict service-layer validation across all repositories prior to Firestore writes (`email <= 254`, `password` `8..128`, `price > 0`, `stock >= 0`, `quantity` `1..99`, `discountPercent` `0..90`, `expense` bounds, `rejectionReason`).
+  - Extracted pure domain helpers in `web/src/services/orderLogic.ts` (`computeRemainingStock`, `applyStockDecrement`, `calculateOrderTotal`, `isValidOrderTransition`).
+- **Commands Executed**: `cd web && npm run build && npm run lint && npm run format:check && npm test`
+- **Results**: `tsc -b && vite build` (`782ms`), ESLint + oxlint (`0` errors, `0` warnings on `54` files), Prettier PASS, `4/4` unit tests PASS.
+
 ---
 
 ## 3. VERIFIED BY AUTOMATED TEST
 
 | Test Suite / Tool | Count | Result | Verification Scope |
 | :--- | :---: | :---: | :--- |
-| **Firestore Security Rules Emulator Tests** (`npm run test:rules`) | **34** | **PASS** | Role escalation prevention, cross-user doc isolation, order privacy, cross-owner product isolation, private cost subcollection isolation (`products/{id}/private/cost`), public costPrice prohibition, business creation forced to `pending`, rejected business resubmission, business ownership immutability, unapproved business order creation block, atomic checkout stock decrement (`lastCheckoutOrderId`), order line item `unitPrice` validation, customer cancellation constraints, owner `unitCost` snapshot, expense isolation, forged analytics event prevention, and real-time snapshot listeners. |
+| **Firestore Security Rules Emulator Tests** (`npm run test:rules`) | **39** | **PASS** | `@firebase/rules-unit-testing`: role escalation prevention, cross-user doc isolation, order privacy & cancellation tamper prevention, bounded order quantities (`1..99`), bounded product `price > 0` / `stock >= 0` / `discount 0..90`, owner-only business creation (`pending`), private cost isolation (`products/{id}/private/cost`), atomic checkout stock decrement (`lastCheckoutOrderId`), forged analytics event prevention, and real-time listeners. |
 | **Web Domain Unit Tests** (`cd web && npm test`) | **4** | **PASS** | `validators` (`email`, strong password, nickname, business/product forms), `formatSoM`, `getEffectivePrice` (`math.floor` parity with `firestore.rules`), `getPeriodBounds` (`Asia/Tashkent` Monday week start), `calculateAnalytics` (`completed + paid` revenue, COGS, gross/net profit). |
 | **Web TypeScript & Vite Build** (`cd web && npm run build`) | - | **PASS** | Clean `tsc -b && vite build` static bundle (`web/dist/`). |
-| **Web Linter** (`cd web && npm run lint`) | **53 files** | **PASS** | ESLint (`@typescript-eslint`, `react`, `react-hooks`, `no-console`, `no-magic-numbers`, `max-lines-per-function`, `no-restricted-imports`, `no-restricted-globals`) + `oxlint`: 0 warnings, 0 errors. |
-| **Web Formatter** (`cd web && npm run format:check`) | **53 files** | **PASS** | Prettier style check passed across all TypeScript/TSX sources and tests. |
+| **Web Linter** (`cd web && npm run lint`) | **54 files** | **PASS** | ESLint (`@typescript-eslint`, `react`, `react-hooks`, `no-console`, `no-magic-numbers`, `max-lines-per-function`, `no-restricted-imports`, `no-restricted-globals`) + `oxlint`: 0 warnings, 0 errors. |
+| **Web Formatter** (`cd web && npm run format:check`) | **54 files** | **PASS** | Prettier style check passed across all TypeScript/TSX sources and tests. |
 | **Browser E2E Flow (Emulator)** (`http://127.0.0.1:5173`) | **6 stages** | **PASS** | Real Firebase Auth + Firestore Emulator end-to-end flows for Owner, Admin, and Customer roles plus `390x844` mobile layout check. |
 | **Legacy Android JVM Unit Tests** (`android-legacy/`, historical pre-migration) | **59** | **PASS** | Archived Kotlin/Compose unit tests (`AnalyticsCalculatorTest`, `AuthViewModelTest`, etc.) prior to Phase 0 migration. |
 

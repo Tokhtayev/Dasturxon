@@ -11,6 +11,8 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../config/firebase';
+import { MAX_EXPENSE_TITLE_LENGTH, MAX_TYPE_NOTE_LENGTH } from '../services/constants';
+import { sanitizeUserText, validateExpenseInput } from '../services/validators';
 import type { Expense } from '../types/domain';
 
 function toMillis(value: unknown): number {
@@ -56,12 +58,15 @@ export const expenseRepository = {
     amount: number;
     category: string;
   }): Promise<string> {
+    const check = validateExpenseInput(params);
+    if (!check.valid) throw new Error(check.error);
+
     const db = getFirebaseDb();
     const ref = await addDoc(collection(db, 'expenses'), {
       businessId: params.businessId,
-      title: params.title.trim(),
+      title: sanitizeUserText(params.title, MAX_EXPENSE_TITLE_LENGTH),
       amount: Math.round(params.amount),
-      category: params.category.trim(),
+      category: sanitizeUserText(params.category, MAX_TYPE_NOTE_LENGTH),
       createdAt: serverTimestamp(),
     });
     return ref.id;

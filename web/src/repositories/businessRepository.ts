@@ -12,6 +12,18 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../config/firebase';
+import {
+  MAX_BUSINESS_ADDRESS_LENGTH,
+  MAX_BUSINESS_NAME_LENGTH,
+  MAX_PHONE_LENGTH,
+  MAX_REJECTION_REASON_LENGTH,
+  MAX_TYPE_NOTE_LENGTH,
+} from '../services/constants';
+import {
+  sanitizeUserText,
+  validateBusinessForm,
+  validateRejectionReason,
+} from '../services/validators';
 import type { Business, BusinessStatus, BusinessTypeKey } from '../types/domain';
 
 function toMillis(value: unknown): number {
@@ -110,20 +122,23 @@ export const businessRepository = {
     phone: string;
     typeNote?: string;
   }): Promise<string> {
+    const cleanNote = sanitizeUserText(params.typeNote ?? '', MAX_TYPE_NOTE_LENGTH);
+    const check = validateBusinessForm({ ...params, typeNote: cleanNote });
+    if (!check.valid) throw new Error(check.error);
+
     const db = getFirebaseDb();
     const payload: Record<string, unknown> = {
       ownerId: params.ownerId,
-      name: params.name.trim(),
+      name: sanitizeUserText(params.name, MAX_BUSINESS_NAME_LENGTH),
       type: params.type,
-      address: params.address.trim(),
-      phone: params.phone.trim(),
+      address: sanitizeUserText(params.address, MAX_BUSINESS_ADDRESS_LENGTH),
+      phone: sanitizeUserText(params.phone, MAX_PHONE_LENGTH),
       status: 'pending', // Enforced by firestore.rules
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
-    const trimmedNote = params.typeNote?.trim();
-    if (params.type === 'other' && trimmedNote) {
-      payload.typeNote = trimmedNote;
+    if (params.type === 'other' && cleanNote) {
+      payload.typeNote = cleanNote;
     }
     const ref = await addDoc(collection(db, 'businesses'), payload);
     return ref.id;
@@ -137,14 +152,17 @@ export const businessRepository = {
     phone: string;
     typeNote?: string;
   }): Promise<void> {
+    const cleanNote = sanitizeUserText(params.typeNote ?? '', MAX_TYPE_NOTE_LENGTH);
+    const check = validateBusinessForm({ ...params, typeNote: cleanNote });
+    if (!check.valid) throw new Error(check.error);
+
     const db = getFirebaseDb();
-    const trimmedNote = params.typeNote?.trim();
     await updateDoc(doc(db, 'businesses', params.businessId), {
-      name: params.name.trim(),
+      name: sanitizeUserText(params.name, MAX_BUSINESS_NAME_LENGTH),
       type: params.type,
-      address: params.address.trim(),
-      phone: params.phone.trim(),
-      typeNote: params.type === 'other' && trimmedNote ? trimmedNote : deleteField(),
+      address: sanitizeUserText(params.address, MAX_BUSINESS_ADDRESS_LENGTH),
+      phone: sanitizeUserText(params.phone, MAX_PHONE_LENGTH),
+      typeNote: params.type === 'other' && cleanNote ? cleanNote : deleteField(),
       updatedAt: serverTimestamp(),
     });
   },
@@ -157,16 +175,19 @@ export const businessRepository = {
     phone: string;
     typeNote?: string;
   }): Promise<void> {
+    const cleanNote = sanitizeUserText(params.typeNote ?? '', MAX_TYPE_NOTE_LENGTH);
+    const check = validateBusinessForm({ ...params, typeNote: cleanNote });
+    if (!check.valid) throw new Error(check.error);
+
     const db = getFirebaseDb();
-    const trimmedNote = params.typeNote?.trim();
     await updateDoc(doc(db, 'businesses', params.businessId), {
-      name: params.name.trim(),
+      name: sanitizeUserText(params.name, MAX_BUSINESS_NAME_LENGTH),
       type: params.type,
-      address: params.address.trim(),
-      phone: params.phone.trim(),
+      address: sanitizeUserText(params.address, MAX_BUSINESS_ADDRESS_LENGTH),
+      phone: sanitizeUserText(params.phone, MAX_PHONE_LENGTH),
       status: 'pending',
       rejectionReason: deleteField(),
-      typeNote: params.type === 'other' && trimmedNote ? trimmedNote : deleteField(),
+      typeNote: params.type === 'other' && cleanNote ? cleanNote : deleteField(),
       updatedAt: serverTimestamp(),
     });
   },
@@ -181,8 +202,13 @@ export const businessRepository = {
       status,
       updatedAt: serverTimestamp(),
     };
-    if (status === 'rejected' && rejectionReason?.trim()) {
-      payload.rejectionReason = rejectionReason.trim();
+    if (status === 'rejected') {
+      const check = validateRejectionReason(rejectionReason ?? '');
+      if (!check.valid) throw new Error(check.error);
+      payload.rejectionReason = sanitizeUserText(
+        rejectionReason ?? '',
+        MAX_REJECTION_REASON_LENGTH
+      );
     } else if (status === 'approved') {
       payload.rejectionReason = deleteField();
     }

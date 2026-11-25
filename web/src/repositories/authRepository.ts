@@ -18,9 +18,19 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseDb, isFirebaseConfigured } from '../config/firebase';
-import { REGISTRATION_PROFILE_DEBOUNCE_MS } from '../services/constants';
+import {
+  MAX_FULL_NAME_LENGTH,
+  MAX_PHONE_LENGTH,
+  REGISTRATION_PROFILE_DEBOUNCE_MS,
+} from '../services/constants';
 import { getReadableErrorMessage } from '../services/errors';
-import { normalizeNickname } from '../services/validators';
+import {
+  isStrongPassword,
+  isValidEmail,
+  isValidNickname,
+  normalizeNickname,
+  sanitizeUserText,
+} from '../services/validators';
 import type { AuthSessionState, RegisterableRole, UserProfile, UserRole } from '../types/domain';
 
 function toMillis(value: unknown): number {
@@ -144,6 +154,9 @@ export const authRepository = {
   },
 
   async signInWithEmail(email: string, password: string): Promise<UserProfile> {
+    if (!isValidEmail(email) || !password) {
+      throw new Error("To'g'ri email va parol kiriting.");
+    }
     const auth = getFirebaseAuth();
     const db = getFirebaseDb();
     try {
@@ -166,9 +179,19 @@ export const authRepository = {
     role: RegisterableRole;
     phone?: string;
   }): Promise<UserProfile> {
+    const cleanFullName = sanitizeUserText(params.fullName, MAX_FULL_NAME_LENGTH);
+    const cleanPhone = sanitizeUserText(params.phone ?? '', MAX_PHONE_LENGTH);
+    const normalized = normalizeNickname(params.nickname);
+    if (
+      !cleanFullName ||
+      !isValidNickname(normalized) ||
+      !isValidEmail(params.email) ||
+      !isStrongPassword(params.password)
+    ) {
+      throw new Error("Ro'yxatdan o'tish ma'lumotlari xavfsizlik talablariga javob bermaydi.");
+    }
     const auth = getFirebaseAuth();
     const db = getFirebaseDb();
-    const normalized = normalizeNickname(params.nickname);
 
     try {
       // 1. Create Auth user first so Firestore security rules see isSignedIn() == true
@@ -187,10 +210,10 @@ export const authRepository = {
         // 3. Atomic WriteBatch to users/{uid} and usernames/{normalized}
         const batch = writeBatch(db);
         batch.set(userRef, {
-          fullName: params.fullName.trim(),
+          fullName: cleanFullName,
           normalizedNickname: normalized,
           email: params.email.trim(),
-          phone: (params.phone ?? '').trim(),
+          phone: cleanPhone,
           role: params.role,
           createdAt: serverTimestamp(),
         });
@@ -212,10 +235,10 @@ export const authRepository = {
 
       return {
         uid,
-        fullName: params.fullName.trim(),
+        fullName: cleanFullName,
         normalizedNickname: normalized,
         email: params.email.trim(),
-        phone: (params.phone ?? '').trim(),
+        phone: cleanPhone,
         role: params.role,
         createdAtMs: Date.now(),
       };
@@ -225,6 +248,9 @@ export const authRepository = {
   },
 
   async sendPasswordReset(email: string): Promise<void> {
+    if (!isValidEmail(email)) {
+      throw new Error("To'g'ri email manzilini kiriting.");
+    }
     const auth = getFirebaseAuth();
     try {
       await sendPasswordResetEmail(auth, email.trim());
@@ -238,8 +264,10 @@ export const authRepository = {
   },
 
   async updateFullName(uid: string, fullName: string): Promise<void> {
+    const cleanName = sanitizeUserText(fullName, MAX_FULL_NAME_LENGTH);
+    if (!cleanName) throw new Error("To'liq ism bo'sh bo'lmasligi kerak.");
     const db = getFirebaseDb();
-    await updateDoc(doc(db, 'users', uid), { fullName: fullName.trim() });
+    await updateDoc(doc(db, 'users', uid), { fullName: cleanName });
   },
 
   async signOut(): Promise<void> {

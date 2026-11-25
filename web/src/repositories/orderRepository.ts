@@ -15,11 +15,13 @@ import {
 import { getFirebaseDb } from '../config/firebase';
 import {
   MAX_DISCOUNT_PERCENT,
-  MAX_ORDER_QUANTITY,
-  MIN_ORDER_QUANTITY,
+  MAX_FULL_NAME_LENGTH,
+  MAX_PHONE_LENGTH,
   PERCENT_DIVISOR,
   TERMINAL_ORDER_STATUSES,
 } from '../services/constants';
+import { applyStockDecrement, calculateOrderTotal } from '../services/orderLogic';
+import { sanitizeDeliveryAddress, sanitizeUserText } from '../services/validators';
 import type {
   Business,
   CustomerOrder,
@@ -158,12 +160,11 @@ export const orderRepository = {
       if (!['available', 'hot_ready'].includes(status)) {
         throw new Error('Mahsulot hozir mavjud emas.');
       }
-      if (params.quantity < MIN_ORDER_QUANTITY || params.quantity > MAX_ORDER_QUANTITY) {
-        throw new Error("Buyurtma miqdori 1 dan 99 gacha bo'lishi kerak.");
-      }
-      if (currentStock !== null && params.quantity > currentStock) {
-        throw new Error(`Zaxira yetarli emas (${currentStock} ta qolgan).`);
-      }
+      const { nextStock, nextStatus } = applyStockDecrement(
+        currentStock,
+        params.quantity,
+        status === 'hot_ready' ? 'hot_ready' : 'available'
+      );
 
       const discountActive =
         discountPercent > 0 &&
@@ -172,24 +173,27 @@ export const orderRepository = {
       const unitPrice = discountActive
         ? price - Math.floor((price * discountPercent) / PERCENT_DIVISOR)
         : price;
-
+      const totalPrice = calculateOrderTotal(unitPrice, params.quantity);
       const productName = typeof pData.name === 'string' ? pData.name : params.product.name;
 
       tx.set(orderRef, {
         customerId: params.customerId,
-        customerName: params.customerName.trim(),
-        customerPhone: params.customerPhone.trim(),
+        customerName: sanitizeUserText(params.customerName, MAX_FULL_NAME_LENGTH) || 'Xaridor',
+        customerPhone: sanitizeUserText(params.customerPhone, MAX_PHONE_LENGTH),
         businessId: params.business.id,
         businessName: params.business.name,
         productId: params.product.id,
         productName,
         quantity: params.quantity,
         unitPrice,
-        totalPrice: unitPrice * params.quantity,
+        totalPrice,
         status: 'pending',
         paymentStatus: 'unpaid',
         fulfillmentType: params.fulfillmentType,
-        deliveryAddress: params.fulfillmentType === 'delivery' ? params.deliveryAddress.trim() : '',
+        deliveryAddress:
+          params.fulfillmentType === 'delivery'
+            ? sanitizeDeliveryAddress(params.deliveryAddress)
+            : '',
         pickupTime: Timestamp.fromMillis(params.pickupTimeMs),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -202,11 +206,10 @@ export const orderRepository = {
         unitPrice,
       });
 
-      if (currentStock !== null) {
-        const remaining = currentStock - params.quantity;
+      if (nextStock !== null) {
         tx.update(productRef, {
-          stock: remaining,
-          status: remaining === 0 ? 'sold_out' : status,
+          stock: nextStock,
+          status: nextStatus,
           lastCheckoutOrderId: orderRef.id,
           updatedAt: serverTimestamp(),
         });

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { EXPENSE_CATEGORIES } from '../../services/constants';
 import { getReadableErrorMessage } from '../../services/errors';
+import { validateExpenseInput } from '../../services/validators';
 
 interface ExpenseModalProps {
   onClose: () => void;
@@ -19,8 +20,9 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({ onClose, onAdd }) =>
     e.preventDefault();
     setError(null);
     const num = Number(amount);
-    if (!title.trim() || !Number.isFinite(num) || num <= 0) {
-      setError('Xarajat nomi va musbat summani kiriting.');
+    const check = validateExpenseInput({ title, amount: num, category });
+    if (!check.valid) {
+      setError(check.error ?? 'Xarajat nomi va musbat summani kiriting.');
       return;
     }
 
