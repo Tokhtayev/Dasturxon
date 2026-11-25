@@ -14,6 +14,9 @@
 .cxx
 local.properties
 node_modules/
+web/node_modules/
+web/dist/
+web/.vite/
 firestore-debug.log
 .idea/vcs.xml
 .kotlin/
