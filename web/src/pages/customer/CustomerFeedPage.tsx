@@ -58,7 +58,7 @@ export const CustomerFeedPage: React.FC = () => {
     });
     setCheckoutProduct(null);
     setSelectedProduct(null);
-    navigate('/customer/orders');
+    navigate('/orders');
   };
 
   return (

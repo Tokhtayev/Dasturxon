@@ -14,7 +14,7 @@ const NEXT_ORDER_STEP: Partial<Record<OrderStatusKey, { next: OrderStatusKey; la
 };
 
 export const OwnerOrdersPage: React.FC = () => {
-  const { orders, advanceOrder, rejectOrder, setPaymentStatus } =
+  const { orders, advanceOrder, cancelOrder, setPaymentStatus } =
     useOutletContext<OwnerContextType>();
   const [segment, setSegment] = useState<'new' | 'progress' | 'history'>('new');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -88,7 +88,7 @@ export const OwnerOrdersPage: React.FC = () => {
               order={order}
               onTogglePayment={(id, next) => void runAction(() => setPaymentStatus(id, next))}
               onAdvance={(id, prodId, next) => void runAction(() => advanceOrder(id, prodId, next))}
-              onReject={(id) => void runAction(() => rejectOrder(id))}
+              onCancel={(id) => void runAction(() => cancelOrder(id))}
             />
           ))}
         </div>
@@ -101,8 +101,8 @@ const OwnerOrderCard: React.FC<{
   order: CustomerOrder;
   onTogglePayment: (orderId: string, next: PaymentStatus) => void;
   onAdvance: (orderId: string, productId: string, next: OrderStatusKey) => void;
-  onReject: (orderId: string) => void;
-}> = ({ order, onTogglePayment, onAdvance, onReject }) => {
+  onCancel: (orderId: string) => void;
+}> = ({ order, onTogglePayment, onAdvance, onCancel }) => {
   const nextStep = NEXT_ORDER_STEP[order.status];
 
   return (
@@ -169,14 +169,14 @@ const OwnerOrderCard: React.FC<{
             </button>
           )}
 
-          {order.status === 'pending' && (
+          {!TERMINAL_ORDER_STATUSES.includes(order.status) && (
             <button
               type="button"
-              onClick={() => onReject(order.id)}
+              onClick={() => onCancel(order.id)}
               className="px-2.5 py-1 rounded-xl border font-bold cursor-pointer"
               style={{ borderColor: 'var(--dx-error)', color: 'var(--dx-error)' }}
             >
-              Rad etish
+              Bekor qilish
             </button>
           )}
         </div>

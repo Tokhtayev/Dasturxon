@@ -63,6 +63,7 @@ export interface Product {
   businessType: BusinessTypeKey;
   businessAddress: string;
   businessPhone: string;
+  category: BusinessTypeKey;
   name: string;
   description: string;
   price: number;

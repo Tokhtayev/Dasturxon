@@ -13,8 +13,9 @@ interface ProductFeedCardProps {
 export const ProductFeedCard: React.FC<ProductFeedCardProps> = ({ product, onSelect, onOrder }) => {
   const effectivePrice = getEffectivePrice(product);
   const discountActive = isDiscountActive(product);
-  const soldOut = product.status === 'sold_out' || product.stock === 0;
-  const visual = BUSINESS_TYPE_VISUALS[product.businessType] ?? BUSINESS_TYPE_VISUALS.other;
+  const soldOut = product.status === 'sold_out' || (product.stock !== null && product.stock <= 0);
+  const visual =
+    BUSINESS_TYPE_VISUALS[product.category || product.businessType] ?? BUSINESS_TYPE_VISUALS.other;
 
   return (
     <div

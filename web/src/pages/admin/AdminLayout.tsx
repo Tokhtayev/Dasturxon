@@ -15,7 +15,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ isDark, onToggleTheme 
       isDark={isDark}
       onToggleTheme={onToggleTheme}
       navItems={[
-        { to: '/admin/approvals', label: 'Tasdiqlar', icon: <ShieldCheck className="w-4 h-4" /> },
+        { to: '/admin', end: true, label: 'Tasdiqlar', icon: <ShieldCheck className="w-4 h-4" /> },
       ]}
     >
       <Outlet />

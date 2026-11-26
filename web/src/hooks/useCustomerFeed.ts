@@ -63,7 +63,8 @@ export function useCustomerFeed(enabled: boolean) {
   const filteredProducts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return visibleProducts.filter((p) => {
-      const catOk = categoryFilter === 'all' || p.businessType === categoryFilter;
+      const effectiveCategory = p.category || p.businessType;
+      const catOk = categoryFilter === 'all' || effectiveCategory === categoryFilter;
       const qOk =
         !q ||
         p.name.toLowerCase().includes(q) ||

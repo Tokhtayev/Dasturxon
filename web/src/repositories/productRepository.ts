@@ -17,6 +17,7 @@ import {
 import { getFirebaseDb } from '../config/firebase';
 import {
   FIRESTORE_IN_CHUNK_SIZE,
+  MAX_IMAGE_DATA_URL_LENGTH,
   MAX_PRODUCT_DESCRIPTION_LENGTH,
   MAX_PRODUCT_NAME_LENGTH,
 } from '../services/constants';
@@ -31,6 +32,7 @@ function toMillis(value: unknown): number {
 
 export function mapProductDoc(id: string, data: Record<string, unknown>): Product {
   const rawType = typeof data.businessType === 'string' ? data.businessType : 'other';
+  const rawCategory = typeof data.category === 'string' ? data.category : rawType;
   const rawStatus = typeof data.status === 'string' ? data.status : 'available';
   const status: ProductStatus =
     rawStatus === 'hot_ready' || rawStatus === 'sold_out' || rawStatus === 'available'
@@ -44,6 +46,7 @@ export function mapProductDoc(id: string, data: Record<string, unknown>): Produc
     businessType: rawType as BusinessTypeKey,
     businessAddress: typeof data.businessAddress === 'string' ? data.businessAddress : '',
     businessPhone: typeof data.businessPhone === 'string' ? data.businessPhone : '',
+    category: rawCategory as BusinessTypeKey,
     name: typeof data.name === 'string' ? data.name : '',
     description: typeof data.description === 'string' ? data.description : '',
     price: typeof data.price === 'number' ? data.price : 0,
@@ -56,6 +59,18 @@ export function mapProductDoc(id: string, data: Record<string, unknown>): Produc
     imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
     updatedAtMs: toMillis(data.updatedAt),
   };
+}
+
+function sanitizeProductImageUrl(raw: string | undefined): string {
+  const trimmed = (raw ?? '').trim();
+  if (!trimmed) return '';
+  if (!trimmed.startsWith('data:image/') && !trimmed.startsWith('https://')) {
+    throw new Error("Rasm formati noto'g'ri.");
+  }
+  if (trimmed.length > MAX_IMAGE_DATA_URL_LENGTH) {
+    throw new Error('Rasm hajmi Firestore hujjat limitidan oshmasligi kerak.');
+  }
+  return trimmed;
 }
 
 export const productRepository = {
@@ -154,8 +169,10 @@ export const productRepository = {
 
   async create(params: {
     business: Business;
+    category: BusinessTypeKey;
     name: string;
     description: string;
+    imageUrl: string;
     price: number;
     costPrice: number;
     stock: number | null;
@@ -173,6 +190,7 @@ export const productRepository = {
     });
     if (!check.valid) throw new Error(check.error);
 
+    const safeImageUrl = sanitizeProductImageUrl(params.imageUrl);
     const db = getFirebaseDb();
     const publicPayload: Record<string, unknown> = {
       businessId: params.business.id,
@@ -180,11 +198,12 @@ export const productRepository = {
       businessType: params.business.type,
       businessAddress: params.business.address,
       businessPhone: params.business.phone,
+      category: params.category,
       name: sanitizeUserText(params.name, MAX_PRODUCT_NAME_LENGTH),
       description: sanitizeUserText(params.description, MAX_PRODUCT_DESCRIPTION_LENGTH),
       price: Math.round(params.price),
       published: params.published,
-      imageUrl: '',
+      imageUrl: safeImageUrl,
       status: params.status,
       discountPercent: Math.round(params.discountPercent),
       updatedAt: serverTimestamp(),
@@ -207,8 +226,10 @@ export const productRepository = {
 
   async update(params: {
     productId: string;
+    category: BusinessTypeKey;
     name: string;
     description: string;
+    imageUrl: string;
     price: number;
     costPrice: number;
     stock: number | null;
@@ -226,10 +247,13 @@ export const productRepository = {
     });
     if (!check.valid) throw new Error(check.error);
 
+    const safeImageUrl = sanitizeProductImageUrl(params.imageUrl);
     const db = getFirebaseDb();
     await updateDoc(doc(db, 'products', params.productId), {
+      category: params.category,
       name: sanitizeUserText(params.name, MAX_PRODUCT_NAME_LENGTH),
       description: sanitizeUserText(params.description, MAX_PRODUCT_DESCRIPTION_LENGTH),
+      imageUrl: safeImageUrl,
       price: Math.round(params.price),
       published: params.published,
       status: params.status,

@@ -60,6 +60,8 @@ describe('orderLogic', () => {
     expect(isValidOrderTransition('owner', 'pending', 'accepted')).toBe(true);
     expect(isValidOrderTransition('owner', 'accepted', 'ready')).toBe(true);
     expect(isValidOrderTransition('owner', 'ready', 'completed')).toBe(true);
+    expect(isValidOrderTransition('owner', 'pending', 'cancelled')).toBe(true);
+    expect(isValidOrderTransition('owner', 'accepted', 'cancelled')).toBe(true);
     expect(isValidOrderTransition('owner', 'pending', 'rejected')).toBe(true);
     expect(isValidOrderTransition('owner', 'completed', 'cancelled')).toBe(false);
     expect(isValidOrderTransition('owner', 'cancelled', 'accepted')).toBe(false);

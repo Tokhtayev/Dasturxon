@@ -15,8 +15,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onClose,
   onOrder,
 }) => {
-  const visual = BUSINESS_TYPE_VISUALS[product.businessType] ?? BUSINESS_TYPE_VISUALS.other;
-  const soldOut = product.status === 'sold_out' || product.stock === 0;
+  const visual =
+    BUSINESS_TYPE_VISUALS[product.category || product.businessType] ?? BUSINESS_TYPE_VISUALS.other;
+  const soldOut = product.status === 'sold_out' || (product.stock !== null && product.stock <= 0);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-xs flex items-center justify-center p-4">
@@ -25,10 +26,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
       >
         <div
-          className="relative h-44 flex items-center justify-center"
+          className="relative h-48 flex items-center justify-center"
           style={{ background: visual.gradient }}
         >
-          <span className="text-6xl">{visual.icon}</span>
+          {product.imageUrl ? (
+            <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-6xl">{visual.icon}</span>
+          )}
           <button
             type="button"
             onClick={onClose}

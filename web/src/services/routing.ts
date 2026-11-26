@@ -7,6 +7,6 @@ export function getRoleHomePath(role: UserRole): string {
     case 'admin':
       return '/admin';
     default:
-      return '/customer';
+      return '/feed';
   }
 }

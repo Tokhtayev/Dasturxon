@@ -142,6 +142,9 @@ service cloud.firestore {
       ) && !('costPrice' in request.resource.data)
         && request.resource.data.price is int
         && request.resource.data.price > 0
+        && (!('imageUrl' in request.resource.data) ||
+            (request.resource.data.imageUrl is string &&
+             request.resource.data.imageUrl.size() <= 900000))
         && (!('stock' in request.resource.data) ||
             request.resource.data.stock == null ||
             (request.resource.data.stock is int && request.resource.data.stock >= 0))
@@ -156,6 +159,7 @@ service cloud.firestore {
       allow update: if isSignedIn() && !('costPrice' in request.resource.data) && (
         (isBusinessOwner(resource.data.businessId) &&
          request.resource.data.businessId == resource.data.businessId &&
+         (!('imageUrl' in request.resource.data) || (request.resource.data.imageUrl is string && request.resource.data.imageUrl.size() <= 900000)) &&
          (!('price' in request.resource.data) || (request.resource.data.price is int && request.resource.data.price > 0)) &&
          (!('stock' in request.resource.data) || request.resource.data.stock == null || (request.resource.data.stock is int && request.resource.data.stock >= 0)) &&
          (!('discountPercent' in request.resource.data) || (request.resource.data.discountPercent is int && request.resource.data.discountPercent >= 0 && request.resource.data.discountPercent <= 90))) ||

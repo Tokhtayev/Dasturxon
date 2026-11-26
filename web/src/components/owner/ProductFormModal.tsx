@@ -1,71 +1,133 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Camera, ImagePlus, Trash2, X } from 'lucide-react';
+import { BYTES_PER_KILOBYTE, BUSINESS_TYPE_VISUALS } from '../../services/constants';
 import { getReadableErrorMessage } from '../../services/errors';
+import { compressImageToBase64 } from '../../services/imageCompression';
 import { validateProductForm } from '../../services/validators';
-import type { Product, ProductStatus } from '../../types/domain';
+import {
+  BUSINESS_TYPES,
+  type BusinessTypeKey,
+  type Product,
+  type ProductStatus,
+} from '../../types/domain';
+
+const BASE64_OVERHEAD_RATIO = 0.75;
+
+export interface ProductFormSaveParams {
+  productId?: string;
+  category: BusinessTypeKey;
+  name: string;
+  description: string;
+  imageUrl: string;
+  price: number;
+  costPrice: number;
+  stock: number | null;
+  discountPercent: number;
+  discountEndsAtMs: number | null;
+  status: ProductStatus;
+  published: boolean;
+}
 
 interface ProductFormModalProps {
   editing: Product | null;
+  defaultCategory: BusinessTypeKey;
   onClose: () => void;
-  onSave: (params: {
-    productId?: string;
-    name: string;
-    description: string;
-    price: number;
-    costPrice: number;
-    stock: number | null;
-    discountPercent: number;
-    discountEndsAtMs: number | null;
-    status: ProductStatus;
-    published: boolean;
-  }) => Promise<void>;
+  onSave: (params: ProductFormSaveParams) => Promise<void>;
 }
 
-export const ProductFormModal: React.FC<ProductFormModalProps> = ({ editing, onClose, onSave }) => {
-  const [name, setName] = useState(editing?.name ?? '');
-  const [description, setDescription] = useState(editing?.description ?? '');
-  const [priceText, setPriceText] = useState(editing ? String(editing.price) : '');
-  const [costText, setCostText] = useState(
-    editing && editing.costPrice > 0 ? String(editing.costPrice) : ''
+interface FormFieldsState {
+  category: BusinessTypeKey;
+  name: string;
+  description: string;
+  imageUrl: string;
+  priceText: string;
+  costText: string;
+  stockText: string;
+  discountText: string;
+  status: ProductStatus;
+  published: boolean;
+}
+
+function initialFormFields(
+  editing: Product | null,
+  defaultCategory: BusinessTypeKey
+): FormFieldsState {
+  return {
+    category: editing?.category ?? defaultCategory,
+    name: editing?.name ?? '',
+    description: editing?.description ?? '',
+    imageUrl: editing?.imageUrl ?? '',
+    priceText: editing ? String(editing.price) : '',
+    costText: editing && editing.costPrice > 0 ? String(editing.costPrice) : '',
+    stockText: editing ? (editing.stock !== null ? String(editing.stock) : '') : '20',
+    discountText: editing ? String(editing.discountPercent) : '0',
+    status: editing?.status ?? 'hot_ready',
+    published: editing?.published ?? true,
+  };
+}
+
+function toSaveParams(fields: FormFieldsState, productId?: string): ProductFormSaveParams {
+  return {
+    productId,
+    category: fields.category,
+    name: fields.name,
+    description: fields.description,
+    imageUrl: fields.imageUrl,
+    price: Number(fields.priceText),
+    costPrice: fields.costText.trim() ? Number(fields.costText) : 0,
+    stock: fields.stockText.trim() ? Number(fields.stockText) : null,
+    discountPercent: fields.discountText.trim() ? Number(fields.discountText) : 0,
+    discountEndsAtMs: null,
+    status: fields.status,
+    published: fields.published,
+  };
+}
+
+export const ProductFormModal: React.FC<ProductFormModalProps> = ({
+  editing,
+  defaultCategory,
+  onClose,
+  onSave,
+}) => {
+  const [fields, setFields] = useState<FormFieldsState>(() =>
+    initialFormFields(editing, defaultCategory)
   );
-  const [stockText, setStockText] = useState(
-    editing ? (editing.stock !== null ? String(editing.stock) : '') : '20'
-  );
-  const [discountText, setDiscountText] = useState(editing ? String(editing.discountPercent) : '0');
-  const [status, setStatus] = useState<ProductStatus>(editing?.status ?? 'hot_ready');
-  const [published, setPublished] = useState(editing?.published ?? true);
+  const [compressingImage, setCompressingImage] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formErr, setFormErr] = useState<string | null>(null);
+
+  const patch = (updates: Partial<FormFieldsState>) =>
+    setFields((prev) => ({ ...prev, ...updates }));
+
+  const handleImagePicked = async (file: File | undefined) => {
+    if (!file) return;
+    setFormErr(null);
+    setCompressingImage(true);
+    try {
+      const dataUrl = await compressImageToBase64(file);
+      patch({ imageUrl: dataUrl });
+    } catch (err) {
+      setFormErr(getReadableErrorMessage(err, 'Rasmni qayta ishlab bo‘lmadi.'));
+    } finally {
+      setCompressingImage(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormErr(null);
     const check = validateProductForm({
-      name,
-      priceText,
-      costPriceText: costText,
-      stockText,
-      discountText,
+      name: fields.name,
+      priceText: fields.priceText,
+      costPriceText: fields.costText,
+      stockText: fields.stockText,
+      discountText: fields.discountText,
     });
-    if (!check.valid) {
-      setFormErr(check.error ?? "Ma'lumotlarni tekshiring.");
-      return;
-    }
+    if (!check.valid) return setFormErr(check.error ?? "Ma'lumotlarni tekshiring.");
 
     setSaving(true);
     try {
-      await onSave({
-        productId: editing?.id,
-        name,
-        description,
-        price: Number(priceText),
-        costPrice: costText.trim() ? Number(costText) : 0,
-        stock: stockText.trim() ? Number(stockText) : null,
-        discountPercent: discountText.trim() ? Number(discountText) : 0,
-        discountEndsAtMs: null,
-        status,
-        published,
-      });
+      await onSave(toSaveParams(fields, editing?.id));
       onClose();
     } catch (err) {
       setFormErr(getReadableErrorMessage(err, "Saqlab bo'lmadi."));
@@ -78,7 +140,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ editing, onC
     <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-xs flex items-center justify-center p-4">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-md rounded-3xl border p-6 space-y-3.5 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-md rounded-3xl border p-6 space-y-3.5 max-h-[92vh] overflow-y-auto"
         style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
       >
         <div className="flex items-center justify-between">
@@ -90,39 +152,41 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ editing, onC
           </button>
         </div>
 
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Mahsulot nomi (masalan: Tandir non)"
-          className="w-full px-3.5 py-2.5 rounded-xl border text-sm"
-          style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+        <ProductPhotoPicker
+          imageUrl={fields.imageUrl}
+          category={fields.category}
+          compressing={compressingImage}
+          onPickFile={(f) => void handleImagePicked(f)}
+          onRemove={() => patch({ imageUrl: '' })}
         />
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={2}
-          placeholder="Tavsif (ixtiyoriy)"
-          className="w-full px-3.5 py-2.5 rounded-xl border text-sm"
-          style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+
+        <ProductTextFields
+          name={fields.name}
+          onNameChange={(name) => patch({ name })}
+          category={fields.category}
+          onCategoryChange={(category) => patch({ category })}
+          description={fields.description}
+          onDescriptionChange={(description) => patch({ description })}
         />
 
         <ProductNumericFields
-          priceText={priceText}
-          onPriceChange={setPriceText}
-          costText={costText}
-          onCostChange={setCostText}
-          stockText={stockText}
-          onStockChange={setStockText}
-          discountText={discountText}
-          onDiscountChange={setDiscountText}
-          status={status}
-          onStatusChange={setStatus}
-          published={published}
-          onPublishedChange={setPublished}
+          priceText={fields.priceText}
+          onPriceChange={(priceText) => patch({ priceText })}
+          costText={fields.costText}
+          onCostChange={(costText) => patch({ costText })}
+          stockText={fields.stockText}
+          onStockChange={(stockText) => patch({ stockText })}
+          discountText={fields.discountText}
+          onDiscountChange={(discountText) => patch({ discountText })}
+          status={fields.status}
+          onStatusChange={(status) => patch({ status })}
+          published={fields.published}
+          onPublishedChange={(published) => patch({ published })}
         />
 
         {formErr && (
           <div
+            role="alert"
             className="p-2.5 rounded-xl text-xs font-bold"
             style={{
               backgroundColor: 'var(--dx-error-container)',
@@ -135,13 +199,110 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ editing, onC
 
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || compressingImage}
           className="w-full py-3 rounded-2xl text-sm font-bold disabled:opacity-50 cursor-pointer"
           style={{ backgroundColor: 'var(--dx-primary)', color: 'var(--dx-on-primary)' }}
         >
           {saving ? 'Saqlanmoqda…' : 'Saqlash'}
         </button>
       </form>
+    </div>
+  );
+};
+
+const ProductPhotoPicker: React.FC<{
+  imageUrl: string;
+  category: BusinessTypeKey;
+  compressing: boolean;
+  onPickFile: (file: File | undefined) => void;
+  onRemove: () => void;
+}> = ({ imageUrl, category, compressing, onPickFile, onRemove }) => {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const visual = BUSINESS_TYPE_VISUALS[category] ?? BUSINESS_TYPE_VISUALS.other;
+  const approxKb = imageUrl
+    ? Math.max(1, Math.round((imageUrl.length * BASE64_OVERHEAD_RATIO) / BYTES_PER_KILOBYTE))
+    : 0;
+
+  return (
+    <div className="space-y-2">
+      <div
+        className="relative h-36 rounded-2xl border overflow-hidden flex items-center justify-center"
+        style={{ background: visual.gradient, borderColor: 'var(--dx-border)' }}
+      >
+        {imageUrl ? (
+          <img src={imageUrl} alt="Mahsulot rasmi" className="w-full h-full object-cover" />
+        ) : (
+          <div className="text-center text-white/95 space-y-1 px-4">
+            <div className="text-4xl">{visual.icon}</div>
+            <div className="text-[11px] font-bold">
+              Rasm tanlanmagan (standart rasm ko‘rsatiladi)
+            </div>
+          </div>
+        )}
+        {imageUrl && (
+          <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-black/65 text-white">
+            ~{approxKb} KB JPEG
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            onPickFile(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+          className="hidden"
+          data-testid="product-photo-input"
+        />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={(e) => {
+            onPickFile(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+          className="hidden"
+        />
+        <button
+          type="button"
+          disabled={compressing}
+          onClick={() => fileInputRef.current?.click()}
+          className="flex-1 px-3 py-2 rounded-xl border text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+          style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+        >
+          <ImagePlus className="w-3.5 h-3.5" /> {compressing ? 'Siqilmoqda…' : 'Rasm tanlash'}
+        </button>
+        <button
+          type="button"
+          disabled={compressing}
+          onClick={() => cameraInputRef.current?.click()}
+          className="px-3 py-2 rounded-xl border text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+          style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+        >
+          <Camera className="w-3.5 h-3.5" /> Kamera
+        </button>
+        {imageUrl && (
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="Rasmni olib tashlash"
+            className="px-3 py-2 rounded-xl border text-xs font-bold cursor-pointer"
+            style={{ borderColor: 'var(--dx-border)', color: 'var(--dx-error)' }}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+      <p className="text-[11px]" style={{ color: 'var(--dx-muted)' }}>
+        Maksimal 5 MB; yuklashdan oldin avtomatik ≤ 800px JPEG qilib siqiladi.
+      </p>
     </div>
   );
 };
@@ -241,8 +402,53 @@ const ProductNumericFields: React.FC<{
           checked={published}
           onChange={(e) => onPublishedChange(e.target.checked)}
         />
-        Xaridorlarga ko‘rsatish
+        Mijozlarga mavjud
       </label>
     </div>
+  </>
+);
+
+const ProductTextFields: React.FC<{
+  name: string;
+  onNameChange: (v: string) => void;
+  category: BusinessTypeKey;
+  onCategoryChange: (v: BusinessTypeKey) => void;
+  description: string;
+  onDescriptionChange: (v: string) => void;
+}> = ({ name, onNameChange, category, onCategoryChange, description, onDescriptionChange }) => (
+  <>
+    <input
+      value={name}
+      onChange={(e) => onNameChange(e.target.value)}
+      placeholder="Mahsulot nomi (masalan: Tandir non)"
+      className="w-full px-3.5 py-2.5 rounded-xl border text-sm"
+      style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+    />
+    <div>
+      <label htmlFor="product-category" className="text-[11px] font-bold block mb-1">
+        Toifa (Kategoriya)
+      </label>
+      <select
+        id="product-category"
+        value={category}
+        onChange={(e) => onCategoryChange(e.target.value as BusinessTypeKey)}
+        className="w-full px-3.5 py-2.5 rounded-xl border text-sm"
+        style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+      >
+        {BUSINESS_TYPES.map((bt) => (
+          <option key={bt.storedValue} value={bt.storedValue}>
+            {bt.icon} {bt.labelUz}
+          </option>
+        ))}
+      </select>
+    </div>
+    <textarea
+      value={description}
+      onChange={(e) => onDescriptionChange(e.target.value)}
+      rows={2}
+      placeholder="Tavsif (ixtiyoriy)"
+      className="w-full px-3.5 py-2.5 rounded-xl border text-sm"
+      style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+    />
   </>
 );

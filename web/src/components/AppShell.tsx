@@ -8,6 +8,7 @@ export interface NavItem {
   to: string;
   label: string;
   icon: React.ReactNode;
+  end?: boolean;
 }
 
 interface AppShellProps {
@@ -41,10 +42,10 @@ export const AppShell: React.FC<AppShellProps> = ({
       >
         <div className="suzani-border-strip w-full" />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             <DxLogo size={34} subtitle="Mahalla Bozori" />
             <span
-              className="hidden sm:inline-block text-[11px] font-extrabold px-2.5 py-1 rounded-full"
+              className="hidden sm:inline-block shrink-0 whitespace-nowrap text-[11px] font-extrabold px-2.5 py-1 rounded-full"
               style={{
                 backgroundColor: 'var(--dx-secondary-container)',
                 color: 'var(--dx-on-secondary-container)',
@@ -54,7 +55,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             </span>
             {emulatorMode && (
               <span
-                className="hidden md:inline-block text-[10px] font-bold px-2 py-0.5 rounded-md border"
+                className="hidden xl:inline-block shrink-0 whitespace-nowrap text-[10px] font-bold px-2 py-0.5 rounded-md border"
                 style={{ borderColor: 'var(--dx-border)', color: 'var(--dx-muted)' }}
               >
                 Emulator
@@ -67,6 +68,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               <NavLink
                 key={item.to}
                 to={item.to}
+                end={item.end}
                 className="px-3.5 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors"
                 style={({ isActive }) => ({
                   backgroundColor: isActive ? 'var(--dx-primary-container)' : 'transparent',

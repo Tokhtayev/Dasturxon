@@ -235,7 +235,10 @@ export const orderRepository = {
     });
   },
 
-  async rejectOrderAndRestoreStock(orderId: string): Promise<void> {
+  async rejectOrderAndRestoreStock(
+    orderId: string,
+    terminalStatus: 'rejected' | 'cancelled' = 'rejected'
+  ): Promise<void> {
     const db = getFirebaseDb();
     const orderRef = doc(db, 'orders', orderId);
     await runTransaction(db, async (tx) => {
@@ -243,7 +246,7 @@ export const orderRepository = {
       if (!orderSnap.exists()) throw new Error('Buyurtma topilmadi.');
       const oData = orderSnap.data();
       if (TERMINAL_ORDER_STATUSES.includes(String(oData.status) as OrderStatusKey)) {
-        throw new Error("Ushbu buyurtmani rad etib bo'lmaydi.");
+        throw new Error("Ushbu buyurtmani bekor qilib bo'lmaydi.");
       }
 
       const productId = typeof oData.productId === 'string' ? oData.productId : '';
@@ -267,7 +270,7 @@ export const orderRepository = {
       }
 
       tx.update(orderRef, {
-        status: 'rejected',
+        status: terminalStatus,
         updatedAt: serverTimestamp(),
       });
     });

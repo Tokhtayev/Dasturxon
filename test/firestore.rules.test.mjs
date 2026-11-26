@@ -819,6 +819,15 @@ test("39. Owner cannot alter order totalPrice or quantity", async () => {
   }));
 });
 
+// 40. Product base64 imageUrl within 900KB limit succeeds; oversized payload (>900KB) fails
+test("40. Product imageUrl size cap allows compact base64 data URL and rejects oversized payloads", async () => {
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  const compactDataUrl = "data:image/jpeg;base64," + "A".repeat(12000);
+  const oversizedDataUrl = "data:image/jpeg;base64," + "A".repeat(900100);
+  await assertSucceeds(setDoc(doc(dbOwner, "products/prod-compact-img"), validProduct({ imageUrl: compactDataUrl })));
+  await assertFails(setDoc(doc(dbOwner, "products/prod-huge-img"), validProduct({ imageUrl: oversizedDataUrl })));
+});
+
 
 
 

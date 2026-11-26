@@ -29,7 +29,8 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({ isDark, onToggleTheme 
         isApproved
           ? [
               {
-                to: '/owner/dashboard',
+                to: '/owner',
+                end: true,
                 label: 'Boshqaruv',
                 icon: <LayoutDashboard className="w-4 h-4" />,
               },
@@ -51,7 +52,8 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({ isDark, onToggleTheme 
             ]
           : [
               {
-                to: '/owner/dashboard',
+                to: '/owner',
+                end: true,
                 label: 'Biznes profili',
                 icon: <LayoutDashboard className="w-4 h-4" />,
               },

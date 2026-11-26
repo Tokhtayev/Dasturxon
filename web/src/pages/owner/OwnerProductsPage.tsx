@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { ProductFormModal } from '../../components/owner/ProductFormModal';
+import {
+  ProductFormModal,
+  type ProductFormSaveParams,
+} from '../../components/owner/ProductFormModal';
 import { formatSoM, getEffectivePrice } from '../../services/analytics';
+import { BUSINESS_TYPE_VISUALS } from '../../services/constants';
 import { getReadableErrorMessage } from '../../services/errors';
-import type { Product, ProductStatus } from '../../types/domain';
+import { BUSINESS_TYPES, type Product, type ProductStatus } from '../../types/domain';
 import type { OwnerContextType } from './OwnerLayout';
 
 const NEXT_STATUS_ACTION: Record<ProductStatus, { status: ProductStatus; label: string }> = {
@@ -32,25 +36,14 @@ const PRODUCT_STATUS_BADGE: Record<ProductStatus, { label: string; bg: string; f
 };
 
 export const OwnerProductsPage: React.FC = () => {
-  const { products, createProduct, updateProduct, setProductStatus, deleteProduct } =
+  const { business, products, createProduct, updateProduct, setProductStatus, deleteProduct } =
     useOutletContext<OwnerContextType>();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const handleSave = async (params: {
-    productId?: string;
-    name: string;
-    description: string;
-    price: number;
-    costPrice: number;
-    stock: number | null;
-    discountPercent: number;
-    discountEndsAtMs: number | null;
-    status: ProductStatus;
-    published: boolean;
-  }) => {
+  const handleSave = async (params: ProductFormSaveParams) => {
     if (params.productId) {
       await updateProduct({ productId: params.productId, ...params });
     } else {
@@ -133,6 +126,7 @@ export const OwnerProductsPage: React.FC = () => {
       {modalOpen && (
         <ProductFormModal
           editing={editing}
+          defaultCategory={business?.type ?? 'bakery'}
           onClose={() => setModalOpen(false)}
           onSave={handleSave}
         />
@@ -156,17 +150,41 @@ const OwnerProductCard: React.FC<OwnerProductCardProps> = ({
 }) => {
   const nextStatus = NEXT_STATUS_ACTION[product.status];
   const badge = PRODUCT_STATUS_BADGE[product.status];
+  const visual =
+    BUSINESS_TYPE_VISUALS[product.category || product.businessType] ?? BUSINESS_TYPE_VISUALS.other;
+  const categoryLabel =
+    BUSINESS_TYPES.find((bt) => bt.storedValue === (product.category || product.businessType))
+      ?.labelUz ?? 'Boshqa';
 
   return (
     <div
       className="p-4 rounded-2xl border space-y-3"
       style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="font-bold text-base">{product.name}</div>
-          <div className="text-xs" style={{ color: 'var(--dx-muted)' }}>
-            {product.description || 'Tavsif kiritilmagan'}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
+          <div
+            className="w-16 h-16 rounded-xl overflow-hidden shrink-0 flex items-center justify-center"
+            style={{ background: visual.gradient }}
+          >
+            {product.imageUrl ? (
+              <img
+                src={product.imageUrl}
+                alt={product.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-2xl">{visual.icon}</span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="font-bold text-base truncate">{product.name}</div>
+            <div className="text-[11px] font-bold" style={{ color: 'var(--dx-secondary)' }}>
+              {categoryLabel}
+            </div>
+            <div className="text-xs truncate" style={{ color: 'var(--dx-muted)' }}>
+              {product.description || 'Tavsif kiritilmagan'}
+            </div>
           </div>
         </div>
         <span

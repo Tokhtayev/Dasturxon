@@ -46,8 +46,15 @@ export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
+  const outOfStock =
+    product.status === 'sold_out' || (product.stock !== null && product.stock <= 0);
+
   const handleConfirm = async () => {
     setCheckoutError(null);
+    if (outOfStock) {
+      setCheckoutError('Ushbu mahsulot tugagan.');
+      return;
+    }
     if (product.stock !== null && qty > product.stock) {
       setCheckoutError(`Zaxira yetarli emas (${product.stock} ta mavjud).`);
       return;

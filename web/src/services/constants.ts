@@ -41,6 +41,14 @@ export const FIRESTORE_IN_CHUNK_SIZE = 10;
 export const MILLIS_TO_THOUSANDS = 1000;
 export const LOW_STOCK_THRESHOLD = 5;
 
+export const MAX_IMAGE_FILE_BYTES = 5 * 1024 * 1024;
+export const MAX_IMAGE_DIMENSION_PX = 800;
+export const IMAGE_JPEG_QUALITY = 0.7;
+export const IMAGE_FALLBACK_QUALITY = 0.55;
+export const MAX_IMAGE_DATA_URL_LENGTH = 700_000;
+export const MIN_IMAGE_DIMENSION = 1;
+export const BYTES_PER_KILOBYTE = 1024;
+
 export const ACTIVE_PRODUCT_STATUSES: readonly ProductStatus[] = ['available', 'hot_ready'];
 export const TERMINAL_ORDER_STATUSES: readonly OrderStatusKey[] = [
   'completed',

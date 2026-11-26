@@ -52,9 +52,9 @@ export function calculateOrderTotal(unitPrice: number, quantity: number): number
 }
 
 const OWNER_TRANSITIONS: Record<OrderStatusKey, readonly OrderStatusKey[]> = {
-  pending: ['accepted', 'rejected'],
-  accepted: ['ready', 'rejected'],
-  ready: ['completed', 'rejected'],
+  pending: ['accepted', 'cancelled', 'rejected'],
+  accepted: ['ready', 'cancelled', 'rejected'],
+  ready: ['completed', 'cancelled', 'rejected'],
   completed: [],
   rejected: [],
   cancelled: [],

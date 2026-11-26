@@ -54,8 +54,10 @@ export function buildOwnerActions({ ownerId, business, costMap, setCostMap }: Ow
     },
 
     createProduct: async (params: {
+      category: BusinessTypeKey;
       name: string;
       description: string;
+      imageUrl: string;
       price: number;
       costPrice: number;
       stock: number | null;
@@ -71,8 +73,10 @@ export function buildOwnerActions({ ownerId, business, costMap, setCostMap }: Ow
 
     updateProduct: async (params: {
       productId: string;
+      category: BusinessTypeKey;
       name: string;
       description: string;
+      imageUrl: string;
       price: number;
       costPrice: number;
       stock: number | null;
@@ -100,7 +104,11 @@ export function buildOwnerActions({ ownerId, business, costMap, setCostMap }: Ow
       await orderRepository.updateStatus(orderId, nextStatus);
     },
 
-    rejectOrder: (orderId: string) => orderRepository.rejectOrderAndRestoreStock(orderId),
+    rejectOrder: (orderId: string) =>
+      orderRepository.rejectOrderAndRestoreStock(orderId, 'rejected'),
+
+    cancelOrder: (orderId: string) =>
+      orderRepository.rejectOrderAndRestoreStock(orderId, 'cancelled'),
 
     setPaymentStatus: (orderId: string, status: PaymentStatus) =>
       orderRepository.setPaymentStatus(orderId, status),
