@@ -17,11 +17,10 @@ import {
 import { getFirebaseDb } from '../config/firebase';
 import {
   FIRESTORE_IN_CHUNK_SIZE,
-  MAX_IMAGE_DATA_URL_LENGTH,
   MAX_PRODUCT_DESCRIPTION_LENGTH,
   MAX_PRODUCT_NAME_LENGTH,
 } from '../services/constants';
-import { sanitizeUserText, validateProductForm } from '../services/validators';
+import { sanitizeImageUrl, sanitizeUserText, validateProductForm } from '../services/validators';
 import type { Business, BusinessTypeKey, Product, ProductStatus } from '../types/domain';
 
 function toMillis(value: unknown): number {
@@ -59,18 +58,6 @@ export function mapProductDoc(id: string, data: Record<string, unknown>): Produc
     imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
     updatedAtMs: toMillis(data.updatedAt),
   };
-}
-
-function sanitizeProductImageUrl(raw: string | undefined): string {
-  const trimmed = (raw ?? '').trim();
-  if (!trimmed) return '';
-  if (!trimmed.startsWith('data:image/') && !trimmed.startsWith('https://')) {
-    throw new Error("Rasm formati noto'g'ri.");
-  }
-  if (trimmed.length > MAX_IMAGE_DATA_URL_LENGTH) {
-    throw new Error('Rasm hajmi Firestore hujjat limitidan oshmasligi kerak.');
-  }
-  return trimmed;
 }
 
 export const productRepository = {
@@ -190,7 +177,7 @@ export const productRepository = {
     });
     if (!check.valid) throw new Error(check.error);
 
-    const safeImageUrl = sanitizeProductImageUrl(params.imageUrl);
+    const safeImageUrl = sanitizeImageUrl(params.imageUrl);
     const db = getFirebaseDb();
     const publicPayload: Record<string, unknown> = {
       businessId: params.business.id,
@@ -247,7 +234,7 @@ export const productRepository = {
     });
     if (!check.valid) throw new Error(check.error);
 
-    const safeImageUrl = sanitizeProductImageUrl(params.imageUrl);
+    const safeImageUrl = sanitizeImageUrl(params.imageUrl);
     const db = getFirebaseDb();
     await updateDoc(doc(db, 'products', params.productId), {
       category: params.category,

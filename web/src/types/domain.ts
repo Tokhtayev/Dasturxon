@@ -112,6 +112,8 @@ export interface CustomerOrder {
   createdAtMs: number;
   updatedAtMs: number;
   paidAtMs?: number;
+  receiptUrl?: string;
+  receiptUploadedAtMs?: number;
 }
 
 export interface Expense {

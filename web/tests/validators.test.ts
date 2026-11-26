@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_IMAGE_DATA_URL_LENGTH } from '../src/services/constants';
 import { getReadableErrorMessage, redactSensitiveTokens } from '../src/services/errors';
 import {
   escapeHtml,
@@ -6,6 +7,7 @@ import {
   isValidEmail,
   isValidNickname,
   normalizeNickname,
+  sanitizeImageUrl,
   sanitizeUserText,
   validateBusinessForm,
   validateExpenseInput,
@@ -189,5 +191,19 @@ describe('validators & text sanitization', () => {
     expect(getReadableErrorMessage(new Error('Bearer tok123456'), 'Fallback')).toBe(
       'Bearer [REDACTED]'
     );
+  });
+
+  it('sanitizeImageUrl allows empty, https, and bounded base64 data URLs while rejecting unsafe or oversized values', () => {
+    expect(sanitizeImageUrl(undefined)).toBe('');
+    expect(sanitizeImageUrl('   ')).toBe('');
+    expect(sanitizeImageUrl(' https://example.com/chek.jpg ')).toBe('https://example.com/chek.jpg');
+    expect(sanitizeImageUrl('data:image/jpeg;base64,/9j/4AAQ')).toBe(
+      'data:image/jpeg;base64,/9j/4AAQ'
+    );
+    expect(() => sanitizeImageUrl('http://example.com/chek.jpg')).toThrow('Rasm formati');
+    expect(() => sanitizeImageUrl('data:text/html;base64,PGgxPg==')).toThrow('Rasm formati');
+    expect(() =>
+      sanitizeImageUrl(`data:image/jpeg;base64,${'A'.repeat(MAX_IMAGE_DATA_URL_LENGTH)}`)
+    ).toThrow('limitidan');
   });
 });

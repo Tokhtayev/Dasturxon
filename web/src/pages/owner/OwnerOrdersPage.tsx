@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { Paperclip, ReceiptText } from 'lucide-react';
+import { ReceiptPreviewModal } from '../../components/ReceiptPreviewModal';
 import { StatusChip } from '../../components/StatusChip';
+import { PaymentReceiptModal } from '../../components/owner/PaymentReceiptModal';
 import { formatSoM } from '../../services/analytics';
 import { TERMINAL_ORDER_STATUSES } from '../../services/constants';
 import { getReadableErrorMessage } from '../../services/errors';
-import type { CustomerOrder, OrderStatusKey, PaymentStatus } from '../../types/domain';
+import type { CustomerOrder, OrderStatusKey } from '../../types/domain';
 import type { OwnerContextType } from './OwnerLayout';
 
 const NEXT_ORDER_STEP: Partial<Record<OrderStatusKey, { next: OrderStatusKey; label: string }>> = {
@@ -18,6 +21,11 @@ export const OwnerOrdersPage: React.FC = () => {
     useOutletContext<OwnerContextType>();
   const [segment, setSegment] = useState<'new' | 'progress' | 'history'>('new');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [receiptModal, setReceiptModal] = useState<{
+    order: CustomerOrder;
+    mode: 'confirm_payment' | 'edit_receipt';
+  } | null>(null);
+  const [previewOrder, setPreviewOrder] = useState<CustomerOrder | null>(null);
 
   const newOrders = orders.filter((o) => o.status === 'pending');
   const progressOrders = orders.filter((o) => o.status === 'accepted' || o.status === 'ready');
@@ -86,24 +94,166 @@ export const OwnerOrdersPage: React.FC = () => {
             <OwnerOrderCard
               key={order.id}
               order={order}
-              onTogglePayment={(id, next) => void runAction(() => setPaymentStatus(id, next))}
+              onOpenConfirmPayment={(target) =>
+                setReceiptModal({ order: target, mode: 'confirm_payment' })
+              }
+              onOpenUploadReceipt={(target) =>
+                setReceiptModal({ order: target, mode: 'edit_receipt' })
+              }
+              onPreviewReceipt={(target) => setPreviewOrder(target)}
+              onMarkUnpaid={(id) => void runAction(() => setPaymentStatus(id, 'unpaid'))}
               onAdvance={(id, prodId, next) => void runAction(() => advanceOrder(id, prodId, next))}
               onCancel={(id) => void runAction(() => cancelOrder(id))}
             />
           ))}
         </div>
       )}
+
+      {receiptModal && (
+        <PaymentReceiptModal
+          order={receiptModal.order}
+          mode={receiptModal.mode}
+          onClose={() => setReceiptModal(null)}
+          onConfirm={(receiptUrl) =>
+            setPaymentStatus(receiptModal.order.id, 'paid', {
+              receiptUrl,
+              preservePaidAt: receiptModal.mode === 'edit_receipt',
+            })
+          }
+        />
+      )}
+
+      {previewOrder && (
+        <ReceiptPreviewModal
+          order={previewOrder}
+          onClose={() => setPreviewOrder(null)}
+          onReplaceReceipt={() => {
+            const target = previewOrder;
+            setPreviewOrder(null);
+            setReceiptModal({ order: target, mode: 'edit_receipt' });
+          }}
+        />
+      )}
     </div>
+  );
+};
+
+const OwnerOrderPaymentActions: React.FC<{
+  order: CustomerOrder;
+  isTerminal: boolean;
+  onOpenConfirmPayment: (order: CustomerOrder) => void;
+  onOpenUploadReceipt: (order: CustomerOrder) => void;
+  onPreviewReceipt: (order: CustomerOrder) => void;
+  onMarkUnpaid: (orderId: string) => void;
+}> = ({
+  order,
+  isTerminal,
+  onOpenConfirmPayment,
+  onOpenUploadReceipt,
+  onPreviewReceipt,
+  onMarkUnpaid,
+}) => {
+  const canAttachReceiptLater =
+    order.paymentStatus === 'paid' && order.status !== 'rejected' && order.status !== 'cancelled';
+
+  return (
+    <>
+      {!isTerminal && order.paymentStatus !== 'paid' && (
+        <button
+          type="button"
+          onClick={() => onOpenConfirmPayment(order)}
+          className="px-2.5 py-1 rounded-xl border font-bold cursor-pointer"
+          style={{
+            backgroundColor: 'var(--dx-bg)',
+            borderColor: 'var(--dx-border)',
+            color: 'var(--dx-text)',
+          }}
+        >
+          To‘lovni tasdiqlash
+        </button>
+      )}
+
+      {!isTerminal && order.paymentStatus === 'paid' && (
+        <button
+          type="button"
+          title="To‘lanmagan holatga qaytarish"
+          onClick={() => onMarkUnpaid(order.id)}
+          className="px-2.5 py-1 rounded-xl border font-bold cursor-pointer"
+          style={{
+            backgroundColor: 'var(--dx-tertiary-container)',
+            borderColor: 'var(--dx-border)',
+            color: 'var(--dx-on-tertiary-container)',
+          }}
+        >
+          ✅ To‘langan
+        </button>
+      )}
+
+      {isTerminal && order.paymentStatus === 'paid' && (
+        <span
+          className="px-2.5 py-1 rounded-xl border font-bold"
+          style={{
+            backgroundColor: 'var(--dx-tertiary-container)',
+            borderColor: 'var(--dx-border)',
+            color: 'var(--dx-on-tertiary-container)',
+          }}
+        >
+          ✅ To‘langan
+        </span>
+      )}
+
+      {order.paymentStatus === 'paid' && order.receiptUrl && (
+        <button
+          type="button"
+          onClick={() => onPreviewReceipt(order)}
+          className="px-2.5 py-1 rounded-xl border font-bold inline-flex items-center gap-1 cursor-pointer"
+          style={{
+            backgroundColor: 'var(--dx-bg)',
+            borderColor: 'var(--dx-border)',
+            color: 'var(--dx-primary)',
+          }}
+        >
+          <ReceiptText className="w-3.5 h-3.5" /> Chek
+        </button>
+      )}
+
+      {canAttachReceiptLater && !order.receiptUrl && (
+        <button
+          type="button"
+          onClick={() => onOpenUploadReceipt(order)}
+          className="px-2.5 py-1 rounded-xl border font-bold inline-flex items-center gap-1 cursor-pointer"
+          style={{
+            backgroundColor: 'var(--dx-bg)',
+            borderColor: 'var(--dx-border)',
+            color: 'var(--dx-text)',
+          }}
+        >
+          <Paperclip className="w-3.5 h-3.5" /> Chek yuklash
+        </button>
+      )}
+    </>
   );
 };
 
 const OwnerOrderCard: React.FC<{
   order: CustomerOrder;
-  onTogglePayment: (orderId: string, next: PaymentStatus) => void;
+  onOpenConfirmPayment: (order: CustomerOrder) => void;
+  onOpenUploadReceipt: (order: CustomerOrder) => void;
+  onPreviewReceipt: (order: CustomerOrder) => void;
+  onMarkUnpaid: (orderId: string) => void;
   onAdvance: (orderId: string, productId: string, next: OrderStatusKey) => void;
   onCancel: (orderId: string) => void;
-}> = ({ order, onTogglePayment, onAdvance, onCancel }) => {
+}> = ({
+  order,
+  onOpenConfirmPayment,
+  onOpenUploadReceipt,
+  onPreviewReceipt,
+  onMarkUnpaid,
+  onAdvance,
+  onCancel,
+}) => {
   const nextStep = NEXT_ORDER_STEP[order.status];
+  const isTerminal = TERMINAL_ORDER_STATUSES.includes(order.status);
 
   return (
     <div
@@ -137,26 +287,14 @@ const OwnerOrderCard: React.FC<{
         </span>
 
         <div className="flex flex-wrap gap-1.5">
-          {!TERMINAL_ORDER_STATUSES.includes(order.status) && (
-            <button
-              type="button"
-              onClick={() =>
-                onTogglePayment(order.id, order.paymentStatus === 'paid' ? 'unpaid' : 'paid')
-              }
-              className="px-2.5 py-1 rounded-xl border font-bold cursor-pointer"
-              style={{
-                backgroundColor:
-                  order.paymentStatus === 'paid' ? 'var(--dx-tertiary-container)' : 'var(--dx-bg)',
-                borderColor: 'var(--dx-border)',
-                color:
-                  order.paymentStatus === 'paid'
-                    ? 'var(--dx-on-tertiary-container)'
-                    : 'var(--dx-text)',
-              }}
-            >
-              {order.paymentStatus === 'paid' ? '✅ To‘langan' : 'To‘lovni tasdiqlash'}
-            </button>
-          )}
+          <OwnerOrderPaymentActions
+            order={order}
+            isTerminal={isTerminal}
+            onOpenConfirmPayment={onOpenConfirmPayment}
+            onOpenUploadReceipt={onOpenUploadReceipt}
+            onPreviewReceipt={onPreviewReceipt}
+            onMarkUnpaid={onMarkUnpaid}
+          />
 
           {nextStep && (
             <button
@@ -169,7 +307,7 @@ const OwnerOrderCard: React.FC<{
             </button>
           )}
 
-          {!TERMINAL_ORDER_STATUSES.includes(order.status) && (
+          {!isTerminal && (
             <button
               type="button"
               onClick={() => onCancel(order.id)}

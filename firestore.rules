@@ -221,11 +221,12 @@ service cloud.firestore {
         && request.resource.data.quantity <= 99
         && (!('totalPrice' in request.resource.data) || (request.resource.data.totalPrice is int && request.resource.data.totalPrice > 0))
         && (!('paymentStatus' in request.resource.data) || request.resource.data.paymentStatus in ['unpaid', 'pending'])
+        && (!('receiptUrl' in request.resource.data) || request.resource.data.receiptUrl == '')
         && isBusinessApproved(request.resource.data.businessId);
 
       // Update:
-      // - Customer can ONLY change status pending/new -> cancelled (cannot alter paymentStatus, totalPrice, quantity)
-      // - Business owner can update order status and paymentStatus for their own business (ownership & amounts immutable)
+      // - Customer can ONLY change status pending/new -> cancelled (cannot alter paymentStatus, totalPrice, quantity, receiptUrl)
+      // - Business owner can update order status, paymentStatus, and payment receipt (receiptUrl <= 900KB only when paid)
       // - Admin can update any order
       allow update: if isSignedIn() && (
         (resource.data.customerId == request.auth.uid &&
@@ -236,7 +237,11 @@ service cloud.firestore {
          request.resource.data.customerId == resource.data.customerId &&
          request.resource.data.businessId == resource.data.businessId &&
          (!('totalPrice' in resource.data) || request.resource.data.totalPrice == resource.data.totalPrice) &&
-         (!('quantity' in resource.data) || request.resource.data.quantity == resource.data.quantity)) ||
+         (!('quantity' in resource.data) || request.resource.data.quantity == resource.data.quantity) &&
+         (!('receiptUrl' in request.resource.data) ||
+          (request.resource.data.receiptUrl is string &&
+           request.resource.data.receiptUrl.size() <= 900000 &&
+           (request.resource.data.receiptUrl == '' || request.resource.data.paymentStatus == 'paid')))) ||
         isAdmin()
       );
 

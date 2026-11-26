@@ -1,4 +1,5 @@
 import React from 'react';
+import { ReceiptText } from 'lucide-react';
 import { StatusChip } from '../StatusChip';
 import { formatSoM } from '../../services/analytics';
 import type { CustomerOrder } from '../../types/domain';
@@ -20,9 +21,14 @@ const STEP_RANK: Record<string, number> = {
 interface CustomerOrderCardProps {
   order: CustomerOrder;
   onCancel: (orderId: string) => void;
+  onViewReceipt?: (order: CustomerOrder) => void;
 }
 
-export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({ order, onCancel }) => (
+export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
+  order,
+  onCancel,
+  onViewReceipt,
+}) => (
   <div
     className="p-4 sm:p-5 rounded-2xl border space-y-3"
     style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
@@ -67,13 +73,27 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({ order, onC
       className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t text-xs"
       style={{ borderColor: 'var(--dx-border)' }}
     >
-      <div className="flex flex-wrap gap-3" style={{ color: 'var(--dx-muted)' }}>
+      <div className="flex flex-wrap items-center gap-3" style={{ color: 'var(--dx-muted)' }}>
         <span>
           {order.fulfillmentType === 'delivery'
             ? `🚚 Yetkazish: ${order.deliveryAddress}`
             : '🛍️ Olib ketish'}
         </span>
         <span>To‘lov: {order.paymentStatus === 'paid' ? '✅ To‘langan' : '⏳ Joyida'}</span>
+        {order.paymentStatus === 'paid' && order.receiptUrl && onViewReceipt && (
+          <button
+            type="button"
+            onClick={() => onViewReceipt(order)}
+            className="px-2.5 py-1 rounded-xl border text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
+            style={{
+              backgroundColor: 'var(--dx-bg)',
+              borderColor: 'var(--dx-border)',
+              color: 'var(--dx-primary)',
+            }}
+          >
+            <ReceiptText className="w-3.5 h-3.5" /> Chekni ko‘rish
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-3">

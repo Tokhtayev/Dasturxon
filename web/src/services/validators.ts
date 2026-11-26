@@ -6,6 +6,7 @@ import {
   MAX_EMAIL_LENGTH,
   MAX_EXPENSE_TITLE_LENGTH,
   MAX_FULL_NAME_LENGTH,
+  MAX_IMAGE_DATA_URL_LENGTH,
   MAX_PASSWORD_LENGTH,
   MAX_PHONE_LENGTH,
   MAX_PRICE_SOM,
@@ -216,4 +217,17 @@ export function validateRejectionReason(reason: string): ValidationResult {
 
 export function sanitizeDeliveryAddress(address: string): string {
   return sanitizeUserText(address, MAX_DELIVERY_ADDRESS_LENGTH);
+}
+
+/** Validates and normalizes an optional data:image/* or https:// image URL within Firestore size caps. */
+export function sanitizeImageUrl(raw: string | undefined): string {
+  const trimmed = (raw ?? '').trim();
+  if (!trimmed) return '';
+  if (!trimmed.startsWith('data:image/') && !trimmed.startsWith('https://')) {
+    throw new Error("Rasm formati noto'g'ri.");
+  }
+  if (trimmed.length > MAX_IMAGE_DATA_URL_LENGTH) {
+    throw new Error('Rasm hajmi Firestore hujjat limitidan oshmasligi kerak.');
+  }
+  return trimmed;
 }

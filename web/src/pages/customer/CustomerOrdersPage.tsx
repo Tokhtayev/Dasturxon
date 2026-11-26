@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { ReceiptPreviewModal } from '../../components/ReceiptPreviewModal';
 import { CustomerOrderCard } from '../../components/customer/CustomerOrderCard';
 import { useAuth } from '../../hooks/useAuth';
 import { useCustomerOrders } from '../../hooks/useCustomerOrders';
 import { getReadableErrorMessage } from '../../services/errors';
+import type { CustomerOrder } from '../../types/domain';
 
 export const CustomerOrdersPage: React.FC = () => {
   const { session } = useAuth();
@@ -10,6 +12,7 @@ export const CustomerOrdersPage: React.FC = () => {
   const { activeOrders, historyOrders, loading, error, cancelOrder } = useCustomerOrders(uid);
   const [segment, setSegment] = useState<'active' | 'history'>('active');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [previewOrder, setPreviewOrder] = useState<CustomerOrder | null>(null);
 
   const list = segment === 'active' ? activeOrders : historyOrders;
 
@@ -83,9 +86,14 @@ export const CustomerOrdersPage: React.FC = () => {
               key={order.id}
               order={order}
               onCancel={(id) => void handleCancel(id)}
+              onViewReceipt={(target) => setPreviewOrder(target)}
             />
           ))}
         </div>
+      )}
+
+      {previewOrder && (
+        <ReceiptPreviewModal order={previewOrder} onClose={() => setPreviewOrder(null)} />
       )}
     </div>
   );

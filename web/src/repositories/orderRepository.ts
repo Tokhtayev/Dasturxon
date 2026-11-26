@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteField,
   doc,
   getDocs,
   onSnapshot,
@@ -21,7 +22,11 @@ import {
   TERMINAL_ORDER_STATUSES,
 } from '../services/constants';
 import { applyStockDecrement, calculateOrderTotal } from '../services/orderLogic';
-import { sanitizeDeliveryAddress, sanitizeUserText } from '../services/validators';
+import {
+  sanitizeDeliveryAddress,
+  sanitizeImageUrl,
+  sanitizeUserText,
+} from '../services/validators';
 import type {
   Business,
   CustomerOrder,
@@ -72,6 +77,9 @@ export function mapOrderDoc(id: string, data: Record<string, unknown>): Customer
     createdAtMs: toMillis(data.createdAt),
     updatedAtMs: toMillis(data.updatedAt),
     paidAtMs: data.paidAt ? toMillis(data.paidAt) : undefined,
+    receiptUrl:
+      typeof data.receiptUrl === 'string' && data.receiptUrl.trim() ? data.receiptUrl : undefined,
+    receiptUploadedAtMs: data.receiptUploadedAt ? toMillis(data.receiptUploadedAt) : undefined,
   };
 }
 
@@ -296,14 +304,29 @@ export const orderRepository = {
     }
   },
 
-  async setPaymentStatus(orderId: string, paymentStatus: PaymentStatus): Promise<void> {
+  async setPaymentStatus(
+    orderId: string,
+    paymentStatus: PaymentStatus,
+    options?: { receiptUrl?: string; preservePaidAt?: boolean }
+  ): Promise<void> {
     const db = getFirebaseDb();
     const payload: Record<string, unknown> = {
       paymentStatus,
       updatedAt: serverTimestamp(),
     };
     if (paymentStatus === 'paid') {
-      payload.paidAt = serverTimestamp();
+      if (!options?.preservePaidAt) {
+        payload.paidAt = serverTimestamp();
+      }
+      if (options?.receiptUrl !== undefined) {
+        const safeReceiptUrl = sanitizeImageUrl(options.receiptUrl);
+        payload.receiptUrl = safeReceiptUrl;
+        payload.receiptUploadedAt = safeReceiptUrl ? serverTimestamp() : deleteField();
+      }
+    } else {
+      payload.paidAt = deleteField();
+      payload.receiptUrl = '';
+      payload.receiptUploadedAt = deleteField();
     }
     await updateDoc(doc(db, 'orders', orderId), payload);
   },

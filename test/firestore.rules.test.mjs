@@ -828,6 +828,66 @@ test("40. Product imageUrl size cap allows compact base64 data URL and rejects o
   await assertFails(setDoc(doc(dbOwner, "products/prod-huge-img"), validProduct({ imageUrl: oversizedDataUrl })));
 });
 
+// 41. Order receiptUrl allowed only by owner when paid & bounded <= 900KB; customer cannot tamper
+test("41. Order payment receiptUrl requires paid status, enforces 900KB cap, and blocks customer tampering", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  const receiptOrderId = "order-receipt-1";
+  const compactReceipt = "data:image/jpeg;base64," + "B".repeat(8000);
+  const oversizedReceipt = "data:image/jpeg;base64," + "B".repeat(900100);
+
+  // Customer cannot pre-populate receiptUrl on creation
+  await assertFails(setDoc(doc(dbCust, `orders/${receiptOrderId}`), {
+    customerId: "customer-1",
+    businessId: "business-1",
+    productId: "product-approved",
+    quantity: 1,
+    totalPrice: 8000,
+    status: "pending",
+    paymentStatus: "unpaid",
+    receiptUrl: compactReceipt,
+    createdAt: Timestamp.now()
+  }));
+
+  // Normal order creation without receipt succeeds
+  await assertSucceeds(setDoc(doc(dbCust, `orders/${receiptOrderId}`), {
+    customerId: "customer-1",
+    businessId: "business-1",
+    productId: "product-approved",
+    quantity: 1,
+    totalPrice: 8000,
+    status: "pending",
+    paymentStatus: "unpaid",
+    createdAt: Timestamp.now()
+  }));
+
+  // Owner cannot attach a non-empty receipt while paymentStatus stays unpaid
+  await assertFails(updateDoc(doc(dbOwner, `orders/${receiptOrderId}`), {
+    paymentStatus: "unpaid",
+    receiptUrl: compactReceipt
+  }));
+
+  // Owner cannot attach an oversized (>900KB) receipt even when paid
+  await assertFails(updateDoc(doc(dbOwner, `orders/${receiptOrderId}`), {
+    paymentStatus: "paid",
+    receiptUrl: oversizedReceipt
+  }));
+
+  // Owner attaches compact JPEG receipt when confirming payment
+  await assertSucceeds(updateDoc(doc(dbOwner, `orders/${receiptOrderId}`), {
+    paymentStatus: "paid",
+    receiptUrl: compactReceipt
+  }));
+
+  // Customer can read their own order including receiptUrl, but cannot replace receiptUrl
+  const custSnap = await getDoc(doc(dbCust, `orders/${receiptOrderId}`));
+  assert.equal(custSnap.data().receiptUrl, compactReceipt);
+  await assertFails(updateDoc(doc(dbCust, `orders/${receiptOrderId}`), {
+    status: "cancelled",
+    receiptUrl: ""
+  }));
+});
+
 
 
 

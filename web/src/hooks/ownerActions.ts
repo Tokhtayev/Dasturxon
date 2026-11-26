@@ -110,8 +110,11 @@ export function buildOwnerActions({ ownerId, business, costMap, setCostMap }: Ow
     cancelOrder: (orderId: string) =>
       orderRepository.rejectOrderAndRestoreStock(orderId, 'cancelled'),
 
-    setPaymentStatus: (orderId: string, status: PaymentStatus) =>
-      orderRepository.setPaymentStatus(orderId, status),
+    setPaymentStatus: (
+      orderId: string,
+      status: PaymentStatus,
+      options?: { receiptUrl?: string; preservePaidAt?: boolean }
+    ) => orderRepository.setPaymentStatus(orderId, status, options),
 
     addExpense: async (params: { title: string; amount: number; category: string }) => {
       if (!business) throw new Error('Biznes topilmadi.');
