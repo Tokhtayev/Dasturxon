@@ -4,11 +4,11 @@ import { formatSoM, getEffectivePrice } from '../../services/analytics';
 import {
   MAX_ORDER_QUANTITY,
   MIN_ORDER_QUANTITY,
-  MIN_PHONE_LENGTH,
   MINUTES_PER_HOUR,
   MS_PER_MINUTE,
 } from '../../services/constants';
 import { getReadableErrorMessage } from '../../services/errors';
+import { isValidContactPhone } from '../../services/validators';
 import type { FulfillmentType, Product } from '../../types/domain';
 
 type PickupPreset = '30m' | '1h' | '2h';
@@ -59,11 +59,12 @@ export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
       setCheckoutError(`Zaxira yetarli emas (${product.stock} ta mavjud).`);
       return;
     }
-    if (
-      fulfillment === 'delivery' &&
-      (!deliveryAddress.trim() || contactPhone.trim().length < MIN_PHONE_LENGTH)
-    ) {
-      setCheckoutError('Yetkazib berish uchun manzil va telefon raqamini kiriting.');
+    if (fulfillment === 'delivery' && !deliveryAddress.trim()) {
+      setCheckoutError('Yetkazib berish uchun manzilni kiriting.');
+      return;
+    }
+    if (!isValidContactPhone(contactPhone)) {
+      setCheckoutError("Bog'lanish uchun telefon raqamingizni kiriting (+998 90 123 45 67).");
       return;
     }
 
@@ -255,7 +256,7 @@ const FulfillmentFields: React.FC<{
         ))}
       </div>
       {fulfillment === 'delivery' && (
-        <div className="space-y-2 pt-1">
+        <div className="pt-1">
           <input
             type="text"
             value={deliveryAddress}
@@ -264,16 +265,22 @@ const FulfillmentFields: React.FC<{
             className="w-full px-3.5 py-2.5 rounded-xl border text-xs"
             style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
           />
-          <input
-            type="tel"
-            value={contactPhone}
-            onChange={(e) => onPhoneChange(e.target.value)}
-            placeholder="Bog'lanish uchun telefon (+998 90...)"
-            className="w-full px-3.5 py-2.5 rounded-xl border text-xs"
-            style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
-          />
         </div>
       )}
+      <div className="space-y-1 pt-1">
+        <label htmlFor="checkout-phone" className="text-xs font-bold block">
+          Bog‘lanish uchun telefon
+        </label>
+        <input
+          id="checkout-phone"
+          type="tel"
+          value={contactPhone}
+          onChange={(e) => onPhoneChange(e.target.value)}
+          placeholder="+998 90 123 45 67"
+          className="w-full px-3.5 py-2.5 rounded-xl border text-xs"
+          style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+        />
+      </div>
     </div>
 
     <div className="space-y-1.5">

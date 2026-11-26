@@ -7,6 +7,7 @@ import { ProductFeedCard } from '../../components/customer/ProductFeedCard';
 import { useAuth } from '../../hooks/useAuth';
 import { useCustomerFeed } from '../../hooks/useCustomerFeed';
 import { useCustomerOrders } from '../../hooks/useCustomerOrders';
+import { isValidContactPhone } from '../../services/validators';
 import {
   BUSINESS_TYPES,
   type BusinessTypeKey,
@@ -16,7 +17,7 @@ import {
 
 export const CustomerFeedPage: React.FC = () => {
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, updatePhone } = useAuth();
   const profile = session.status === 'ready' ? session.profile : null;
 
   const {
@@ -56,6 +57,13 @@ export const CustomerFeedPage: React.FC = () => {
       fulfillmentType: params.fulfillmentType,
       deliveryAddress: params.deliveryAddress,
     });
+    if (
+      profile &&
+      !isValidContactPhone(profile.phone) &&
+      isValidContactPhone(params.contactPhone)
+    ) {
+      void updatePhone(params.contactPhone).catch(() => {});
+    }
     setCheckoutProduct(null);
     setSelectedProduct(null);
     navigate('/orders');

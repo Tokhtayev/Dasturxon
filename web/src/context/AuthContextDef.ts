@@ -16,6 +16,7 @@ export interface AuthContextValue {
   }) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateFullName: (fullName: string) => Promise<void>;
+  updatePhone: (phone: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 

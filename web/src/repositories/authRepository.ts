@@ -270,6 +270,12 @@ export const authRepository = {
     await updateDoc(doc(db, 'users', uid), { fullName: cleanName });
   },
 
+  async updatePhone(uid: string, phone: string): Promise<void> {
+    const cleanPhone = sanitizeUserText(phone, MAX_PHONE_LENGTH);
+    const db = getFirebaseDb();
+    await updateDoc(doc(db, 'users', uid), { phone: cleanPhone });
+  },
+
   async signOut(): Promise<void> {
     if (!isFirebaseConfigured) return;
     await signOut(getFirebaseAuth());

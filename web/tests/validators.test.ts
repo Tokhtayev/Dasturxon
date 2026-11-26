@@ -3,7 +3,9 @@ import { MAX_IMAGE_DATA_URL_LENGTH } from '../src/services/constants';
 import { getReadableErrorMessage, redactSensitiveTokens } from '../src/services/errors';
 import {
   escapeHtml,
+  formatContactPhoneDisplay,
   isStrongPassword,
+  isValidContactPhone,
   isValidEmail,
   isValidNickname,
   normalizeNickname,
@@ -205,5 +207,14 @@ describe('validators & text sanitization', () => {
     expect(() =>
       sanitizeImageUrl(`data:image/jpeg;base64,${'A'.repeat(MAX_IMAGE_DATA_URL_LENGTH)}`)
     ).toThrow('limitidan');
+  });
+
+  it('isValidContactPhone and formatContactPhoneDisplay reject bare +998 prefixes and keep valid phones', () => {
+    expect(isValidContactPhone('+998')).toBe(false);
+    expect(isValidContactPhone('+998 ')).toBe(false);
+    expect(isValidContactPhone('')).toBe(false);
+    expect(isValidContactPhone('+998 90 123 45 67')).toBe(true);
+    expect(formatContactPhoneDisplay('+998')).toBe('');
+    expect(formatContactPhoneDisplay('+998 90 123 45 67')).toBe('+998 90 123 45 67');
   });
 });

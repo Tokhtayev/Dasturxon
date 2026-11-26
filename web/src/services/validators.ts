@@ -219,6 +219,19 @@ export function sanitizeDeliveryAddress(address: string): string {
   return sanitizeUserText(address, MAX_DELIVERY_ADDRESS_LENGTH);
 }
 
+/** Checks that a contact phone contains at least MIN_PHONE_LENGTH digits (not just a '+998' prefix). */
+export function isValidContactPhone(raw: string | undefined): boolean {
+  const clean = sanitizeUserText(raw ?? '', MAX_PHONE_LENGTH);
+  const digitsCount = clean.replace(/\D/g, '').length;
+  return digitsCount >= MIN_PHONE_LENGTH;
+}
+
+/** Returns a formatted phone string when valid, or empty string for incomplete legacy values like '+998'. */
+export function formatContactPhoneDisplay(raw: string | undefined): string {
+  const clean = sanitizeUserText(raw ?? '', MAX_PHONE_LENGTH);
+  return isValidContactPhone(clean) ? clean : '';
+}
+
 /** Validates and normalizes an optional data:image/* or https:// image URL within Firestore size caps. */
 export function sanitizeImageUrl(raw: string | undefined): string {
   const trimmed = (raw ?? '').trim();

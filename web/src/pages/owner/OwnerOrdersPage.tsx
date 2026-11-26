@@ -7,6 +7,7 @@ import { PaymentReceiptModal } from '../../components/owner/PaymentReceiptModal'
 import { formatSoM } from '../../services/analytics';
 import { TERMINAL_ORDER_STATUSES } from '../../services/constants';
 import { getReadableErrorMessage } from '../../services/errors';
+import { formatContactPhoneDisplay } from '../../services/validators';
 import type { CustomerOrder, OrderStatusKey } from '../../types/domain';
 import type { OwnerContextType } from './OwnerLayout';
 
@@ -254,6 +255,7 @@ const OwnerOrderCard: React.FC<{
 }) => {
   const nextStep = NEXT_ORDER_STEP[order.status];
   const isTerminal = TERMINAL_ORDER_STATUSES.includes(order.status);
+  const phoneDisplay = formatContactPhoneDisplay(order.customerPhone);
 
   return (
     <div
@@ -272,7 +274,17 @@ const OwnerOrderCard: React.FC<{
             {order.fulfillmentType === 'delivery'
               ? `🚚 ${order.deliveryAddress}`
               : '🛍️ Olib ketish'}{' '}
-            · {order.customerPhone}
+            ·{' '}
+            {phoneDisplay ? (
+              <a
+                href={`tel:${phoneDisplay.replace(/\s+/g, '')}`}
+                className="underline font-semibold"
+              >
+                {phoneDisplay}
+              </a>
+            ) : (
+              'Telefon kiritilmagan'
+            )}
           </div>
         </div>
         <StatusChip status={order.status} />

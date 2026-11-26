@@ -33,6 +33,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session.status !== 'ready') return;
       await authRepository.updateFullName(session.profile.uid, fullName);
     },
+    updatePhone: async (phone) => {
+      if (session.status !== 'ready') return;
+      await authRepository.updatePhone(session.profile.uid, phone);
+    },
     signOut: async () => {
       await authRepository.signOut();
     },
