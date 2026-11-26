@@ -360,14 +360,29 @@ const DEMO_STORES = [
 ];
 
 async function signInOrRegister(auth, db, params) {
+  let cred;
   try {
-    const cred = await signInWithEmailAndPassword(auth, params.email, params.password);
-    return cred.user.uid;
-  } catch {
-    const cred = await createUserWithEmailAndPassword(auth, params.email, params.password);
-    const uid = cred.user.uid;
+    cred = await signInWithEmailAndPassword(auth, params.email, params.password);
+  } catch (signInErr) {
+    try {
+      cred = await createUserWithEmailAndPassword(auth, params.email, params.password);
+    } catch (createErr) {
+      if (createErr?.code === 'auth/email-already-in-use') {
+        throw new Error(
+          `${params.email} allaqachon ro'yxatdan o'tgan, lekin --demo-password mos kelmadi.`,
+          { cause: signInErr }
+        );
+      }
+      throw createErr;
+    }
+  }
+
+  const uid = cred.user.uid;
+  const userRef = doc(db, 'users', uid);
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) {
     const batch = writeBatch(db);
-    batch.set(doc(db, 'users', uid), {
+    batch.set(userRef, {
       uid,
       fullName: params.fullName,
       normalizedNickname: params.nick,
@@ -381,8 +396,8 @@ async function signInOrRegister(auth, db, params) {
       createdAt: serverTimestamp(),
     });
     await batch.commit();
-    return uid;
   }
+  return uid;
 }
 
 async function ensureBusinessAndProducts(db, ownerUid, store, demoPassword, auth) {
@@ -538,10 +553,11 @@ async function main() {
   const adminPassword = args['admin-password'] || process.env.ADMIN_PASSWORD;
   const demoPassword = args['demo-password'] || 'Dasturxon2026!';
   const customerEmail = 'mijoz_demo@dasturxon.test';
+  const hasAdmin = Boolean(adminEmail && adminPassword);
 
-  if (!adminEmail || !adminPassword) {
+  if (Boolean(adminEmail) !== Boolean(adminPassword)) {
     console.error(
-      'Usage: node scripts/seed_live_catalog.mjs --admin-email <admin@...> --admin-password <pass> [--emulator]'
+      'Pass both --admin-email and --admin-password together, or omit both to seed as business owners only.'
     );
     process.exit(1);
   }
@@ -573,15 +589,17 @@ async function main() {
     connectFirestoreEmulator(db, '127.0.0.1', 8080);
   }
 
-  // Verify admin login AND admin role in Firestore BEFORE creating catalog
-  const adminCred = await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
-  const adminSnap = await getDoc(doc(db, 'users', adminCred.user.uid));
-  if (!adminSnap.exists() || adminSnap.data().role !== 'admin') {
-    throw new Error(
-      `${adminEmail} hisobining Firestore users/${adminCred.user.uid}.role maydoni "admin" emas! Avval Firebase Console da role = "admin" qiling.`
-    );
+  if (hasAdmin) {
+    // Verify admin login AND admin role in Firestore BEFORE creating catalog
+    const adminCred = await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+    const adminSnap = await getDoc(doc(db, 'users', adminCred.user.uid));
+    if (!adminSnap.exists() || adminSnap.data().role !== 'admin') {
+      throw new Error(
+        `${adminEmail} hisobining Firestore users/${adminCred.user.uid}.role maydoni "admin" emas! Avval Firebase Console da role = "admin" qiling.`
+      );
+    }
+    await signOut(auth);
   }
-  await signOut(auth);
 
   const createdStores = [];
   for (const store of DEMO_STORES) {
@@ -596,25 +614,33 @@ async function main() {
     await signOut(auth);
     const created = await ensureBusinessAndProducts(db, uid, store, demoPassword, auth);
     createdStores.push(created);
-    console.log(`Prepared business: ${store.business.name} (${store.products.length} products)`);
+    console.log(
+      `Prepared business: ${store.business.name} [${created.businessStatus}] (${store.products.length} products)`
+    );
   }
 
-  // Approve all created pending businesses as Admin
-  await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
-  for (const s of createdStores) {
-    if (s.businessStatus !== 'approved') {
-      await updateDoc(doc(db, 'businesses', s.businessId), {
-        status: 'approved',
-        rejectionReason: '',
-        updatedAt: serverTimestamp(),
-      });
-      console.log(`Admin approved: ${s.business.name}`);
+  if (hasAdmin) {
+    // Approve all created pending businesses as Admin
+    await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+    for (const s of createdStores) {
+      if (s.businessStatus !== 'approved') {
+        await updateDoc(doc(db, 'businesses', s.businessId), {
+          status: 'approved',
+          rejectionReason: '',
+          updatedAt: serverTimestamp(),
+        });
+        s.businessStatus = 'approved';
+        console.log(`Admin approved: ${s.business.name}`);
+      }
     }
+    await signOut(auth);
   }
-  await signOut(auth);
 
-  // Place sample orders + complete the first one for realistic Owner Analytics
-  const orders = await seedCustomerOrders(auth, db, createdStores[0], customerEmail, demoPassword);
+  // Place sample orders + complete the first one only when the first business is approved
+  const firstApproved = createdStores[0]?.businessStatus === 'approved' ? createdStores[0] : null;
+  const orders = firstApproved
+    ? await seedCustomerOrders(auth, db, firstApproved, customerEmail, demoPassword)
+    : null;
   if (orders && orders.length >= 2) {
     await signInWithEmailAndPassword(auth, createdStores[0].store.ownerEmail, demoPassword);
     const firstOrderRef = doc(db, 'orders', orders[0].id);
@@ -631,11 +657,24 @@ async function main() {
     await signOut(auth);
   }
 
+  const pendingCount = createdStores.filter((s) => s.businessStatus !== 'approved').length;
   console.log('\n=== DEMO SEED COMPLETE ===');
-  console.log(`Businesses: ${createdStores.length}, Total products: ${createdStores.reduce((n, s) => n + s.products.length, 0)}`);
-  console.log(`Demo Customer: ${customerEmail} / ${demoPassword}`);
-  console.log(`Demo Owner (Gulzor Patir w/ analytics & pending order): ${DEMO_STORES[0].ownerEmail} / ${demoPassword}`);
-  console.log(`Admin: ${adminEmail}`);
+  console.log(
+    `Businesses: ${createdStores.length} (${createdStores.length - pendingCount} approved, ${pendingCount} pending), Total products: ${createdStores.reduce((n, s) => n + s.products.length, 0)}`
+  );
+  for (const s of createdStores) {
+    console.log(`  - ${s.business.name} [${s.businessStatus}] -> ${s.store.ownerEmail} / ${demoPassword}`);
+  }
+  if (orders) {
+    console.log(`Demo Customer: ${customerEmail} / ${demoPassword} (${orders.length} sample orders)`);
+  } else if (pendingCount > 0) {
+    console.log(
+      'Note: Businesses are in "pending" status. Approve them in /#/admin (or re-run with --admin-email and --admin-password) to make them visible in Customer /#/feed and seed analytics orders.'
+    );
+  }
+  if (hasAdmin) {
+    console.log(`Admin: ${adminEmail}`);
+  }
 }
 
 main().catch((err) => {
