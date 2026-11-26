@@ -10,7 +10,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\"",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "seed:demo": "node scripts/seed_live_catalog.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.5",

@@ -66,8 +66,7 @@ export const OwnerProductsPage: React.FC = () => {
         <div>
           <h1 className="font-display text-2xl font-extrabold">Mahsulotlar ({products.length})</h1>
           <p className="text-xs" style={{ color: 'var(--dx-muted)' }}>
-            Tannarx (<code className="font-mono-code">products/&#123;id&#125;/private/cost</code>)
-            faqat sizga ko‘rinadi
+            Tannarx faqat sizga ko‘rinadi — xaridorlar vitrinasiga chiqmaydi
           </p>
         </div>
         <button

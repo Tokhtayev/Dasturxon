@@ -11,6 +11,7 @@
     "test:rules": "npx --no-install firebase emulators:exec --project demo-dasturxon --only firestore \"node --test test/firestore.rules.test.mjs\"",
     "test:all": "npm run test:web && npm run test:rules",
     "emulators": "npx --no-install firebase emulators:start --project demo-dasturxon --only auth,firestore",
+    "seed:demo": "npm --prefix web run seed:demo --",
     "deploy:hosting": "npm run build:web && npx --no-install firebase deploy --only hosting",
     "deploy:rules": "npx --no-install firebase deploy --only firestore:rules,firestore:indexes",
     "deploy:all": "npm run build:web && npx --no-install firebase deploy"

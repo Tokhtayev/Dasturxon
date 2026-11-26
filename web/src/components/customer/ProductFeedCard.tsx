@@ -1,5 +1,5 @@
 import React from 'react';
-import { Store } from 'lucide-react';
+import { MapPin, Store } from 'lucide-react';
 import { formatSoM, getEffectivePrice, isDiscountActive } from '../../services/analytics';
 import { BUSINESS_TYPE_VISUALS } from '../../services/constants';
 import type { Product } from '../../types/domain';
@@ -73,6 +73,15 @@ export const ProductFeedCard: React.FC<ProductFeedCardProps> = ({ product, onSel
             {product.stock !== null && !soldOut && <span>Zaxira: {product.stock} ta</span>}
           </div>
           <h3 className="font-bold text-base truncate">{product.name}</h3>
+          {product.businessAddress && (
+            <div
+              className="text-[11px] truncate inline-flex items-center gap-1 max-w-full"
+              style={{ color: 'var(--dx-muted)' }}
+            >
+              <MapPin className="w-3 h-3 shrink-0" />
+              <span className="truncate">{product.businessAddress}</span>
+            </div>
+          )}
           {product.description && (
             <p className="text-xs line-clamp-2" style={{ color: 'var(--dx-muted)' }}>
               {product.description}

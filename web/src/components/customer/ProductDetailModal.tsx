@@ -73,10 +73,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {product.description}
             </p>
           )}
-          <div className="text-xs space-y-1" style={{ color: 'var(--dx-muted)' }}>
+          <div className="text-xs space-y-1.5" style={{ color: 'var(--dx-muted)' }}>
             {product.businessAddress && (
-              <div className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5" /> {product.businessAddress}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 shrink-0" /> {product.businessAddress}
+                </span>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    `${product.businessName}, ${product.businessAddress}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold underline shrink-0"
+                  style={{ color: 'var(--dx-secondary)' }}
+                >
+                  Xaritada ochish ↗
+                </a>
               </div>
             )}
             {product.businessPhone && (

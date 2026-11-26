@@ -111,5 +111,13 @@ export default tseslint.config(
       'max-lines-per-function': 'off',
     },
   },
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
   prettierConfig
 );
