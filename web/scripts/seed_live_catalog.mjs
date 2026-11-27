@@ -85,35 +85,62 @@ const DEMO_STORES = [
       {
         name: 'Issiq Tandir Non',
         category: 'bakery',
-        description: "Har soatda yangi uziladigan, kunjutli va xushbo'y mahalla tandir noni.",
+        description:
+          "Shahriston metrosi va Yunusobod 7-mavze to'yxonalari hamda do'konlari uchun kunjutli issiq tandir noni (optom 200 tadan 2 700 so'm).",
         imageFile: 'food_tandir_non.jpg',
         price: 5000,
-        costPrice: 2500,
-        stock: 60,
+        costPrice: 1900,
+        stock: 1200,
         discountPercent: 0,
         status: 'hot_ready',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 200,
+        wholesalePrice: 2700,
       },
       {
         name: "Sariyog'li Samarqand Patir",
         category: 'bakery',
-        description: "Toza sariyog' va sutda qorilgan, qarsildoq chetli milliy patir.",
+        description:
+          "To'y va marosim dasturxonlari uchun toza sariyog' va sutda qorilgan Samarqand patiri (optom 40 tadan 9 500 so'm).",
         imageFile: 'food_patir_non.jpg',
         price: 14000,
-        costPrice: 7200,
-        stock: 24,
+        costPrice: 6800,
+        stock: 240,
         discountPercent: 10,
         status: 'hot_ready',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 40,
+        wholesalePrice: 9500,
       },
       {
         name: "Tandir Go'shtli Somsa",
         category: 'bakery',
-        description: "Qo'lda yoyilgan qatlama xamir va maydalangan mol go'shtli somsa.",
+        description:
+          "Yunusobod ofislari va choyxonalar uchun qarsildoq tandir mol go'shtli somsa (optom 80 tadan 6 500 so'm).",
         imageFile: 'food_somsa.jpg',
         price: 9000,
-        costPrice: 4800,
-        stock: 40,
+        costPrice: 4400,
+        stock: 400,
         discountPercent: 0,
         status: 'hot_ready',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 80,
+        wholesalePrice: 6500,
+      },
+      {
+        name: "Yunusobod Obi Non (to'y partiyasi)",
+        category: 'bakery',
+        description:
+          "Yunusobod 7-mavze (48A) va Universam bozori atrofidagi oshxonalar uchun standart issiq obi non (optom 300 tadan 2 500 so'm).",
+        imageFile: 'food_tandir_non.jpg',
+        price: 4000,
+        costPrice: 1700,
+        stock: 1500,
+        discountPercent: 0,
+        status: 'hot_ready',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 300,
+        wholesalePrice: 2500,
       },
     ],
   },
@@ -125,7 +152,7 @@ const DEMO_STORES = [
     business: {
       name: "O'z Non Mahalla Novvoyxonasi",
       type: 'bakery',
-      address: 'Yunusobod tumani, 8-mavze, 45-uy, Toshkent',
+      address: 'Yunusobod tumani, 8-mavze, 45-uy (Universam yaqinida), Toshkent',
       phone: '+998 90 412 88 10',
     },
     expenses: [{ title: 'Kunjut, sut va xamirturush', amount: 195000, category: 'Xomashyo' }],
@@ -133,35 +160,62 @@ const DEMO_STORES = [
       {
         name: 'Kunjutli Shirmoy Patir',
         category: 'bakery',
-        description: 'Nozik sutli ta’mga ega an’anaviy shirmoy patir noni.',
+        description:
+          "Yunusobod 8-mavze sexidan sutli an'anaviy shirmoy patir partiyasi (optom 50 tadan 7 800 so'm).",
         imageFile: 'food_patir_non.jpg',
         price: 11000,
-        costPrice: 5500,
-        stock: 30,
+        costPrice: 5200,
+        stock: 300,
         discountPercent: 0,
         status: 'available',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 50,
+        wholesalePrice: 7800,
       },
       {
         name: 'Oilaviy Tandir Non',
         category: 'bakery',
-        description: 'Katta o‘lchamli kundalik non, issiq holda topshiriladi.',
+        description:
+          "Do'konlar, kichik kafelar va tadbirlar uchun kunlik tandir noni (optom 150 tadan 2 900 so'm).",
         imageFile: 'food_tandir_non.jpg',
         price: 4500,
-        costPrice: 2200,
-        stock: 75,
+        costPrice: 2000,
+        stock: 900,
         discountPercent: 0,
         status: 'hot_ready',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 150,
+        wholesalePrice: 2900,
       },
       {
         name: 'Kichik Qovoqli Somsa (2 dona)',
         category: 'bakery',
-        description: 'Shirin qovoq va ziravorlar bilan pishirilgan yengil somsa.',
+        description:
+          "Tushlik to'plamlari va korporativ buyurtmalar uchun shirin qovoqli somsa (optom 60 tadan 6 800 so'm).",
         imageFile: 'food_somsa.jpg',
         price: 10000,
-        costPrice: 4500,
-        stock: 28,
+        costPrice: 4300,
+        stock: 300,
         discountPercent: 0,
         status: 'available',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 60,
+        wholesalePrice: 6800,
+      },
+      {
+        name: 'Universam Mini-Market Obi Noni',
+        category: 'bakery',
+        description:
+          "Yunusobod 8-mavze va 19-mavze mahalla do'konlariga tonggi yetkazib berish uchun obi non (optom 250 tadan).",
+        imageFile: 'food_tandir_non.jpg',
+        price: 3800,
+        costPrice: 1800,
+        stock: 1250,
+        discountPercent: 0,
+        status: 'hot_ready',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 250,
+        wholesalePrice: 2600,
       },
     ],
   },
@@ -173,7 +227,7 @@ const DEMO_STORES = [
     business: {
       name: 'Caramellina Qandolat Sexi',
       type: 'confectionery',
-      address: 'Yunusobod tumani, 18-mavze, 23-uy, Toshkent',
+      address: "Yunusobod tumani, 18-mavze, 23-uy (Mega Planet yo'nalishi), Toshkent",
       phone: '+998 90 321 18 23',
     },
     expenses: [{ title: 'Asal, qaymoq va shokolad', amount: 420000, category: 'Xomashyo' }],
@@ -181,35 +235,62 @@ const DEMO_STORES = [
       {
         name: "Klassik Medovik (bo'lak)",
         category: 'confectionery',
-        description: "Tog' asali va smetanali kremdan tayyorlangan yumshoq asalli tort.",
+        description:
+          "Yunusobod kafe va kofe nuqtalari uchun tog' asalli medovik bo'laklari (optom 25 tadan 19 500 so'm).",
         imageFile: 'food_medovik.jpg',
         price: 28000,
-        costPrice: 14500,
-        stock: 16,
+        costPrice: 13500,
+        stock: 150,
         discountPercent: 15,
         status: 'available',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 25,
+        wholesalePrice: 19500,
       },
       {
         name: 'San-Sebastyan Chizkeyk',
         category: 'pastry',
-        description: "Filadelfiya pishlog'i va rezavor sousli nozik pishirilgan chizkeyk.",
+        description:
+          "Kofexona va tadbir shirinlik stoli uchun Filadelfiya pishloqli chizkeyk (optom 20 tadan 25 500 so'm).",
         imageFile: 'food_cheesecake.jpg',
         price: 36000,
-        costPrice: 19000,
-        stock: 12,
+        costPrice: 18000,
+        stock: 100,
         discountPercent: 0,
         status: 'hot_ready',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 20,
+        wholesalePrice: 25500,
       },
       {
         name: 'Butun Medovik Tort (1 kg)',
         category: 'confectionery',
-        description: 'Mehmondorchilik va tug‘ilgan kunlar uchun tayyor qadoqlangan tort.',
+        description:
+          "To'y, tug'ilgan kun va korporativ sovg'alar uchun qadoqlangan 1 kg tortlar (optom 8 tadan 110 000 so'm).",
         imageFile: 'food_medovik.jpg',
         price: 145000,
-        costPrice: 82000,
-        stock: 6,
+        costPrice: 78000,
+        stock: 50,
         discountPercent: 0,
         status: 'available',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 8,
+        wholesalePrice: 110000,
+      },
+      {
+        name: "Tadbir Medovik To'plami (12 bo'lak)",
+        category: 'confectionery',
+        description:
+          "Banket va ofis ziyofatlari uchun 12 bo'lakli maxsus qutida qadoqlangan desert to'plami (optom 5 qutidan).",
+        imageFile: 'food_medovik.jpg',
+        price: 240000,
+        costPrice: 125000,
+        stock: 40,
+        discountPercent: 0,
+        status: 'available',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 5,
+        wholesalePrice: 185000,
       },
     ],
   },
@@ -229,35 +310,62 @@ const DEMO_STORES = [
       {
         name: 'Reza Mevali Chizkeyk',
         category: 'pastry',
-        description: "Yangi malina va qulupnay bilan bezatilgan sovuq chizkeyk bo'lagi.",
+        description:
+          "Amir Temur shoh ko'chasi ofislari va uchrashuvlar uchun yangi malinali chizkeyk (optom 20 tadan 24 000 so'm).",
         imageFile: 'food_cheesecake.jpg',
         price: 34000,
-        costPrice: 18000,
-        stock: 14,
+        costPrice: 16500,
+        stock: 120,
         discountPercent: 0,
         status: 'available',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 20,
+        wholesalePrice: 24000,
       },
       {
         name: "Ko'k Choy va Limon (choynak)",
         category: 'cafe',
-        description: "Tog' o'simliklari va yangi limon qo'shilgan tetiklashtiruvchi choy.",
+        description:
+          "Seminar va tushlik tadbirlari uchun termosda yoki choynakda tayyor limondor ko'k choy (optom 15 tadan).",
         imageFile: 'food_tea.jpg',
         price: 15000,
         costPrice: 4500,
-        stock: 45,
+        stock: 120,
         discountPercent: 0,
         status: 'hot_ready',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 15,
+        wholesalePrice: 10500,
       },
       {
-        name: "Qaymoqli Karamel Medovik",
+        name: 'Qaymoqli Karamel Medovik',
         category: 'pastry',
-        description: "Yumshoq biskvit va yengil karamel kremi uyg'unligi.",
+        description:
+          "Yumshoq biskvit va karamel kremli pishiriq bo'lagi, kafe hamkorlari uchun (optom 24 tadan 19 000 so'm).",
         imageFile: 'food_medovik.jpg',
         price: 27000,
-        costPrice: 13500,
-        stock: 10,
+        costPrice: 13000,
+        stock: 120,
         discountPercent: 0,
         status: 'available',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 24,
+        wholesalePrice: 19000,
+      },
+      {
+        name: "Kofe-Breyk Pishiriq To'plami (ofislar uchun)",
+        category: 'cafe',
+        description:
+          'Yunusobod va Bodomzor atrofidagi biznes-markazlar kofe-breyklari uchun shirinlik qutisi (optom 15 tadan).',
+        imageFile: 'food_cheesecake.jpg',
+        price: 45000,
+        costPrice: 21000,
+        stock: 150,
+        discountPercent: 0,
+        status: 'available',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 15,
+        wholesalePrice: 32000,
       },
     ],
   },
@@ -269,7 +377,7 @@ const DEMO_STORES = [
     business: {
       name: "Yetti Mo'jiza Milliy Choyxonasi",
       type: 'teahouse',
-      address: 'Yunusobod tumani, 17-mavze, 7A-uy, Toshkent',
+      address: "Yunusobod tumani, 17-mavze, 7A-uy (Iftixor ko'chasi yo'nalishi), Toshkent",
       phone: '+998 90 917 07 07',
     },
     expenses: [{ title: "Guruch (Lazer) va mol go'shti", amount: 640000, category: 'Xomashyo' }],
@@ -277,35 +385,62 @@ const DEMO_STORES = [
       {
         name: "Toshkent To'y Oshi (1 porsiya)",
         category: 'teahouse',
-        description: "Sariq sabzi, no'xat, mayiz va qazili an'anaviy bayramona palov.",
+        description:
+          "Sariq sabzi, no'xat, mayiz va qazili to'y oshi; Yunusobod va Iftixor atrofidagi marosimlarga (optom 30 porsiyadan 29 500 so'm).",
         imageFile: 'food_plov.jpg',
         price: 38000,
         costPrice: 21000,
-        stock: 25,
+        stock: 300,
         discountPercent: 0,
         status: 'hot_ready',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 30,
+        wholesalePrice: 29500,
       },
       {
         name: "Ko'mirda Qiyma Shashlik (1 six)",
         category: 'teahouse',
-        description: "Saksovul cho'g'ida pishirilgan sersuv qiyma kabob.",
+        description:
+          "Saksovul cho'g'ida pishirilgan sersuv qiyma kabob, to'y va gap-gashtaklar uchun (optom 50 sixdan 17 500 so'm).",
         imageFile: 'food_shashlik.jpg',
         price: 24000,
-        costPrice: 13000,
-        stock: 30,
+        costPrice: 12500,
+        stock: 500,
         discountPercent: 0,
         status: 'hot_ready',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 50,
+        wholesalePrice: 17500,
       },
       {
-        name: "Novvotli Qora Choy (1 L choynak)",
+        name: 'Novvotli Qora Choy (1 L choynak)',
         category: 'teahouse',
-        description: 'Taom bilan birga tortiladigan xushbo‘y navvotli choy.',
+        description:
+          "Tadbir va choyxona stollari uchun xushbo'y navvotli choy partiyasi (optom 20 choynakdan 8 000 so'm).",
         imageFile: 'food_tea.jpg',
         price: 12000,
         costPrice: 3500,
-        stock: 50,
+        stock: 200,
         discountPercent: 0,
         status: 'available',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 20,
+        wholesalePrice: 8000,
+      },
+      {
+        name: 'Bayramona Lazer Palov (1 kg lagan)',
+        category: 'teahouse',
+        description:
+          "Katta oilaviy va ofis tushliklari uchun qazi va bedana tuxumli 1 kg lagan palov (optom 10 kgdan 105 000 so'm).",
+        imageFile: 'food_plov.jpg',
+        price: 135000,
+        costPrice: 74000,
+        stock: 80,
+        discountPercent: 0,
+        status: 'available',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 10,
+        wholesalePrice: 105000,
       },
     ],
   },
@@ -317,7 +452,7 @@ const DEMO_STORES = [
     business: {
       name: "Bog'ishamol Milliy Oshxonasi",
       type: 'kitchen',
-      address: "Yunusobod tumani, Bog'ishamol tor ko'chasi, 131-uy, Toshkent",
+      address: "Yunusobod tumani, Bog'ishamol tor ko'chasi, 131-uy (Teleminora yaqini), Toshkent",
       phone: '+998 90 831 31 00',
     },
     expenses: [],
@@ -325,24 +460,32 @@ const DEMO_STORES = [
       {
         name: 'Choyxona Palovi (maxsus)',
         category: 'kitchen',
-        description: "Devzira guruch va qo'y yog'ida damlangan haqiqiy choyxona oshi.",
+        description:
+          "Devzira guruch va qo'y yog'ida damlangan choyxona palovi; Iftixor va Bog'ishamol atrofiga (optom 25 porsiyadan 34 000 so'm).",
         imageFile: 'food_plov.jpg',
         price: 44000,
         costPrice: 24000,
-        stock: 20,
+        stock: 250,
         discountPercent: 10,
         status: 'hot_ready',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 25,
+        wholesalePrice: 34000,
       },
       {
         name: 'Jaz Shashlik (1 six)',
         category: 'kitchen',
-        description: "Marinadlangan yumshoq mol go'shtidan tayyorlangan jaz kabob.",
+        description:
+          "Marinadlangan yumshoq mol go'shtidan tayyorlangan jaz kabob (optom 50 sixdan 21 500 so'm).",
         imageFile: 'food_shashlik.jpg',
         price: 29000,
-        costPrice: 16000,
-        stock: 18,
+        costPrice: 15500,
+        stock: 400,
         discountPercent: 0,
         status: 'available',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 50,
+        wholesalePrice: 21500,
       },
       {
         name: 'Tomchi Somsa (bugun tugagan namuna)',
@@ -354,6 +497,22 @@ const DEMO_STORES = [
         stock: 0,
         discountPercent: 0,
         status: 'sold_out',
+        wholesaleEnabled: false,
+      },
+      {
+        name: "To'yxona Tandir Somsasi (partiya)",
+        category: 'kitchen',
+        description:
+          "Yunusobod va Toshkent bo'ylab tadbirlar uchun qalin go'shtli tandir somsasi (optom 100 tadan 8 500 so'm).",
+        imageFile: 'food_somsa.jpg',
+        price: 12000,
+        costPrice: 5800,
+        stock: 600,
+        discountPercent: 0,
+        status: 'hot_ready',
+        wholesaleEnabled: true,
+        wholesaleMinQty: 100,
+        wholesalePrice: 8500,
       },
     ],
   },
@@ -409,8 +568,15 @@ async function ensureBusinessAndProducts(db, ownerUid, store, demoPassword, auth
   let businessId;
   let businessStatus;
   if (!existingBizSnap.empty) {
-    businessId = existingBizSnap.docs[0].id;
-    businessStatus = existingBizSnap.docs[0].data().status;
+    const bizDoc = existingBizSnap.docs[0];
+    businessId = bizDoc.id;
+    businessStatus = bizDoc.data().status;
+    if (bizDoc.data().address !== store.business.address) {
+      await updateDoc(bizDoc.ref, {
+        address: store.business.address,
+        updatedAt: serverTimestamp(),
+      });
+    }
   } else {
     const ref = await addDoc(collection(db, 'businesses'), {
       ownerId: ownerUid,
@@ -429,13 +595,52 @@ async function ensureBusinessAndProducts(db, ownerUid, store, demoPassword, auth
   const existingProds = await getDocs(
     query(collection(db, 'products'), where('businessId', '==', businessId))
   );
-  const existingNames = new Set(existingProds.docs.map((d) => d.data().name));
+  const existingByName = new Map(existingProds.docs.map((d) => [d.data().name, d]));
   const createdProductIds = [];
 
   for (const prod of store.products) {
-    if (existingNames.has(prod.name)) {
-      const match = existingProds.docs.find((d) => d.data().name === prod.name);
-      if (match) createdProductIds.push({ id: match.id, ...prod });
+    const wholesaleEnabled = Boolean(prod.wholesaleEnabled);
+    const wholesalePayload = wholesaleEnabled
+      ? {
+          wholesaleEnabled: true,
+          wholesaleMinQty: prod.wholesaleMinQty,
+          wholesalePrice: prod.wholesalePrice,
+        }
+      : {
+          wholesaleEnabled: false,
+          wholesaleMinQty: null,
+          wholesalePrice: null,
+        };
+
+    const match = existingByName.get(prod.name);
+    if (match) {
+      const existingData = match.data();
+      const nextStock =
+        prod.status === 'sold_out'
+          ? 0
+          : wholesaleEnabled
+            ? Math.max(existingData.stock ?? 0, prod.stock)
+            : existingData.stock;
+      const nextStatus =
+        prod.status === 'sold_out'
+          ? 'sold_out'
+          : existingData.status === 'sold_out' && nextStock > 0
+            ? prod.status
+            : existingData.status;
+      await updateDoc(match.ref, {
+        businessAddress: store.business.address,
+        description: prod.description,
+        price: prod.price,
+        stock: nextStock,
+        status: nextStatus,
+        ...wholesalePayload,
+        updatedAt: serverTimestamp(),
+      });
+      await setDoc(doc(db, 'products', match.id, 'private', 'cost'), {
+        costPrice: prod.costPrice,
+        updatedAt: serverTimestamp(),
+      });
+      createdProductIds.push({ id: match.id, ...prod });
       continue;
     }
     const prodRef = await addDoc(collection(db, 'products'), {
@@ -453,6 +658,7 @@ async function ensureBusinessAndProducts(db, ownerUid, store, demoPassword, auth
       status: prod.status,
       stock: prod.stock,
       discountPercent: prod.discountPercent,
+      ...wholesalePayload,
       updatedAt: serverTimestamp(),
     });
     await setDoc(doc(db, 'products', prodRef.id, 'private', 'cost'), {
@@ -478,7 +684,13 @@ async function ensureBusinessAndProducts(db, ownerUid, store, demoPassword, auth
   }
 
   await signOut(auth);
-  return { businessId, businessStatus, business: store.business, products: createdProductIds, store };
+  return {
+    businessId,
+    businessStatus,
+    business: store.business,
+    products: createdProductIds,
+    store,
+  };
 }
 
 async function seedCustomerOrders(auth, db, firstApprovedBiz, customerEmail, customerPass) {
@@ -495,56 +707,129 @@ async function seedCustomerOrders(auth, db, firstApprovedBiz, customerEmail, cus
   const existingOrders = await getDocs(
     query(collection(db, 'orders'), where('customerId', '==', custUid))
   );
-  if (!existingOrders.empty) {
-    await signOut(auth);
-    return existingOrders.docs.map((d) => ({ id: d.id, productId: d.data().productId }));
+  const created = [];
+  const targetProduct = firstApprovedBiz.products[0];
+
+  if (existingOrders.empty) {
+    for (const qty of [4, 2]) {
+      const orderRef = doc(collection(db, 'orders'));
+      const itemRef = doc(collection(orderRef, 'items'));
+      await runTransaction(db, async (tx) => {
+        const pSnap = await tx.get(doc(db, 'products', targetProduct.id));
+        const curStock = pSnap.data().stock;
+        const nextStock = curStock - qty;
+        const total = targetProduct.price * qty;
+        tx.set(orderRef, {
+          customerId: custUid,
+          customerName: 'Azizbek Toshmatov',
+          customerPhone: '+998 90 700 11 22',
+          businessId: firstApprovedBiz.businessId,
+          businessName: firstApprovedBiz.business.name,
+          productId: targetProduct.id,
+          productName: targetProduct.name,
+          orderType: 'retail',
+          quantity: qty,
+          unitPrice: targetProduct.price,
+          totalPrice: total,
+          prepaymentPercent: 50,
+          prepaymentAmount: Math.ceil(total / 2),
+          prepaymentStatus: 'awaiting_advance',
+          advanceReceiptUrl: '',
+          status: 'pending',
+          paymentStatus: 'unpaid',
+          fulfillmentType: 'pickup',
+          deliveryAddress: '',
+          pickupTime: Timestamp.fromMillis(Date.now() + 3600_000),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        tx.set(itemRef, {
+          productId: targetProduct.id,
+          name: targetProduct.name,
+          qty,
+          unitPrice: targetProduct.price,
+        });
+        tx.update(doc(db, 'products', targetProduct.id), {
+          stock: nextStock,
+          status: nextStock === 0 ? 'sold_out' : targetProduct.status,
+          lastCheckoutOrderId: orderRef.id,
+          updatedAt: serverTimestamp(),
+        });
+      });
+      created.push({
+        id: orderRef.id,
+        productId: targetProduct.id,
+        costPrice: targetProduct.costPrice,
+      });
+    }
   }
 
-  const targetProduct = firstApprovedBiz.products[0];
-  const created = [];
-  for (const qty of [4, 2]) {
-    const orderRef = doc(collection(db, 'orders'));
-    const itemRef = doc(collection(orderRef, 'items'));
+  const hasWholesaleSample = existingOrders.docs.some((d) => d.data().orderType === 'wholesale');
+  const wholesaleProduct = firstApprovedBiz.products.find(
+    (p) => p.wholesaleEnabled && p.wholesaleMinQty && p.wholesalePrice
+  );
+  if (!hasWholesaleSample && wholesaleProduct) {
+    const wOrderRef = doc(collection(db, 'orders'));
+    const wItemRef = doc(collection(wOrderRef, 'items'));
     await runTransaction(db, async (tx) => {
-      const pSnap = await tx.get(doc(db, 'products', targetProduct.id));
-      const curStock = pSnap.data().stock;
-      const nextStock = curStock - qty;
-      tx.set(orderRef, {
+      const pRef = doc(db, 'products', wholesaleProduct.id);
+      const pSnap = await tx.get(pRef);
+      const pData = pSnap.data();
+      const qty = wholesaleProduct.wholesaleMinQty;
+      const unitPrice = wholesaleProduct.wholesalePrice;
+      if (
+        !pData ||
+        pData.wholesaleEnabled !== true ||
+        typeof pData.stock !== 'number' ||
+        pData.stock < qty
+      ) {
+        return;
+      }
+      const nextStock = pData.stock - qty;
+      const totalPrice = unitPrice * qty;
+      tx.set(wOrderRef, {
         customerId: custUid,
         customerName: 'Azizbek Toshmatov',
         customerPhone: '+998 90 700 11 22',
         businessId: firstApprovedBiz.businessId,
         businessName: firstApprovedBiz.business.name,
-        productId: targetProduct.id,
-        productName: targetProduct.name,
+        productId: wholesaleProduct.id,
+        productName: wholesaleProduct.name,
+        orderType: 'wholesale',
         quantity: qty,
-        unitPrice: targetProduct.price,
-        totalPrice: targetProduct.price * qty,
+        unitPrice,
+        totalPrice,
+        prepaymentPercent: 50,
+        prepaymentAmount: Math.ceil(totalPrice / 2),
+        prepaymentStatus: 'awaiting_advance',
+        advanceReceiptUrl: '',
         status: 'pending',
         paymentStatus: 'unpaid',
         fulfillmentType: 'pickup',
         deliveryAddress: '',
-        pickupTime: Timestamp.fromMillis(Date.now() + 3600_000),
+        pickupTime: Timestamp.fromMillis(Date.now() + 7200_000),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      tx.set(itemRef, {
-        productId: targetProduct.id,
-        name: targetProduct.name,
+      tx.set(wItemRef, {
+        productId: wholesaleProduct.id,
+        name: wholesaleProduct.name,
         qty,
-        unitPrice: targetProduct.price,
+        unitPrice,
       });
-      tx.update(doc(db, 'products', targetProduct.id), {
+      tx.update(pRef, {
         stock: nextStock,
-        status: nextStock === 0 ? 'sold_out' : targetProduct.status,
-        lastCheckoutOrderId: orderRef.id,
+        status: nextStock === 0 ? 'sold_out' : pData.status,
+        lastCheckoutOrderId: wOrderRef.id,
         updatedAt: serverTimestamp(),
       });
     });
-    created.push({ id: orderRef.id, productId: targetProduct.id, costPrice: targetProduct.costPrice });
   }
+
   await signOut(auth);
-  return created;
+  return created.length > 0
+    ? created
+    : existingOrders.docs.map((d) => ({ id: d.id, productId: d.data().productId }));
 }
 
 async function main() {
@@ -658,15 +943,24 @@ async function main() {
   }
 
   const pendingCount = createdStores.filter((s) => s.businessStatus !== 'approved').length;
+  const totalProducts = createdStores.reduce((n, s) => n + s.products.length, 0);
+  const wholesaleCount = createdStores.reduce(
+    (n, s) => n + s.products.filter((p) => p.wholesaleEnabled).length,
+    0
+  );
   console.log('\n=== DEMO SEED COMPLETE ===');
   console.log(
-    `Businesses: ${createdStores.length} (${createdStores.length - pendingCount} approved, ${pendingCount} pending), Total products: ${createdStores.reduce((n, s) => n + s.products.length, 0)}`
+    `Businesses: ${createdStores.length} (${createdStores.length - pendingCount} approved, ${pendingCount} pending), Total products: ${totalProducts} (${wholesaleCount} wholesale)`
   );
   for (const s of createdStores) {
-    console.log(`  - ${s.business.name} [${s.businessStatus}] -> ${s.store.ownerEmail} / ${demoPassword}`);
+    console.log(
+      `  - ${s.business.name} [${s.businessStatus}] -> ${s.store.ownerEmail} / ${demoPassword}`
+    );
   }
   if (orders) {
-    console.log(`Demo Customer: ${customerEmail} / ${demoPassword} (${orders.length} sample orders)`);
+    console.log(
+      `Demo Customer: ${customerEmail} / ${demoPassword} (${orders.length} sample orders)`
+    );
   } else if (pendingCount > 0) {
     console.log(
       'Note: Businesses are in "pending" status. Approve them in /#/admin (or re-run with --admin-email and --admin-password) to make them visible in Customer /#/feed and seed analytics orders.'
