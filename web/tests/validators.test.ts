@@ -4,9 +4,12 @@ import { getReadableErrorMessage, redactSensitiveTokens } from '../src/services/
 import {
   buildSmsHref,
   buildTelHref,
+  deriveNicknameCandidates,
   escapeHtml,
   formatContactPhoneDisplay,
+  isRealDeliverableEmail,
   isStrongPassword,
+  isValidAppsScriptWebhookUrl,
   isValidContactPhone,
   isValidEmail,
   isValidNickname,
@@ -251,5 +254,21 @@ describe('validators & text sanitization', () => {
         productsSummary: 'Tandir non',
       }).valid
     ).toBe(false);
+  });
+
+  it('validates Apps Script webhook URLs, real deliverable emails, and nickname candidates', () => {
+    expect(
+      isValidAppsScriptWebhookUrl('https://script.google.com/macros/s/AKfycbxTest123_abc/exec')
+    ).toBe(true);
+    expect(isValidAppsScriptWebhookUrl('https://evil.example.com/exec')).toBe(false);
+    expect(isValidAppsScriptWebhookUrl('http://script.google.com/macros/s/abc/exec')).toBe(false);
+
+    expect(isRealDeliverableEmail('asadbektoxtayev.dev@gmail.com')).toBe(true);
+    expect(isRealDeliverableEmail('bogishamol_kitchen@dasturxon.test')).toBe(false);
+    expect(isRealDeliverableEmail('bad-email')).toBe(false);
+
+    const candidates = deriveNicknameCandidates('Asadbek.Dev+1@gmail.com', 'AbCd1234567890');
+    expect(candidates.length).toBeGreaterThanOrEqual(2);
+    expect(candidates.every((c) => isValidNickname(c))).toBe(true);
   });
 });

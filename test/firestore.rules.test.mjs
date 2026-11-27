@@ -963,6 +963,43 @@ test("43. Admin can onboard and approve a business for an owner while non-admins
   }));
 });
 
+// 44. User profile creation enforces token email match when present in Firebase Auth token
+test("44. User cannot create profile with mismatched Firebase token email", async () => {
+  const dbSpoof = testEnv.authenticatedContext("new-user-1", {
+    email: "real@gmail.com"
+  }).firestore();
+  await assertFails(setDoc(doc(dbSpoof, "users/new-user-1"), {
+    fullName: "Real User",
+    email: "victim@gmail.com",
+    role: "customer",
+    createdAt: Timestamp.now()
+  }));
+
+  await assertSucceeds(setDoc(doc(dbSpoof, "users/new-user-1"), {
+    fullName: "Real User",
+    email: "real@gmail.com",
+    role: "customer",
+    createdAt: Timestamp.now()
+  }));
+});
+
+// 45. App settings allow only Admin to save validated Google Apps Script webhook URL
+test("45. Only Admin can write validated Google Apps Script URL in appSettings/notifications", async () => {
+  const dbAnon = testEnv.unauthenticatedContext().firestore();
+  const dbCustomer = testEnv.authenticatedContext("customer-1").firestore();
+  const dbAdmin = testEnv.authenticatedContext("admin-1").firestore();
+  const validUrl = "https://script.google.com/macros/s/AKfycbx12345_testWebhook/exec";
+
+  await assertFails(getDoc(doc(dbAnon, "appSettings/notifications")));
+  await assertFails(setDoc(doc(dbCustomer, "appSettings/notifications"), { emailWebhookUrl: validUrl }));
+  await assertFails(setDoc(doc(dbAdmin, "appSettings/notifications"), { emailWebhookUrl: "https://evil.example/hook" }));
+  await assertFails(setDoc(doc(dbAdmin, "appSettings/other"), { emailWebhookUrl: validUrl }));
+
+  await assertSucceeds(setDoc(doc(dbAdmin, "appSettings/notifications"), { emailWebhookUrl: validUrl }));
+  const readBack = await getDoc(doc(dbCustomer, "appSettings/notifications"));
+  assert.equal(readBack.data().emailWebhookUrl, validUrl);
+});
+
 
 
 

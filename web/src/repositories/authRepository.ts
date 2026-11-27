@@ -1,10 +1,13 @@
 import { FirebaseError } from 'firebase/app';
 import {
+  browserPopupRedirectResolver,
   createUserWithEmailAndPassword,
   deleteUser,
+  GoogleAuthProvider,
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   type Unsubscribe,
 } from 'firebase/auth';
@@ -25,7 +28,9 @@ import {
 } from '../services/constants';
 import { getReadableErrorMessage } from '../services/errors';
 import {
+  deriveNicknameCandidates,
   isStrongPassword,
+  isValidContactPhone,
   isValidEmail,
   isValidNickname,
   normalizeNickname,
@@ -73,6 +78,16 @@ export function mapAuthErrorMessage(err: unknown): string {
         return 'Internet aloqasi yoki Firebase Emulyator ulanishini tekshiring.';
       case 'auth/user-disabled':
         return 'Ushbu hisob vaqtincha bloklangan.';
+      case 'auth/popup-closed-by-user':
+        return "Google oynasi yopildi. Qaytadan urinib ko'ring.";
+      case 'auth/popup-blocked':
+        return 'Brauzer Google kirish oynasini blokladi. Pop-up oynalarga ruxsat bering.';
+      case 'auth/operation-not-allowed':
+        return 'Firebase Console -> Authentication -> Sign-in method bo‘limida Google bilan kirish yoqilmagan.';
+      case 'auth/unauthorized-domain':
+        return 'Ushbu sayt domeni Firebase Console Authorized domains ro‘yxatiga qo‘shilmagan.';
+      case 'auth/account-exists-with-different-credential':
+        return 'Ushbu email boshqa usul bilan ro‘yxatdan o‘tgan. Email va parol bilan kiring.';
       case 'permission-denied':
         return "Ruxsat cheklangan yoki hisob ma'lumotlariga kirish taqiqlangan.";
       default:
@@ -132,6 +147,7 @@ export const authRepository = {
                 status: 'profile_missing',
                 uid: firebaseUser.uid,
                 email: firebaseUser.email ?? '',
+                displayName: firebaseUser.displayName ?? '',
               });
             }, REGISTRATION_PROFILE_DEBOUNCE_MS);
           }
@@ -166,6 +182,127 @@ export const authRepository = {
         throw new Error('Foydalanuvchi profili Firestore bazasida topilmadi.');
       }
       return mapUserDoc(cred.user.uid, snap.data() as Record<string, unknown>);
+    } catch (error) {
+      throw new Error(mapAuthErrorMessage(error));
+    }
+  },
+
+  async completeGoogleProfile(params: {
+    fullName: string;
+    nickname: string;
+    role: RegisterableRole;
+    phone?: string;
+  }): Promise<UserProfile> {
+    const currentUser = getFirebaseAuth().currentUser;
+    if (!currentUser?.email) {
+      throw new Error('Avval Google hisobingiz bilan kiring.');
+    }
+    const cleanFullName = sanitizeUserText(params.fullName, MAX_FULL_NAME_LENGTH);
+    const cleanPhone = sanitizeUserText(params.phone ?? '', MAX_PHONE_LENGTH);
+    const normalized = normalizeNickname(params.nickname);
+    if (!cleanFullName || cleanFullName.length < 2) {
+      throw new Error("To'liq ism kamida 2 belgidan iborat bo'lishi kerak.");
+    }
+    if (!isValidNickname(normalized)) {
+      throw new Error('Nickname 3-20 ta kichik lotin harf, raqam, _ yoki . bo‘lsin.');
+    }
+    if (params.role === 'owner' && !isValidContactPhone(cleanPhone)) {
+      throw new Error("Biznes egasi uchun admin bog'lanadigan telefon raqami majburiy.");
+    }
+
+    const db = getFirebaseDb();
+    try {
+      const existing = await getDoc(doc(db, 'usernames', normalized));
+      if (existing.exists()) {
+        throw new Error('Ushbu nickname allaqachon band. Boshqa nom tanlang.');
+      }
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'users', currentUser.uid), {
+        fullName: cleanFullName,
+        normalizedNickname: normalized,
+        email: currentUser.email,
+        phone: cleanPhone,
+        role: params.role,
+        createdAt: serverTimestamp(),
+      });
+      batch.set(doc(db, 'usernames', normalized), {
+        uid: currentUser.uid,
+        createdAt: serverTimestamp(),
+      });
+      await batch.commit();
+
+      return {
+        uid: currentUser.uid,
+        fullName: cleanFullName,
+        normalizedNickname: normalized,
+        email: currentUser.email,
+        phone: cleanPhone,
+        role: params.role,
+        createdAtMs: Date.now(),
+      };
+    } catch (error) {
+      throw new Error(mapAuthErrorMessage(error));
+    }
+  },
+
+  async signInWithGoogle(params?: {
+    preferredRole?: RegisterableRole;
+    phone?: string;
+  }): Promise<
+    | { status: 'ready'; profile: UserProfile }
+    | { status: 'needs_profile'; uid: string; email: string; displayName: string }
+  > {
+    const auth = getFirebaseAuth();
+    const db = getFirebaseDb();
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    try {
+      const cred = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+      const userSnap = await getDoc(doc(db, 'users', cred.user.uid));
+      if (userSnap.exists()) {
+        return {
+          status: 'ready',
+          profile: mapUserDoc(cred.user.uid, userSnap.data() as Record<string, unknown>),
+        };
+      }
+
+      const cleanPhone = sanitizeUserText(params?.phone ?? '', MAX_PHONE_LENGTH);
+      const canAutoCreate =
+        params?.preferredRole === 'customer' ||
+        (params?.preferredRole === 'owner' && isValidContactPhone(cleanPhone));
+
+      if (!canAutoCreate || !params?.preferredRole) {
+        return {
+          status: 'needs_profile',
+          uid: cred.user.uid,
+          email: cred.user.email ?? '',
+          displayName: cred.user.displayName ?? '',
+        };
+      }
+
+      const candidates = deriveNicknameCandidates(cred.user.email ?? '', cred.user.uid);
+      let freeNick = candidates[candidates.length - 1] ?? 'dasturxon_user';
+      for (const candidate of candidates) {
+        const nickSnap = await getDoc(doc(db, 'usernames', candidate));
+        if (!nickSnap.exists()) {
+          freeNick = candidate;
+          break;
+        }
+      }
+
+      const rawName = sanitizeUserText(
+        cred.user.displayName || cred.user.email?.split('@')[0] || 'Foydalanuvchi',
+        MAX_FULL_NAME_LENGTH
+      );
+      const fullName = rawName.length >= 2 ? rawName : 'Foydalanuvchi';
+      const profile = await this.completeGoogleProfile({
+        fullName,
+        nickname: freeNick,
+        role: params.preferredRole,
+        phone: cleanPhone,
+      });
+      return { status: 'ready', profile };
     } catch (error) {
       throw new Error(mapAuthErrorMessage(error));
     }

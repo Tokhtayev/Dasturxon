@@ -3,6 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { getRoleHomePath } from '../services/routing';
 import type { UserRole } from '../types/domain';
+import { GoogleProfileSetupCard } from './GoogleProfileSetupCard';
 
 export const RoleGuard: React.FC<{ allowedRole: UserRole }> = ({ allowedRole }) => {
   const { session, signOut } = useAuth();
@@ -25,7 +26,17 @@ export const RoleGuard: React.FC<{ allowedRole: UserRole }> = ({ allowedRole }) 
     return <Navigate to="/login" replace />;
   }
 
-  if (session.status === 'profile_missing' || session.status === 'error') {
+  if (session.status === 'profile_missing') {
+    return (
+      <GoogleProfileSetupCard
+        uid={session.uid}
+        email={session.email}
+        displayName={session.displayName}
+      />
+    );
+  }
+
+  if (session.status === 'error') {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div
@@ -33,15 +44,9 @@ export const RoleGuard: React.FC<{ allowedRole: UserRole }> = ({ allowedRole }) 
           style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
         >
           <div className="text-3xl">⚠️</div>
-          <h2 className="font-display text-xl font-bold">
-            {session.status === 'profile_missing'
-              ? 'Foydalanuvchi profili topilmadi'
-              : 'Sessiyada xatolik yuz berdi'}
-          </h2>
+          <h2 className="font-display text-xl font-bold">Sessiyada xatolik yuz berdi</h2>
           <p className="text-sm" style={{ color: 'var(--dx-muted)' }}>
-            {session.status === 'profile_missing'
-              ? `${session.email} uchun Firestore users/{uid} hujjati mavjud emas.`
-              : session.message}
+            {session.message}
           </p>
           <button
             type="button"
@@ -74,6 +79,16 @@ export const GuestOnlyGuard: React.FC = () => {
           style={{ borderColor: 'var(--dx-primary)', borderTopColor: 'transparent' }}
         />
       </div>
+    );
+  }
+
+  if (session.status === 'profile_missing') {
+    return (
+      <GoogleProfileSetupCard
+        uid={session.uid}
+        email={session.email}
+        displayName={session.displayName}
+      />
     );
   }
 

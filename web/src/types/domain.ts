@@ -12,11 +12,25 @@ export interface UserProfile {
   createdAtMs: number;
 }
 
+export type LoginMethod = 'email' | 'google';
+
+export type LoginEmailDeliveryStatus =
+  'sending' | 'sent' | 'skipped_test_domain' | 'not_configured' | 'failed';
+
+export interface LoginNotice {
+  email: string;
+  role: UserRole;
+  fullName: string;
+  method: LoginMethod;
+  emailStatus: LoginEmailDeliveryStatus;
+  timestampMs: number;
+}
+
 export type AuthSessionState =
   | { status: 'loading' }
   | { status: 'signed_out' }
   | { status: 'ready'; profile: UserProfile }
-  | { status: 'profile_missing'; uid: string; email: string }
+  | { status: 'profile_missing'; uid: string; email: string; displayName?: string }
   | { status: 'error'; message: string };
 
 export type BusinessTypeKey =

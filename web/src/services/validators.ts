@@ -8,6 +8,7 @@ import {
   MAX_EXPENSE_TITLE_LENGTH,
   MAX_FULL_NAME_LENGTH,
   MAX_IMAGE_DATA_URL_LENGTH,
+  MAX_NICKNAME_LENGTH,
   MAX_PASSWORD_LENGTH,
   MAX_PHONE_LENGTH,
   MAX_PRICE_SOM,
@@ -16,19 +17,26 @@ import {
   MAX_REJECTION_REASON_LENGTH,
   MAX_STOCK_COUNT,
   MAX_TYPE_NOTE_LENGTH,
+  MAX_WEBHOOK_URL_LENGTH,
   MIN_BUSINESS_ADDRESS_LENGTH,
   MIN_BUSINESS_NAME_LENGTH,
   MIN_EXPENSE_TITLE_LENGTH,
   MIN_FULL_NAME_LENGTH,
+  MIN_NICKNAME_LENGTH,
   MIN_PASSWORD_LENGTH,
   MIN_PHONE_LENGTH,
   MIN_REJECTION_REASON_LENGTH,
   MIN_SUMMARY_LENGTH,
   MIN_TYPE_NOTE_LENGTH,
+  NICKNAME_FALLBACK_UID_LEN,
+  NICKNAME_UID_SUFFIX_LEN,
 } from './constants.ts';
 
 const EMAIL_REGEX = /^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const NICKNAME_REGEX = /^[a-z0-9_.]{3,20}$/;
+const APPS_SCRIPT_WEBHOOK_REGEX =
+  /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/;
+const TEST_EMAIL_DOMAIN_REGEX = /@.*\.(test|example|invalid|localhost)$/i;
 const ASCII_SPACE_CODE = 32;
 const ASCII_DEL_CODE = 127;
 const BIDI_RANGE_START = 0x202a;
@@ -290,4 +298,43 @@ export function sanitizeImageUrl(raw: string | undefined): string {
     throw new Error('Rasm hajmi Firestore hujjat limitidan oshmasligi kerak.');
   }
   return trimmed;
+}
+
+/** Checks that a webhook URL matches the deployed Google Apps Script Web App exec endpoint. */
+export function isValidAppsScriptWebhookUrl(raw: string): boolean {
+  const trimmed = raw.trim();
+  return (
+    trimmed.length > 0 &&
+    trimmed.length <= MAX_WEBHOOK_URL_LENGTH &&
+    APPS_SCRIPT_WEBHOOK_REGEX.test(trimmed)
+  );
+}
+
+/** Returns true when an email can receive real external mail (excludes synthetic .test/.example domains). */
+export function isRealDeliverableEmail(raw: string): boolean {
+  const trimmed = raw.trim();
+  return EMAIL_REGEX.test(trimmed) && !TEST_EMAIL_DOMAIN_REGEX.test(trimmed);
+}
+
+/** Builds ordered valid unique nickname candidates from a user email/name and UID. */
+export function deriveNicknameCandidates(email: string, uid: string): string[] {
+  const local = (email.split('@')[0] || 'user')
+    .toLowerCase()
+    .replace(/[^a-z0-9_.]/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const uidTail = uid.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const shortTail = uidTail.slice(0, NICKNAME_UID_SUFFIX_LEN) || '01';
+  const maxPrefixLen = MAX_NICKNAME_LENGTH - shortTail.length - 1;
+  const cleanPrefix = (local || 'user').slice(0, maxPrefixLen);
+  const firstCandidate =
+    cleanPrefix.length >= MIN_NICKNAME_LENGTH ? cleanPrefix : `user_${shortTail}`;
+  const secondCandidate = `${(local || 'user').slice(0, maxPrefixLen)}_${shortTail}`;
+  const fallback = `u_${uidTail.slice(0, NICKNAME_FALLBACK_UID_LEN) || 'member_01'}`.slice(
+    0,
+    MAX_NICKNAME_LENGTH
+  );
+
+  return [firstCandidate, secondCandidate, fallback].filter(
+    (item, idx, arr) => NICKNAME_REGEX.test(item) && arr.indexOf(item) === idx
+  );
 }

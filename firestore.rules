@@ -45,6 +45,7 @@ service cloud.firestore {
       allow create: if isOwner(userId)
         && request.resource.data.role in ['customer', 'owner']
         && request.resource.data.email is string
+        && (!('email' in request.auth.token) || request.resource.data.email == request.auth.token.email)
         && request.resource.data.fullName is string
         && request.resource.data.fullName.size() >= 2
         && request.resource.data.fullName.size() <= 100;
@@ -355,6 +356,25 @@ service cloud.firestore {
 
       // Update & Delete: Admin records legalForm (MChJ/YaTT), businessType, address, activity/products summary, and replies
       allow update, delete: if isAdmin();
+    }
+
+    // ------------------------------------------------------------------------
+    // App Settings Collection: /appSettings/{settingId}
+    // ------------------------------------------------------------------------
+    match /appSettings/{settingId} {
+      // Signed-in users need the validated Apps Script webhook endpoint for sign-in email notifications
+      allow read: if isSignedIn();
+
+      // Only Admin may store a validated Google Apps Script Web App URL
+      allow create, update: if isAdmin()
+        && settingId == 'notifications'
+        && (!('emailWebhookUrl' in request.resource.data) ||
+            request.resource.data.emailWebhookUrl == '' ||
+            (request.resource.data.emailWebhookUrl is string &&
+             request.resource.data.emailWebhookUrl.size() <= 300 &&
+             request.resource.data.emailWebhookUrl.matches('^https://script\\.google\\.com/macros/s/[A-Za-z0-9_-]+/exec$')));
+
+      allow delete: if isAdmin();
     }
   }
 }

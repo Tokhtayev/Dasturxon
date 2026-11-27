@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { AdminContactModal } from '../components/AdminContactModal';
 import { DxLogo } from '../components/DxLogo';
+import { GoogleAuthButton } from '../components/GoogleAuthButton';
 import { useAuth } from '../hooks/useAuth';
 import { ADMIN_SUPPORT_PHONE } from '../services/constants';
 import { getReadableErrorMessage } from '../services/errors';
@@ -88,7 +89,7 @@ export const LoginPage: React.FC<{ initialTab?: AuthTab }> = ({ initialTab = 'lo
 };
 
 const LoginTabPanel: React.FC = () => {
-  const { signIn, resetPassword, firebaseReady } = useAuth();
+  const { signIn, signInWithGoogle, resetPassword, firebaseReady } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -114,6 +115,20 @@ const LoginTabPanel: React.FC = () => {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setError(null);
+    setResetMessage(null);
+    if (!firebaseReady) return setError('Firebase Web SDK sozlanmagan (.env faylini tekshiring).');
+    setSubmitting(true);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setError(getReadableErrorMessage(err, 'Google orqali kirishda xatolik yuz berdi.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleForgotPassword = async () => {
     setError(null);
     setResetMessage(null);
@@ -132,19 +147,27 @@ const LoginTabPanel: React.FC = () => {
   };
 
   return (
-    <LoginForm
-      email={email}
-      onEmailChange={setEmail}
-      password={password}
-      onPasswordChange={setPassword}
-      showPassword={showPassword}
-      onTogglePassword={() => setShowPassword((v) => !v)}
-      submitting={submitting}
-      error={error}
-      resetMessage={resetMessage}
-      onForgotPassword={() => void handleForgotPassword()}
-      onSubmit={handleSubmit}
-    />
+    <div className="space-y-4">
+      <LoginForm
+        email={email}
+        onEmailChange={setEmail}
+        password={password}
+        onPasswordChange={setPassword}
+        showPassword={showPassword}
+        onTogglePassword={() => setShowPassword((v) => !v)}
+        submitting={submitting}
+        error={error}
+        resetMessage={resetMessage}
+        onForgotPassword={() => void handleForgotPassword()}
+        onSubmit={handleSubmit}
+      />
+      <AuthOrDivider />
+      <GoogleAuthButton
+        label="Google (Gmail) bilan kirish"
+        disabled={submitting}
+        onClick={() => void handleGoogleLogin()}
+      />
+    </div>
   );
 };
 
@@ -199,8 +222,19 @@ const OwnerAdminHelpBox: React.FC<{ onOpenInquiry: () => void }> = ({ onOpenInqu
   );
 };
 
+const AuthOrDivider: React.FC = () => (
+  <div
+    className="flex items-center gap-3 text-[11px] font-bold"
+    style={{ color: 'var(--dx-muted)' }}
+  >
+    <span className="h-px flex-1" style={{ backgroundColor: 'var(--dx-border)' }} />
+    <span>yoki</span>
+    <span className="h-px flex-1" style={{ backgroundColor: 'var(--dx-border)' }} />
+  </div>
+);
+
 const RegisterTabPanel: React.FC = () => {
-  const { signUp, firebaseReady } = useAuth();
+  const { signUp, signInWithGoogle, firebaseReady } = useAuth();
   const [role, setRole] = useState<RegisterableRole>('customer');
   const [fullName, setFullName] = useState('');
   const [nickname, setNickname] = useState('');
@@ -233,10 +267,33 @@ const RegisterTabPanel: React.FC = () => {
     }
   };
 
+  const handleGoogleSignUp = async () => {
+    setError(null);
+    if (!firebaseReady) return setError('Firebase Web SDK sozlanmagan (.env faylini tekshiring).');
+    setSubmitting(true);
+    try {
+      await signInWithGoogle(role, phone);
+    } catch (err) {
+      setError(getReadableErrorMessage(err, 'Google bilan kirishda xatolik yuz berdi.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-3.5">
         <RoleSelector role={role} onChange={setRole} />
+        <GoogleAuthButton
+          label={
+            role === 'owner'
+              ? 'Google bilan Biznes egasi sifatida kirish'
+              : 'Google bilan Mijoz sifatida kirish'
+          }
+          disabled={submitting}
+          onClick={() => void handleGoogleSignUp()}
+        />
+        <AuthOrDivider />
         {role === 'owner' ? (
           <OwnerAdminHelpBox onOpenInquiry={() => setContactModalOpen(true)} />
         ) : (

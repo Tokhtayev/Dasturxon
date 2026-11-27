@@ -1,7 +1,8 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LogOut, Moon, Sun } from 'lucide-react';
+import { CheckCircle2, LogOut, Mail, Moon, Sun, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import type { LoginNotice, UserRole } from '../types/domain';
 import { DxLogo } from './DxLogo';
 
 export interface NavItem {
@@ -20,6 +21,57 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
+const ROLE_TITLES: Record<UserRole, string> = {
+  customer: 'Mijoz',
+  owner: 'Biznes egasi',
+  admin: 'Administrator',
+};
+
+const EMAIL_STATUS_LABELS: Record<LoginNotice['emailStatus'], string> = {
+  sending: 'Gmail manzilingizga tasdiq xabarnomasi yuborilmoqda…',
+  sent: '✉️ Haqiqiy Gmailingizga kirish bildirishnomasi yuborildi (Spam jildini ham tekshiring).',
+  skipped_test_domain: 'ℹ️ Test email (@dasturxon.test) bo‘lgani uchun haqiqiy pochta yuborilmadi.',
+  not_configured:
+    '⚙️ Haqiqiy Gmailga xat borishi uchun Admin panelida Google Apps Script havolasini ulang.',
+  failed: '⚠️ Tizimga kirdingiz, lekin Gmailga xabarnoma yuborishda xatolik yuz berdi.',
+};
+
+const LoginNoticeBanner: React.FC<{ notice: LoginNotice; onDismiss: () => void }> = ({
+  notice,
+  onDismiss,
+}) => (
+  <div
+    role="status"
+    className="mb-5 p-3.5 sm:p-4 rounded-2xl border flex items-start justify-between gap-3"
+    style={{
+      backgroundColor: 'var(--dx-tertiary-container)',
+      borderColor: 'var(--dx-tertiary)',
+      color: 'var(--dx-on-tertiary-container)',
+    }}
+  >
+    <div className="flex items-start gap-2.5 min-w-0">
+      <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+      <div className="space-y-0.5 min-w-0">
+        <div className="text-xs sm:text-sm font-extrabold">
+          Siz {ROLE_TITLES[notice.role]} sifatida tizimga kirdingiz ({notice.email})
+        </div>
+        <div className="text-[11px] sm:text-xs opacity-90 flex items-center gap-1.5">
+          <Mail className="w-3.5 h-3.5 shrink-0" />
+          <span>{EMAIL_STATUS_LABELS[notice.emailStatus]}</span>
+        </div>
+      </div>
+    </div>
+    <button
+      type="button"
+      onClick={onDismiss}
+      aria-label="Xabarnomani yopish"
+      className="p-1 rounded-lg cursor-pointer opacity-80 hover:opacity-100 shrink-0"
+    >
+      <X className="w-4 h-4" />
+    </button>
+  </div>
+);
+
 export const AppShell: React.FC<AppShellProps> = ({
   roleBadge,
   navItems,
@@ -27,7 +79,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   onToggleTheme,
   children,
 }) => {
-  const { session, emulatorMode, signOut } = useAuth();
+  const { session, loginNotice, dismissLoginNotice, emulatorMode, signOut } = useAuth();
   const displayName =
     session.status === 'ready' ? session.profile.fullName || session.profile.email : '';
 
@@ -41,11 +93,11 @@ export const AppShell: React.FC<AppShellProps> = ({
         }}
       >
         <div className="suzani-border-strip w-full" />
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 shrink-0">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 shrink-0 min-w-0">
             <DxLogo size={34} subtitle="Mahalla Bozori" />
             <span
-              className="hidden sm:inline-block shrink-0 whitespace-nowrap text-[11px] font-extrabold px-2.5 py-1 rounded-full"
+              className="inline-flex items-center shrink-0 whitespace-nowrap text-[10px] sm:text-[11px] font-extrabold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full"
               style={{
                 backgroundColor: 'var(--dx-secondary-container)',
                 color: 'var(--dx-on-secondary-container)',
@@ -114,32 +166,39 @@ export const AppShell: React.FC<AppShellProps> = ({
         </div>
       </header>
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-7">{children}</main>
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-7">
+        {loginNotice && <LoginNoticeBanner notice={loginNotice} onDismiss={dismissLoginNotice} />}
+        {children}
+      </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-30 border-t px-1.5 py-1.5 grid gap-1 backdrop-blur-md"
-        style={{
-          gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))`,
-          backgroundColor: 'color-mix(in srgb, var(--dx-surface) 95%, transparent)',
-          borderColor: 'var(--dx-border)',
-        }}
-      >
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className="py-1.5 px-1 rounded-xl flex flex-col items-center gap-0.5 text-[11px] font-bold transition-colors"
-            style={({ isActive }) => ({
-              backgroundColor: isActive ? 'var(--dx-primary-container)' : 'transparent',
-              color: isActive ? 'var(--dx-on-primary-container)' : 'var(--dx-muted)',
-            })}
-          >
-            {item.icon}
-            <span className="truncate max-w-full">{item.label}</span>
-          </NavLink>
-        ))}
-      </nav>
+      <MobileBottomNav navItems={navItems} />
     </div>
   );
 };
+
+const MobileBottomNav: React.FC<{ navItems: NavItem[] }> = ({ navItems }) => (
+  <nav
+    className="md:hidden fixed bottom-0 left-0 right-0 z-30 border-t px-1.5 py-1.5 grid gap-1 backdrop-blur-md"
+    style={{
+      gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))`,
+      backgroundColor: 'color-mix(in srgb, var(--dx-surface) 95%, transparent)',
+      borderColor: 'var(--dx-border)',
+    }}
+  >
+    {navItems.map((item) => (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        className="py-1.5 px-1 rounded-xl flex flex-col items-center gap-0.5 text-[11px] font-bold transition-colors"
+        style={({ isActive }) => ({
+          backgroundColor: isActive ? 'var(--dx-primary-container)' : 'transparent',
+          color: isActive ? 'var(--dx-on-primary-container)' : 'var(--dx-muted)',
+        })}
+      >
+        {item.icon}
+        <span className="truncate max-w-full">{item.label}</span>
+      </NavLink>
+    ))}
+  </nav>
+);

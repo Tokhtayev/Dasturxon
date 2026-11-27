@@ -20,6 +20,15 @@ export const MIN_SUMMARY_LENGTH = 3;
 export const MAX_BUSINESS_SUMMARY_LENGTH = 400;
 export const MAX_ADMIN_NOTE_LENGTH = 400;
 export const ADMIN_SUPPORT_PHONE = '+998 90 123 45 67';
+export const DEFAULT_LOGIN_EMAIL_WEBHOOK_URL = (
+  import.meta.env.VITE_LOGIN_EMAIL_WEBHOOK_URL ?? ''
+).trim();
+export const MAX_WEBHOOK_URL_LENGTH = 300;
+export const USER_AGENT_TRUNCATE_LEN = 120;
+export const MIN_NICKNAME_LENGTH = 3;
+export const MAX_NICKNAME_LENGTH = 20;
+export const NICKNAME_UID_SUFFIX_LEN = 4;
+export const NICKNAME_FALLBACK_UID_LEN = 12;
 
 export const MAX_PRODUCT_NAME_LENGTH = 100;
 export const MAX_PRODUCT_DESCRIPTION_LENGTH = 400;

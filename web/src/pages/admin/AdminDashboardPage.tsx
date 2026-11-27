@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Edit3, MessageSquareText, PhoneCall, Store } from 'lucide-react';
 import { AdminBusinessReviewModal } from '../../components/admin/AdminBusinessReviewModal';
+import { AdminGmailWebhookCard } from '../../components/admin/AdminGmailWebhookCard';
 import { RejectBusinessModal } from '../../components/admin/RejectBusinessModal';
 import { useAdminBusinesses } from '../../hooks/useAdminBusinesses';
 import { useAuth } from '../../hooks/useAuth';
@@ -135,6 +136,8 @@ export const AdminDashboardPage: React.FC = () => {
         totalInqCount={inquiries.length}
         onTabChange={setTab}
       />
+
+      <AdminGmailWebhookCard />
 
       {(error || actionErr) && (
         <div

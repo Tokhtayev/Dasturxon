@@ -1,5 +1,6 @@
 import { getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import {
+  browserPopupRedirectResolver,
   connectAuthEmulator,
   indexedDBLocalPersistence,
   initializeAuth,
@@ -57,6 +58,7 @@ function ensureInitialized(): void {
     // Store Auth tokens strictly in IndexedDB (never localStorage or sessionStorage)
     authInstance = initializeAuth(appInstance, {
       persistence: indexedDBLocalPersistence,
+      popupRedirectResolver: browserPopupRedirectResolver,
     });
   }
   if (!dbInstance) {
