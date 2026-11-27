@@ -77,6 +77,7 @@ export function buildOwnerActions({ ownerId, business, costMap, setCostMap }: Ow
       status: ProductStatus;
       published: boolean;
       wholesaleEnabled?: boolean;
+      wholesaleOnly?: boolean;
       wholesaleMinQty?: number | null;
       wholesalePrice?: number | null;
     }) => {
@@ -99,6 +100,7 @@ export function buildOwnerActions({ ownerId, business, costMap, setCostMap }: Ow
       status: ProductStatus;
       published: boolean;
       wholesaleEnabled?: boolean;
+      wholesaleOnly?: boolean;
       wholesaleMinQty?: number | null;
       wholesalePrice?: number | null;
     }) => {

@@ -41,12 +41,17 @@ export const OwnerProductsPage: React.FC = () => {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [filterMode, setFilterMode] = useState<'all' | 'wholesale'>('all');
+  const [filterMode, setFilterMode] = useState<'all' | 'retail' | 'wholesale'>('all');
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const retailCount = products.filter((p) => !p.wholesaleOnly).length;
   const wholesaleCount = products.filter((p) => p.wholesaleEnabled).length;
   const visibleProducts =
-    filterMode === 'wholesale' ? products.filter((p) => p.wholesaleEnabled) : products;
+    filterMode === 'wholesale'
+      ? products.filter((p) => p.wholesaleEnabled)
+      : filterMode === 'retail'
+        ? products.filter((p) => !p.wholesaleOnly)
+        : products;
 
   const handleSave = async (params: ProductFormSaveParams) => {
     if (params.productId) {
@@ -102,6 +107,7 @@ export const OwnerProductsPage: React.FC = () => {
       <OwnerProductFilterTabs
         filterMode={filterMode}
         totalCount={products.length}
+        retailCount={retailCount}
         wholesaleCount={wholesaleCount}
         onSelect={setFilterMode}
       />
@@ -153,15 +159,17 @@ export const OwnerProductsPage: React.FC = () => {
 };
 
 const OwnerProductFilterTabs: React.FC<{
-  filterMode: 'all' | 'wholesale';
+  filterMode: 'all' | 'retail' | 'wholesale';
   totalCount: number;
+  retailCount: number;
   wholesaleCount: number;
-  onSelect: (mode: 'all' | 'wholesale') => void;
-}> = ({ filterMode, totalCount, wholesaleCount, onSelect }) => (
-  <div className="flex gap-2">
+  onSelect: (mode: 'all' | 'retail' | 'wholesale') => void;
+}> = ({ filterMode, totalCount, retailCount, wholesaleCount, onSelect }) => (
+  <div className="flex flex-wrap gap-2">
     {(
       [
         ['all', `Barchasi (${totalCount})`],
+        ['retail', `🛒 Oddiy vitrina (${retailCount})`],
         ['wholesale', `📦 Optom (${wholesaleCount})`],
       ] as const
     ).map(([key, label]) => (
@@ -253,7 +261,8 @@ const OwnerProductCard: React.FC<OwnerProductCardProps> = ({
               color: 'var(--dx-on-secondary-container)',
             }}
           >
-            📦 Optom: {product.wholesaleMinQty}+ ta · {formatSoM(product.wholesalePrice)}
+            📦 {product.wholesaleOnly ? 'Faqat Optom: ' : 'Optom: '}
+            {product.wholesaleMinQty}+ ta · {formatSoM(product.wholesalePrice)}
           </span>
         )}
         <span style={{ color: 'var(--dx-secondary)' }}>

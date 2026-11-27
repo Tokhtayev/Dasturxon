@@ -58,6 +58,7 @@ export function mapProductDoc(id: string, data: Record<string, unknown>): Produc
     imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
     updatedAtMs: toMillis(data.updatedAt),
     wholesaleEnabled: data.wholesaleEnabled === true,
+    wholesaleOnly: data.wholesaleOnly === true && data.wholesaleEnabled === true,
     wholesaleMinQty: typeof data.wholesaleMinQty === 'number' ? data.wholesaleMinQty : null,
     wholesalePrice: typeof data.wholesalePrice === 'number' ? data.wholesalePrice : null,
   };
@@ -171,6 +172,7 @@ export const productRepository = {
     status: ProductStatus;
     published: boolean;
     wholesaleEnabled?: boolean;
+    wholesaleOnly?: boolean;
     wholesaleMinQty?: number | null;
     wholesalePrice?: number | null;
   }): Promise<string> {
@@ -210,6 +212,7 @@ export const productRepository = {
       status: params.status,
       discountPercent: Math.round(params.discountPercent),
       wholesaleEnabled: wholesaleActive,
+      wholesaleOnly: wholesaleActive && Boolean(params.wholesaleOnly),
       updatedAt: serverTimestamp(),
     };
     if (params.stock !== null) publicPayload.stock = Math.round(params.stock);
@@ -246,6 +249,7 @@ export const productRepository = {
     status: ProductStatus;
     published: boolean;
     wholesaleEnabled?: boolean;
+    wholesaleOnly?: boolean;
     wholesaleMinQty?: number | null;
     wholesalePrice?: number | null;
   }): Promise<void> {
@@ -285,6 +289,7 @@ export const productRepository = {
           ? Timestamp.fromMillis(params.discountEndsAtMs)
           : deleteField(),
       wholesaleEnabled: wholesaleActive,
+      wholesaleOnly: wholesaleActive && Boolean(params.wholesaleOnly),
       wholesaleMinQty:
         wholesaleActive && params.wholesaleMinQty
           ? Math.round(params.wholesaleMinQty)

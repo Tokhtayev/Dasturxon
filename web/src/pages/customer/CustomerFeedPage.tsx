@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Boxes } from 'lucide-react';
 import { FeedFilterControls } from '../../components/customer/FeedFilterControls';
@@ -31,6 +31,11 @@ export const CustomerFeedPage: React.FC = () => {
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [checkoutProduct, setCheckoutProduct] = useState<Product | null>(null);
+
+  const retailProducts = useMemo(
+    () => filteredProducts.filter((p) => !p.wholesaleOnly),
+    [filteredProducts]
+  );
 
   const handleSubmitOrder = async (params: {
     quantity: number;
@@ -71,25 +76,7 @@ export const CustomerFeedPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl sm:text-3xl font-extrabold">Mahalla Bozori</h1>
-          <p className="text-xs sm:text-sm mt-0.5" style={{ color: 'var(--dx-muted)' }}>
-            Tasdiqlangan mahalliy bizneslar: {businesses.length} ta · Jonli mahsulotlar
-          </p>
-        </div>
-        <Link
-          to="/wholesale"
-          className="px-3.5 py-2 rounded-xl border text-xs font-extrabold inline-flex items-center gap-1.5"
-          style={{
-            backgroundColor: 'var(--dx-secondary-container)',
-            borderColor: 'var(--dx-secondary)',
-            color: 'var(--dx-on-secondary-container)',
-          }}
-        >
-          <Boxes className="w-4 h-4" /> Optom bozor →
-        </Link>
-      </div>
+      <FeedHeroHeader businessCount={businesses.length} productCount={retailProducts.length} />
 
       <FeedFilterControls
         searchQuery={searchQuery}
@@ -114,7 +101,7 @@ export const CustomerFeedPage: React.FC = () => {
         <FeedSkeletons />
       ) : (
         <FeedProductGrid
-          products={filteredProducts}
+          products={retailProducts}
           onSelect={setSelectedProduct}
           onOrder={setCheckoutProduct}
         />
@@ -139,6 +126,31 @@ export const CustomerFeedPage: React.FC = () => {
     </div>
   );
 };
+
+const FeedHeroHeader: React.FC<{ businessCount: number; productCount: number }> = ({
+  businessCount,
+  productCount,
+}) => (
+  <div className="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 className="font-display text-2xl sm:text-3xl font-extrabold">Mahalla Bozori</h1>
+      <p className="text-xs sm:text-sm mt-0.5" style={{ color: 'var(--dx-muted)' }}>
+        Kundalik mahalliy vitrina · {businessCount} ta biznes, {productCount} ta chakana taom va non
+      </p>
+    </div>
+    <Link
+      to="/wholesale"
+      className="px-3.5 py-2 rounded-xl border text-xs font-extrabold inline-flex items-center gap-1.5"
+      style={{
+        backgroundColor: 'var(--dx-secondary-container)',
+        borderColor: 'var(--dx-secondary)',
+        color: 'var(--dx-on-secondary-container)',
+      }}
+    >
+      <Boxes className="w-4 h-4" /> Optom bozor →
+    </Link>
+  </div>
+);
 
 const FeedSkeletons: React.FC = () => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -30,29 +30,43 @@ export const WholesaleProductCard: React.FC<WholesaleProductCardProps> = ({
   return (
     <div
       onClick={() => onSelect(product)}
-      className="rounded-2xl border overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md flex flex-col justify-between"
+      className="rounded-2xl border overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md flex flex-col sm:flex-row"
       style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
     >
-      <div>
-        <WholesaleCardCover
-          product={product}
-          visual={visual}
-          minQty={minQty}
-          savingsPct={savingsPct}
-          unavailable={unavailable}
-        />
+      <WholesaleCardMedia
+        product={product}
+        visual={visual}
+        minQty={minQty}
+        savingsPct={savingsPct}
+        unavailable={unavailable}
+      />
 
-        <div className="p-4 space-y-2">
+      <div className="p-4 flex-1 min-w-0 flex flex-col justify-between gap-3">
+        <div className="space-y-1.5">
           <div
             className="flex items-center justify-between gap-2 text-[11px]"
             style={{ color: 'var(--dx-muted)' }}
           >
             <span className="font-bold truncate inline-flex items-center gap-1">
-              <Store className="w-3 h-3" /> {product.businessName}
+              <Store className="w-3 h-3 shrink-0" /> {product.businessName}
             </span>
-            {product.stock !== null && !unavailable && <span>Zaxira: {product.stock} ta</span>}
+            {product.stock !== null && !unavailable && (
+              <span
+                className="font-bold px-2 py-0.5 rounded-full shrink-0"
+                style={{
+                  backgroundColor: 'var(--dx-tertiary-container)',
+                  color: 'var(--dx-on-tertiary-container)',
+                }}
+              >
+                Ombor: {product.stock} ta
+              </span>
+            )}
           </div>
-          <h3 className="font-bold text-base truncate">{product.name}</h3>
+
+          <h3 className="font-display font-extrabold text-base leading-snug line-clamp-2">
+            {product.name}
+          </h3>
+
           {product.businessAddress && (
             <div
               className="text-[11px] truncate inline-flex items-center gap-1 max-w-full"
@@ -63,65 +77,96 @@ export const WholesaleProductCard: React.FC<WholesaleProductCardProps> = ({
             </div>
           )}
 
-          <div
-            className="p-2.5 rounded-xl text-xs space-y-0.5"
-            style={{ backgroundColor: 'var(--dx-bg)' }}
-          >
-            <div className="flex items-center justify-between">
-              <span style={{ color: 'var(--dx-muted)' }}>Minimal partiya ({minQty} ta):</span>
-              <span className="font-extrabold" style={{ color: 'var(--dx-primary)' }}>
-                {formatSoM(minBatchTotal)}
-              </span>
-            </div>
-            <div className="text-[11px]" style={{ color: 'var(--dx-tertiary)' }}>
-              50% avans: {formatSoM(Math.ceil(minBatchTotal / 2))}
-            </div>
-          </div>
+          {product.description && (
+            <p className="text-xs line-clamp-2" style={{ color: 'var(--dx-muted)' }}>
+              {product.description}
+            </p>
+          )}
         </div>
-      </div>
 
-      <div className="px-4 pb-4 pt-1 flex items-center justify-between gap-2">
-        <div>
-          <div className="font-extrabold text-sm" style={{ color: 'var(--dx-primary)' }}>
-            {formatSoM(wholesalePrice)} / dona
+        <WholesalePricingMatrix
+          minQty={minQty}
+          wholesalePrice={wholesalePrice}
+          retailRefPrice={product.price}
+          minBatchTotal={minBatchTotal}
+        />
+
+        <div className="flex items-center justify-between gap-2 pt-0.5">
+          <div className="text-[11px]" style={{ color: 'var(--dx-muted)' }}>
+            50% avans: <strong>{formatSoM(Math.ceil(minBatchTotal / 2))}</strong>
           </div>
-          {product.price > wholesalePrice && (
-            <div className="text-[11px] line-through" style={{ color: 'var(--dx-muted)' }}>
-              {formatSoM(product.price)} oddiy
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          {cleanPhone && (
-            <a
-              href={buildTelHref(cleanPhone)}
-              onClick={(e) => e.stopPropagation()}
-              aria-label="Qo‘ng‘iroq qilish"
-              className="p-2 rounded-xl border"
-              style={{ borderColor: 'var(--dx-border)', color: 'var(--dx-secondary)' }}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {cleanPhone && (
+              <a
+                href={buildTelHref(cleanPhone)}
+                onClick={(e) => e.stopPropagation()}
+                aria-label="Qo‘ng‘iroq qilish"
+                className="p-2 rounded-xl border"
+                style={{ borderColor: 'var(--dx-border)', color: 'var(--dx-secondary)' }}
+              >
+                <PhoneCall className="w-3.5 h-3.5" />
+              </a>
+            )}
+            <button
+              type="button"
+              disabled={unavailable}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOrderWholesale(product);
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-extrabold disabled:opacity-45 cursor-pointer"
+              style={{ backgroundColor: 'var(--dx-secondary)', color: '#FFFFFF' }}
             >
-              <PhoneCall className="w-3.5 h-3.5" />
-            </a>
-          )}
-          <button
-            type="button"
-            disabled={unavailable}
-            onClick={(e) => {
-              e.stopPropagation();
-              onOrderWholesale(product);
-            }}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold disabled:opacity-45 cursor-pointer"
-            style={{ backgroundColor: 'var(--dx-primary)', color: 'var(--dx-on-primary)' }}
-          >
-            Optom olish
-          </button>
+              Partiya buyurtma
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-const WholesaleCardCover: React.FC<{
+const WholesalePricingMatrix: React.FC<{
+  minQty: number;
+  wholesalePrice: number;
+  retailRefPrice: number;
+  minBatchTotal: number;
+}> = ({ minQty, wholesalePrice, retailRefPrice, minBatchTotal }) => (
+  <div
+    className="grid grid-cols-3 gap-2 p-2.5 rounded-xl border text-[11px]"
+    style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+  >
+    <div>
+      <div style={{ color: 'var(--dx-muted)' }}>1 dona optom</div>
+      <div className="font-extrabold text-xs" style={{ color: 'var(--dx-secondary)' }}>
+        {formatSoM(wholesalePrice)}
+      </div>
+      {retailRefPrice > wholesalePrice && (
+        <div className="text-[10px] line-through" style={{ color: 'var(--dx-muted)' }}>
+          {formatSoM(retailRefPrice)}
+        </div>
+      )}
+    </div>
+    <div>
+      <div style={{ color: 'var(--dx-muted)' }}>Min. partiya</div>
+      <div className="font-extrabold text-xs">{minQty} dona</div>
+      <div className="text-[10px]" style={{ color: 'var(--dx-muted)' }}>
+        10 000 gacha
+      </div>
+    </div>
+    <div>
+      <div style={{ color: 'var(--dx-muted)' }}>Partiya jami</div>
+      <div className="font-extrabold text-xs" style={{ color: 'var(--dx-primary)' }}>
+        {formatSoM(minBatchTotal)}
+      </div>
+      <div className="text-[10px]" style={{ color: 'var(--dx-tertiary)' }}>
+        50% avansli
+      </div>
+    </div>
+  </div>
+);
+
+const WholesaleCardMedia: React.FC<{
   product: Product;
   visual: { icon: string; gradient: string };
   minQty: number;
@@ -129,7 +174,7 @@ const WholesaleCardCover: React.FC<{
   unavailable: boolean;
 }> = ({ product, visual, minQty, savingsPct, unavailable }) => (
   <div
-    className="relative h-36 flex items-center justify-center"
+    className="relative h-40 sm:h-auto sm:w-44 shrink-0 flex items-center justify-center"
     style={{ background: visual.gradient }}
   >
     {product.imageUrl ? (
@@ -137,24 +182,20 @@ const WholesaleCardCover: React.FC<{
     ) : (
       <span className="text-5xl drop-shadow-md select-none">{visual.icon}</span>
     )}
-    <span
-      className="absolute top-2.5 left-2.5 inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full"
-      style={{
-        backgroundColor: 'var(--dx-secondary-container)',
-        color: 'var(--dx-on-secondary-container)',
-      }}
-    >
-      <Boxes className="w-3 h-3" /> Min: {minQty} dona
+    <span className="absolute top-2.5 left-2.5 inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-stone-900/80 text-white">
+      <Boxes className="w-3 h-3" /> {minQty}+ ta
     </span>
     {savingsPct > 0 && (
-      <span className="absolute top-2.5 right-2.5 text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-[#0F7C84] text-white">
-        -{savingsPct}% optom
+      <span className="absolute bottom-2.5 left-2.5 text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-[#0F7C84] text-white">
+        -{savingsPct}% ulgurji
       </span>
     )}
     {unavailable && (
-      <div className="absolute inset-0 bg-black/50 flex items-center justify-center px-3 text-center">
+      <div className="absolute inset-0 bg-black/55 flex items-center justify-center px-3 text-center">
         <span className="px-3 py-1 rounded-xl text-xs font-extrabold bg-white text-stone-900">
-          {product.status === 'sold_out' ? 'Tugagan' : `Zaxira ${product.stock} ta (min ${minQty})`}
+          {product.status === 'sold_out'
+            ? 'Partiya tugagan'
+            : `Ombor ${product.stock} ta (min ${minQty})`}
         </span>
       </div>
     )}

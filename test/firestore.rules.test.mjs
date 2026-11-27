@@ -1081,12 +1081,20 @@ test("47. Wholesale orders allow 200+ units at wholesalePrice while blocking bel
   const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
   const dbCust = testEnv.authenticatedContext("customer-1").firestore();
 
-  // Owner creates wholesale bread product: 5000 retail, 2700 wholesale from min 200 units, stock 500
+  // wholesaleOnly cannot be enabled when wholesaleEnabled is false
+  await assertFails(setDoc(doc(dbOwner, "products/prod-invalid-wholesale-only"), validProduct({
+    name: "Broken Wholesale Only",
+    wholesaleEnabled: false,
+    wholesaleOnly: true,
+  })));
+
+  // Owner creates wholesale-only bread product: 5000 retail ref, 2700 wholesale from min 200 units, stock 500
   await assertSucceeds(setDoc(doc(dbOwner, "products/prod-optom-non"), validProduct({
     name: "Optom Tandir Non",
     price: 5000,
     stock: 500,
     wholesaleEnabled: true,
+    wholesaleOnly: true,
     wholesaleMinQty: 200,
     wholesalePrice: 2700,
   })));

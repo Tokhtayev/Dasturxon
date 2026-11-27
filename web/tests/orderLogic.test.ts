@@ -104,6 +104,13 @@ describe('orderLogic', () => {
     expect(() =>
       resolveOrderModePricing({ product: bread, quantity: 100, orderType: 'wholesale' })
     ).toThrow('kamida 200 dona');
+    expect(() =>
+      resolveOrderModePricing({
+        product: { ...bread, wholesaleOnly: true },
+        quantity: 2,
+        orderType: 'retail',
+      })
+    ).toThrow('faqat optom');
     expect(getWholesaleSavingsPercent(bread)).toBe(46);
   });
 });

@@ -92,7 +92,8 @@ export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
   onSubmitOrder,
 }) => {
   const hasWholesale = isWholesaleEligible(product);
-  const startWholesale = hasWholesale && initialOrderType === 'wholesale';
+  const wholesaleOnly = Boolean(hasWholesale && product.wholesaleOnly);
+  const startWholesale = wholesaleOnly || (hasWholesale && initialOrderType === 'wholesale');
   const [orderType, setOrderType] = useState<OrderType>(startWholesale ? 'wholesale' : 'retail');
   const [qty, setQty] = useState(() =>
     startWholesale ? (product.wholesaleMinQty ?? 2) : MIN_ORDER_QUANTITY
@@ -251,14 +252,17 @@ const CheckoutModalBody: React.FC<CheckoutModalBodyProps> = (props) => (
         unitPrice={props.unitPrice}
         orderType={props.orderType}
       />
-      {props.hasWholesale && props.product.wholesaleMinQty && props.product.wholesalePrice && (
-        <CheckoutOrderTypeToggle
-          orderType={props.orderType}
-          wholesaleMinQty={props.product.wholesaleMinQty}
-          wholesalePrice={props.product.wholesalePrice}
-          onChange={props.onModeChange}
-        />
-      )}
+      {props.hasWholesale &&
+        !props.product.wholesaleOnly &&
+        props.product.wholesaleMinQty &&
+        props.product.wholesalePrice && (
+          <CheckoutOrderTypeToggle
+            orderType={props.orderType}
+            wholesaleMinQty={props.product.wholesaleMinQty}
+            wholesalePrice={props.product.wholesalePrice}
+            onChange={props.onModeChange}
+          />
+        )}
       <QuantitySelector
         qty={props.qty}
         minQty={props.minQty}

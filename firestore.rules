@@ -165,7 +165,11 @@ service cloud.firestore {
              request.resource.data.wholesaleMinQty <= 10000 &&
              request.resource.data.wholesalePrice is int &&
              request.resource.data.wholesalePrice > 0 &&
-             request.resource.data.wholesalePrice < request.resource.data.price));
+             request.resource.data.wholesalePrice < request.resource.data.price))
+        && (!('wholesaleOnly' in request.resource.data) ||
+            (request.resource.data.wholesaleOnly is bool &&
+             (request.resource.data.wholesaleOnly == false ||
+              request.resource.data.wholesaleEnabled == true)));
 
       // Update & Delete:
       // - Business owner or admin can update/delete products (businessId immutable, no costPrice, valid bounds).
@@ -184,7 +188,11 @@ service cloud.firestore {
            request.resource.data.wholesaleMinQty >= 2 &&
            request.resource.data.wholesaleMinQty <= 10000 &&
            request.resource.data.wholesalePrice is int &&
-           request.resource.data.wholesalePrice > 0))) ||
+           request.resource.data.wholesalePrice > 0)) &&
+         (!('wholesaleOnly' in request.resource.data) ||
+          (request.resource.data.wholesaleOnly is bool &&
+           (request.resource.data.wholesaleOnly == false ||
+            request.resource.data.wholesaleEnabled == true)))) ||
         isAdmin() ||
         (
           isBusinessApproved(resource.data.businessId) &&

@@ -18,6 +18,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const visual =
     BUSINESS_TYPE_VISUALS[product.category || product.businessType] ?? BUSINESS_TYPE_VISUALS.other;
   const soldOut = product.status === 'sold_out' || (product.stock !== null && product.stock <= 0);
+  const wholesaleFocused = Boolean(
+    product.wholesaleOnly &&
+    product.wholesaleEnabled &&
+    product.wholesaleMinQty &&
+    product.wholesalePrice
+  );
+  const headlinePrice =
+    wholesaleFocused && product.wholesalePrice
+      ? product.wholesalePrice
+      : getEffectivePrice(product);
+  const showOriginalStrike = wholesaleFocused
+    ? product.price > headlinePrice
+    : isDiscountActive(product);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-xs flex items-center justify-center p-4">
@@ -54,15 +67,24 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <div
             className="p-3.5 rounded-2xl flex items-center justify-between"
             style={{
-              backgroundColor: 'var(--dx-primary-container)',
-              color: 'var(--dx-on-primary-container)',
+              backgroundColor: wholesaleFocused
+                ? 'var(--dx-secondary-container)'
+                : 'var(--dx-primary-container)',
+              color: wholesaleFocused
+                ? 'var(--dx-on-secondary-container)'
+                : 'var(--dx-on-primary-container)',
             }}
           >
             <div>
-              {isDiscountActive(product) && (
-                <div className="text-xs line-through opacity-75">{formatSoM(product.price)}</div>
+              {showOriginalStrike && (
+                <div className="text-xs line-through opacity-75">
+                  {formatSoM(product.price)} {wholesaleFocused ? 'chakana' : ''}
+                </div>
               )}
-              <div className="text-xl font-extrabold">{formatSoM(getEffectivePrice(product))}</div>
+              <div className="text-xl font-extrabold">
+                {formatSoM(headlinePrice)}
+                {wholesaleFocused ? ' / dona' : ''}
+              </div>
             </div>
             {product.stock !== null && (
               <span className="text-xs font-bold">Zaxira: {product.stock} ta</span>
@@ -85,31 +107,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {product.description}
             </p>
           )}
-          <div className="text-xs space-y-1.5" style={{ color: 'var(--dx-muted)' }}>
-            {product.businessAddress && (
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 shrink-0" /> {product.businessAddress}
-                </span>
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                    `${product.businessName}, ${product.businessAddress}`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold underline shrink-0"
-                  style={{ color: 'var(--dx-secondary)' }}
-                >
-                  Xaritada ochish ↗
-                </a>
-              </div>
-            )}
-            {product.businessPhone && (
-              <div className="flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5" /> {product.businessPhone}
-              </div>
-            )}
-          </div>
+          <ProductDetailLocation product={product} />
           <button
             type="button"
             disabled={soldOut}
@@ -117,10 +115,38 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             className="w-full py-3 rounded-2xl text-sm font-bold disabled:opacity-45 cursor-pointer"
             style={{ backgroundColor: 'var(--dx-primary)', color: 'var(--dx-on-primary)' }}
           >
-            {soldOut ? 'Tugagan' : 'Buyurtma berish'}
+            {soldOut ? 'Tugagan' : wholesaleFocused ? 'Partiya buyurtma berish' : 'Buyurtma berish'}
           </button>
         </div>
       </div>
     </div>
   );
 };
+
+const ProductDetailLocation: React.FC<{ product: Product }> = ({ product }) => (
+  <div className="text-xs space-y-1.5" style={{ color: 'var(--dx-muted)' }}>
+    {product.businessAddress && (
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5">
+          <MapPin className="w-3.5 h-3.5 shrink-0" /> {product.businessAddress}
+        </span>
+        <a
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+            `${product.businessName}, ${product.businessAddress}`
+          )}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-bold underline shrink-0"
+          style={{ color: 'var(--dx-secondary)' }}
+        >
+          Xaritada ochish ↗
+        </a>
+      </div>
+    )}
+    {product.businessPhone && (
+      <div className="flex items-center gap-1.5">
+        <Phone className="w-3.5 h-3.5" /> {product.businessPhone}
+      </div>
+    )}
+  </div>
+);

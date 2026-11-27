@@ -120,6 +120,7 @@ function computeCheckoutPricing(
       discountEndsAtMs:
         pData.discountEndsAt instanceof Timestamp ? pData.discountEndsAt.toMillis() : null,
       wholesaleEnabled: pData.wholesaleEnabled === true,
+      wholesaleOnly: pData.wholesaleOnly === true && pData.wholesaleEnabled === true,
       wholesaleMinQty: typeof pData.wholesaleMinQty === 'number' ? pData.wholesaleMinQty : null,
       wholesalePrice: typeof pData.wholesalePrice === 'number' ? pData.wholesalePrice : null,
     },

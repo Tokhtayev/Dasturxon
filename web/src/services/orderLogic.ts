@@ -72,6 +72,7 @@ export function resolveOrderModePricing(params: {
     | 'discountPercent'
     | 'discountEndsAtMs'
     | 'wholesaleEnabled'
+    | 'wholesaleOnly'
     | 'wholesaleMinQty'
     | 'wholesalePrice'
   >;
@@ -80,6 +81,9 @@ export function resolveOrderModePricing(params: {
   nowMs?: number;
 }): { unitPrice: number; totalPrice: number; maxQty: number; minQty: number } {
   const { product, quantity, orderType, nowMs = Date.now() } = params;
+  if (product.wholesaleOnly && orderType !== 'wholesale') {
+    throw new Error('Bu mahsulot faqat optom bozor orqali partiya bilan sotiladi.');
+  }
   if (orderType === 'wholesale') {
     if (
       !product.wholesaleEnabled ||

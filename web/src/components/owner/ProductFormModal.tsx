@@ -28,6 +28,7 @@ export interface ProductFormSaveParams {
   status: ProductStatus;
   published: boolean;
   wholesaleEnabled?: boolean;
+  wholesaleOnly?: boolean;
   wholesaleMinQty?: number | null;
   wholesalePrice?: number | null;
 }
@@ -51,6 +52,7 @@ interface FormFieldsState {
   status: ProductStatus;
   published: boolean;
   wholesaleEnabled: boolean;
+  wholesaleOnly: boolean;
   wholesaleMinQtyText: string;
   wholesalePriceText: string;
 }
@@ -71,6 +73,7 @@ function initialFormFields(
     status: editing?.status ?? 'hot_ready',
     published: editing?.published ?? true,
     wholesaleEnabled: Boolean(editing?.wholesaleEnabled),
+    wholesaleOnly: Boolean(editing?.wholesaleEnabled && editing?.wholesaleOnly),
     wholesaleMinQtyText:
       editing?.wholesaleMinQty && editing.wholesaleMinQty > 0
         ? String(editing.wholesaleMinQty)
@@ -95,6 +98,7 @@ function toSaveParams(fields: FormFieldsState, productId?: string): ProductFormS
     status: fields.status,
     published: fields.published,
     wholesaleEnabled: fields.wholesaleEnabled,
+    wholesaleOnly: fields.wholesaleEnabled && fields.wholesaleOnly,
     wholesaleMinQty: fields.wholesaleEnabled ? Number(fields.wholesaleMinQtyText) : null,
     wholesalePrice: fields.wholesaleEnabled ? Number(fields.wholesalePriceText) : null,
   };
@@ -203,7 +207,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         <ProductWholesaleSection
           wholesaleEnabled={fields.wholesaleEnabled}
-          onToggle={(wholesaleEnabled) => patch({ wholesaleEnabled })}
+          onToggle={(wholesaleEnabled) =>
+            patch({
+              wholesaleEnabled,
+              wholesaleOnly: wholesaleEnabled ? fields.wholesaleOnly : false,
+            })
+          }
+          wholesaleOnly={fields.wholesaleOnly}
+          onToggleWholesaleOnly={(wholesaleOnly) => patch({ wholesaleOnly })}
           minQtyText={fields.wholesaleMinQtyText}
           onMinQtyChange={(wholesaleMinQtyText) => patch({ wholesaleMinQtyText })}
           wholesalePriceText={fields.wholesalePriceText}
@@ -497,6 +508,8 @@ const ProductTextFields: React.FC<{
 const ProductWholesaleSection: React.FC<{
   wholesaleEnabled: boolean;
   onToggle: (val: boolean) => void;
+  wholesaleOnly: boolean;
+  onToggleWholesaleOnly: (val: boolean) => void;
   minQtyText: string;
   onMinQtyChange: (val: string) => void;
   wholesalePriceText: string;
@@ -505,6 +518,8 @@ const ProductWholesaleSection: React.FC<{
 }> = ({
   wholesaleEnabled,
   onToggle,
+  wholesaleOnly,
+  onToggleWholesaleOnly,
   minQtyText,
   onMinQtyChange,
   wholesalePriceText,
@@ -559,6 +574,15 @@ const ProductWholesaleSection: React.FC<{
               />
             </div>
           </div>
+          <label className="flex items-start gap-2 text-[11px] font-bold cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              checked={wholesaleOnly}
+              onChange={(e) => onToggleWholesaleOnly(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>Faqat Optom Bozor sahifasida ko‘rinsin (oddiy vitrinaga chiqmasin)</span>
+          </label>
           {previewValid && (
             <div className="text-[11px] font-bold" style={{ color: 'var(--dx-secondary)' }}>
               Partiya: {minQty} dona × {formatSoM(wPrice)} = {formatSoM(minQty * wPrice)}

@@ -120,6 +120,7 @@ export interface Product {
   imageUrl: string;
   updatedAtMs: number;
   wholesaleEnabled?: boolean;
+  wholesaleOnly?: boolean;
   wholesaleMinQty?: number | null;
   wholesalePrice?: number | null;
 }

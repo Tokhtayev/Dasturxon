@@ -105,7 +105,7 @@ export const CustomerWholesalePage: React.FC = () => {
       ) : wholesaleProducts.length === 0 ? (
         <WholesaleEmptyState />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {wholesaleProducts.map((p) => (
             <WholesaleProductCard
               key={p.id}
@@ -140,38 +140,54 @@ export const CustomerWholesalePage: React.FC = () => {
 
 const WholesaleHeroHeader: React.FC<{ count: number }> = ({ count }) => (
   <div
-    className="p-4 sm:p-5 rounded-3xl border flex flex-wrap items-center justify-between gap-3"
+    className="p-5 sm:p-6 rounded-3xl border text-white space-y-4"
     style={{
-      backgroundColor: 'var(--dx-secondary-container)',
-      borderColor: 'var(--dx-secondary)',
+      background: 'linear-gradient(135deg, #0D3B3E 0%, #14535B 60%, #1C6C75 100%)',
+      borderColor: '#1E7E88',
     }}
   >
-    <div className="space-y-1">
-      <div className="inline-flex items-center gap-2 font-display text-2xl sm:text-3xl font-extrabold">
-        <Boxes className="w-6 h-6" style={{ color: 'var(--dx-secondary)' }} />
-        <span>Optom Bozor</span>
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="space-y-1">
+        <div className="inline-flex items-center gap-2 font-display text-2xl sm:text-3xl font-extrabold">
+          <Boxes className="w-6 h-6 text-[#93F2DC]" />
+          <span>Optom Bozor · B2B Partiyalar</span>
+        </div>
+        <p className="text-xs sm:text-sm text-white/85">
+          To‘ylar, ofislar va mahalla do‘konlari uchun bevosita sex narxida katta partiyalar (
+          {count} ta maxsus ulgurji taklif)
+        </p>
       </div>
-      <p className="text-xs sm:text-sm" style={{ color: 'var(--dx-muted)' }}>
-        Katta partiyalar (masalan: 200 ta non × 2 700 so‘m) arzon narxda · 50% oldindan to‘lov
-        kafolati bilan ({count} ta taklif)
-      </p>
+      <Link
+        to="/feed"
+        className="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/25 text-xs font-bold inline-flex items-center gap-1.5"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" /> Oddiy vitrinaga qaytish
+      </Link>
     </div>
-    <Link
-      to="/feed"
-      className="px-3.5 py-2 rounded-xl border text-xs font-bold inline-flex items-center gap-1.5"
-      style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
-    >
-      <ArrowLeft className="w-3.5 h-3.5" /> Oddiy vitrina
-    </Link>
+
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+      <div className="px-3 py-2 rounded-xl bg-white/10 border border-white/15">
+        <span className="font-extrabold text-[#93F2DC]">📦 Partiya hajmi:</span>{' '}
+        <span className="text-white/90">5 tadan 10 000 tagacha</span>
+      </div>
+      <div className="px-3 py-2 rounded-xl bg-white/10 border border-white/15">
+        <span className="font-extrabold text-[#93F2DC]">💸 Sex narxi:</span>{' '}
+        <span className="text-white/90">Chakanadan 23%–46% arzon</span>
+      </div>
+      <div className="px-3 py-2 rounded-xl bg-white/10 border border-white/15">
+        <span className="font-extrabold text-[#93F2DC]">🛡️ Himoya:</span>{' '}
+        <span className="text-white/90">50% avans cheki bilan tasdiqlash</span>
+      </div>
+    </div>
   </div>
 );
 
 const WholesaleSkeletons: React.FC = () => (
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-    {[1, 2, 3].map((k) => (
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    {[1, 2, 3, 4].map((k) => (
       <div
         key={k}
-        className="h-64 rounded-2xl border animate-pulse"
+        className="h-52 rounded-2xl border animate-pulse"
         style={{ backgroundColor: 'var(--dx-surface-variant)', borderColor: 'var(--dx-border)' }}
       />
     ))}
