@@ -271,4 +271,45 @@ describe('validators & text sanitization', () => {
     expect(candidates.length).toBeGreaterThanOrEqual(2);
     expect(candidates.every((c) => isValidNickname(c))).toBe(true);
   });
+
+  it('validateProductForm enforces wholesale min quantity (>= 2) and wholesalePrice < price', () => {
+    expect(
+      validateProductForm({
+        name: 'Tandir non',
+        priceText: '5000',
+        costPriceText: '1800',
+        stockText: '500',
+        discountText: '0',
+        wholesaleEnabled: true,
+        wholesaleMinQtyText: '200',
+        wholesalePriceText: '2700',
+      }).valid
+    ).toBe(true);
+
+    expect(
+      validateProductForm({
+        name: 'Tandir non',
+        priceText: '5000',
+        costPriceText: '1800',
+        stockText: '500',
+        discountText: '0',
+        wholesaleEnabled: true,
+        wholesaleMinQtyText: '1',
+        wholesalePriceText: '2700',
+      }).valid
+    ).toBe(false);
+
+    expect(
+      validateProductForm({
+        name: 'Tandir non',
+        priceText: '5000',
+        costPriceText: '1800',
+        stockText: '500',
+        discountText: '0',
+        wholesaleEnabled: true,
+        wholesaleMinQtyText: '200',
+        wholesalePriceText: '5500',
+      }).valid
+    ).toBe(false);
+  });
 });

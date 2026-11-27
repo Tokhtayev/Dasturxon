@@ -3,6 +3,7 @@ import { Check, Minus, PhoneCall, Plus, ShieldCheck, ShoppingBag, Truck, X } fro
 import { formatSoM, getEffectivePrice } from '../../services/analytics';
 import {
   MAX_ORDER_QUANTITY,
+  MAX_WHOLESALE_QUANTITY,
   MIN_ORDER_QUANTITY,
   MINUTES_PER_HOUR,
   MS_PER_MINUTE,
@@ -15,7 +16,7 @@ import {
   formatContactPhoneDisplay,
   isValidContactPhone,
 } from '../../services/validators';
-import type { FulfillmentType, Product } from '../../types/domain';
+import type { FulfillmentType, OrderType, Product } from '../../types/domain';
 import { ReceiptPhotoPicker } from '../ReceiptPhotoPicker';
 
 type PickupPreset = '30m' | '1h' | '2h';
@@ -28,6 +29,7 @@ const PICKUP_MINUTES: Record<PickupPreset, number> = {
 
 interface OrderCheckoutModalProps {
   product: Product;
+  initialOrderType?: OrderType;
   defaultPhone: string;
   onClose: () => void;
   onSubmitOrder: (params: {
@@ -37,6 +39,7 @@ interface OrderCheckoutModalProps {
     deliveryAddress: string;
     contactPhone: string;
     advanceReceiptUrl?: string;
+    orderType: OrderType;
   }) => Promise<void>;
 }
 
@@ -44,11 +47,22 @@ function validateCheckoutInput(params: {
   outOfStock: boolean;
   stock: number | null;
   qty: number;
+  minQty: number;
+  maxQty: number;
+  orderType: OrderType;
   fulfillment: FulfillmentType;
   deliveryAddress: string;
   contactPhone: string;
 }): string | null {
   if (params.outOfStock) return 'Ushbu mahsulot tugagan.';
+  if (!Number.isInteger(params.qty) || params.qty < params.minQty) {
+    return params.orderType === 'wholesale'
+      ? `Optom buyurtma kamida ${params.minQty} dona bo‘lishi kerak.`
+      : 'Miqdor kamida 1 dona bo‘lishi kerak.';
+  }
+  if (params.qty > params.maxQty) {
+    return `Bir buyurtmada ko‘pi bilan ${params.maxQty} dona tanlash mumkin.`;
+  }
   if (params.stock !== null && params.qty > params.stock) {
     return `Zaxira yetarli emas (${params.stock} ta mavjud).`;
   }
@@ -61,13 +75,28 @@ function validateCheckoutInput(params: {
   return null;
 }
 
+function isWholesaleEligible(product: Product): boolean {
+  return Boolean(
+    product.wholesaleEnabled &&
+    product.wholesaleMinQty &&
+    product.wholesalePrice &&
+    product.wholesalePrice > 0
+  );
+}
+
 export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
   product,
+  initialOrderType = 'retail',
   defaultPhone,
   onClose,
   onSubmitOrder,
 }) => {
-  const [qty, setQty] = useState(MIN_ORDER_QUANTITY);
+  const hasWholesale = isWholesaleEligible(product);
+  const startWholesale = hasWholesale && initialOrderType === 'wholesale';
+  const [orderType, setOrderType] = useState<OrderType>(startWholesale ? 'wholesale' : 'retail');
+  const [qty, setQty] = useState(() =>
+    startWholesale ? (product.wholesaleMinQty ?? 2) : MIN_ORDER_QUANTITY
+  );
   const [fulfillment, setFulfillment] = useState<FulfillmentType>('pickup');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [contactPhone, setContactPhone] = useState(defaultPhone || '+998 ');
@@ -77,10 +106,26 @@ export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  const totalPrice = getEffectivePrice(product) * qty;
+  const minQty = orderType === 'wholesale' ? (product.wholesaleMinQty ?? 2) : MIN_ORDER_QUANTITY;
+  const maxQty = orderType === 'wholesale' ? MAX_WHOLESALE_QUANTITY : MAX_ORDER_QUANTITY;
+  const unitPrice =
+    orderType === 'wholesale' && product.wholesalePrice
+      ? product.wholesalePrice
+      : getEffectivePrice(product);
+  const totalPrice = unitPrice * Math.max(1, qty);
   const { prepaymentAmount, remainingAmount } = calculateOrderPrepayment(totalPrice);
   const outOfStock =
     product.status === 'sold_out' || (product.stock !== null && product.stock <= 0);
+
+  const handleModeChange = (nextMode: OrderType) => {
+    setOrderType(nextMode);
+    setCheckoutError(null);
+    setQty(
+      nextMode === 'wholesale'
+        ? Math.max(product.wholesaleMinQty ?? 2, qty)
+        : Math.min(MAX_ORDER_QUANTITY, Math.max(MIN_ORDER_QUANTITY, qty))
+    );
+  };
 
   const handlePickAdvanceFile = async (file: File | undefined) => {
     if (!file) return;
@@ -101,14 +146,14 @@ export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
       outOfStock,
       stock: product.stock,
       qty,
+      minQty,
+      maxQty,
+      orderType,
       fulfillment,
       deliveryAddress,
       contactPhone,
     });
-    if (validationErr) {
-      setCheckoutError(validationErr);
-      return;
-    }
+    if (validationErr) return setCheckoutError(validationErr);
 
     setSubmitting(true);
     try {
@@ -120,6 +165,7 @@ export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
         deliveryAddress: deliveryAddress.trim(),
         contactPhone: contactPhone.trim(),
         advanceReceiptUrl: advanceReceiptUrl || undefined,
+        orderType,
       });
     } catch (err) {
       setCheckoutError(getReadableErrorMessage(err, 'Buyurtma yaratilmadi.'));
@@ -129,62 +175,131 @@ export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div
-        className="w-full max-w-md rounded-t-3xl sm:rounded-3xl border shadow-2xl p-5 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto"
-        style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
-      >
-        <CheckoutModalHeader submitting={submitting} onClose={onClose} />
-
-        <CheckoutProductHeader product={product} />
-        <QuantitySelector qty={qty} stock={product.stock} onChange={setQty} />
-        <FulfillmentFields
-          fulfillment={fulfillment}
-          onFulfillmentChange={setFulfillment}
-          deliveryAddress={deliveryAddress}
-          onAddressChange={setDeliveryAddress}
-          contactPhone={contactPhone}
-          onPhoneChange={setContactPhone}
-          pickupPreset={pickupPreset}
-          onPresetChange={setPickupPreset}
-        />
-
-        <CheckoutPrepaymentSection
-          totalPrice={totalPrice}
-          prepaymentAmount={prepaymentAmount}
-          remainingAmount={remainingAmount}
-          businessPhone={product.businessPhone}
-          receiptUrl={advanceReceiptUrl}
-          busy={compressing || submitting}
-          compressing={compressing}
-          onPickFile={(f) => void handlePickAdvanceFile(f)}
-          onClear={() => setAdvanceReceiptUrl('')}
-        />
-
-        {checkoutError && (
-          <div
-            className="p-3 rounded-xl text-xs font-bold"
-            style={{
-              backgroundColor: 'var(--dx-error-container)',
-              color: 'var(--dx-on-error-container)',
-            }}
-          >
-            {checkoutError}
-          </div>
-        )}
-
-        <CheckoutFooter
-          totalPrice={totalPrice}
-          prepaymentAmount={prepaymentAmount}
-          remainingAmount={remainingAmount}
-          submitting={submitting}
-          busy={submitting || compressing}
-          onConfirm={() => void handleConfirm()}
-        />
-      </div>
-    </div>
+    <CheckoutModalBody
+      product={product}
+      hasWholesale={hasWholesale}
+      orderType={orderType}
+      unitPrice={unitPrice}
+      qty={qty}
+      minQty={minQty}
+      maxQty={maxQty}
+      totalPrice={totalPrice}
+      prepaymentAmount={prepaymentAmount}
+      remainingAmount={remainingAmount}
+      fulfillment={fulfillment}
+      deliveryAddress={deliveryAddress}
+      contactPhone={contactPhone}
+      pickupPreset={pickupPreset}
+      advanceReceiptUrl={advanceReceiptUrl}
+      compressing={compressing}
+      submitting={submitting}
+      checkoutError={checkoutError}
+      onClose={onClose}
+      onModeChange={handleModeChange}
+      onQtyChange={setQty}
+      onFulfillmentChange={setFulfillment}
+      onAddressChange={setDeliveryAddress}
+      onPhoneChange={setContactPhone}
+      onPresetChange={setPickupPreset}
+      onPickFile={(f) => void handlePickAdvanceFile(f)}
+      onClearFile={() => setAdvanceReceiptUrl('')}
+      onConfirm={() => void handleConfirm()}
+    />
   );
 };
+
+interface CheckoutModalBodyProps {
+  product: Product;
+  hasWholesale: boolean;
+  orderType: OrderType;
+  unitPrice: number;
+  qty: number;
+  minQty: number;
+  maxQty: number;
+  totalPrice: number;
+  prepaymentAmount: number;
+  remainingAmount: number;
+  fulfillment: FulfillmentType;
+  deliveryAddress: string;
+  contactPhone: string;
+  pickupPreset: PickupPreset;
+  advanceReceiptUrl: string;
+  compressing: boolean;
+  submitting: boolean;
+  checkoutError: string | null;
+  onClose: () => void;
+  onModeChange: (m: OrderType) => void;
+  onQtyChange: (q: number) => void;
+  onFulfillmentChange: (f: FulfillmentType) => void;
+  onAddressChange: (a: string) => void;
+  onPhoneChange: (p: string) => void;
+  onPresetChange: (p: PickupPreset) => void;
+  onPickFile: (f: File | undefined) => void;
+  onClearFile: () => void;
+  onConfirm: () => void;
+}
+
+const CheckoutModalBody: React.FC<CheckoutModalBodyProps> = (props) => (
+  <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div
+      className="w-full max-w-md rounded-t-3xl sm:rounded-3xl border shadow-2xl p-5 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto"
+      style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
+    >
+      <CheckoutModalHeader submitting={props.submitting} onClose={props.onClose} />
+      <CheckoutProductHeader
+        product={props.product}
+        unitPrice={props.unitPrice}
+        orderType={props.orderType}
+      />
+      {props.hasWholesale && props.product.wholesaleMinQty && props.product.wholesalePrice && (
+        <CheckoutOrderTypeToggle
+          orderType={props.orderType}
+          wholesaleMinQty={props.product.wholesaleMinQty}
+          wholesalePrice={props.product.wholesalePrice}
+          onChange={props.onModeChange}
+        />
+      )}
+      <QuantitySelector
+        qty={props.qty}
+        minQty={props.minQty}
+        maxQty={props.maxQty}
+        stock={props.product.stock}
+        wholesale={props.orderType === 'wholesale'}
+        onChange={props.onQtyChange}
+      />
+      <FulfillmentFields
+        fulfillment={props.fulfillment}
+        onFulfillmentChange={props.onFulfillmentChange}
+        deliveryAddress={props.deliveryAddress}
+        onAddressChange={props.onAddressChange}
+        contactPhone={props.contactPhone}
+        onPhoneChange={props.onPhoneChange}
+        pickupPreset={props.pickupPreset}
+        onPresetChange={props.onPresetChange}
+      />
+      <CheckoutPrepaymentSection
+        totalPrice={props.totalPrice}
+        prepaymentAmount={props.prepaymentAmount}
+        remainingAmount={props.remainingAmount}
+        businessPhone={props.product.businessPhone}
+        receiptUrl={props.advanceReceiptUrl}
+        busy={props.compressing || props.submitting}
+        compressing={props.compressing}
+        onPickFile={props.onPickFile}
+        onClear={props.onClearFile}
+      />
+      {props.checkoutError && <CheckoutErrorAlert message={props.checkoutError} />}
+      <CheckoutFooter
+        totalPrice={props.totalPrice}
+        prepaymentAmount={props.prepaymentAmount}
+        remainingAmount={props.remainingAmount}
+        submitting={props.submitting}
+        busy={props.submitting || props.compressing}
+        onConfirm={props.onConfirm}
+      />
+    </div>
+  </div>
+);
 
 const CheckoutModalHeader: React.FC<{ submitting: boolean; onClose: () => void }> = ({
   submitting,
@@ -301,7 +416,62 @@ const CheckoutPrepaymentSection: React.FC<{
   );
 };
 
-const CheckoutProductHeader: React.FC<{ product: Product }> = ({ product }) => (
+const CheckoutErrorAlert: React.FC<{ message: string }> = ({ message }) => (
+  <div
+    className="p-3 rounded-xl text-xs font-bold"
+    style={{
+      backgroundColor: 'var(--dx-error-container)',
+      color: 'var(--dx-on-error-container)',
+    }}
+  >
+    {message}
+  </div>
+);
+
+const CheckoutOrderTypeToggle: React.FC<{
+  orderType: OrderType;
+  wholesaleMinQty: number;
+  wholesalePrice: number;
+  onChange: (mode: OrderType) => void;
+}> = ({ orderType, wholesaleMinQty, wholesalePrice, onChange }) => (
+  <div className="grid grid-cols-2 gap-2">
+    <button
+      type="button"
+      onClick={() => onChange('retail')}
+      className="p-2.5 rounded-xl border text-xs font-bold cursor-pointer text-left"
+      style={{
+        backgroundColor: orderType === 'retail' ? 'var(--dx-primary-container)' : 'var(--dx-bg)',
+        borderColor: orderType === 'retail' ? 'var(--dx-primary)' : 'var(--dx-border)',
+      }}
+    >
+      <div>Chakana</div>
+      <div className="text-[10px] font-normal" style={{ color: 'var(--dx-muted)' }}>
+        1–99 dona
+      </div>
+    </button>
+    <button
+      type="button"
+      onClick={() => onChange('wholesale')}
+      className="p-2.5 rounded-xl border text-xs font-bold cursor-pointer text-left"
+      style={{
+        backgroundColor:
+          orderType === 'wholesale' ? 'var(--dx-secondary-container)' : 'var(--dx-bg)',
+        borderColor: orderType === 'wholesale' ? 'var(--dx-secondary)' : 'var(--dx-border)',
+      }}
+    >
+      <div>📦 Optom</div>
+      <div className="text-[10px] font-normal" style={{ color: 'var(--dx-muted)' }}>
+        {wholesaleMinQty}+ ta · {formatSoM(wholesalePrice)}
+      </div>
+    </button>
+  </div>
+);
+
+const CheckoutProductHeader: React.FC<{
+  product: Product;
+  unitPrice: number;
+  orderType: OrderType;
+}> = ({ product, unitPrice, orderType }) => (
   <div
     className="p-3.5 rounded-2xl flex items-center justify-between"
     style={{ backgroundColor: 'var(--dx-surface-variant)' }}
@@ -309,53 +479,88 @@ const CheckoutProductHeader: React.FC<{ product: Product }> = ({ product }) => (
     <div>
       <div className="font-bold text-sm">{product.name}</div>
       <div className="text-xs" style={{ color: 'var(--dx-muted)' }}>
-        {product.businessName}
+        {product.businessName} · {orderType === 'wholesale' ? 'Optom narx' : 'Oddiy narx'}
       </div>
     </div>
     <div className="font-extrabold text-sm" style={{ color: 'var(--dx-primary)' }}>
-      {formatSoM(getEffectivePrice(product))}
+      {formatSoM(unitPrice)}
     </div>
   </div>
 );
 
 const QuantitySelector: React.FC<{
   qty: number;
+  minQty: number;
+  maxQty: number;
   stock: number | null;
+  wholesale: boolean;
   onChange: (next: number) => void;
-}> = ({ qty, stock, onChange }) => (
-  <div className="flex items-center justify-between">
-    <div>
-      <div className="text-xs font-bold">Miqdor</div>
-      {stock !== null && (
-        <div className="text-[11px]" style={{ color: 'var(--dx-muted)' }}>
-          Mavjud: {stock} ta
+}> = ({ qty, minQty, maxQty, stock, wholesale, onChange }) => {
+  const effectiveMax = stock !== null ? Math.min(stock, maxQty) : maxQty;
+  const clampQty = (val: number) => Math.max(minQty, Math.min(effectiveMax, val));
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="text-xs font-bold">Miqdor {wholesale ? `(min ${minQty} ta)` : ''}</div>
+          {stock !== null && (
+            <div className="text-[11px]" style={{ color: 'var(--dx-muted)' }}>
+              Mavjud: {stock} ta
+            </div>
+          )}
+        </div>
+        <div
+          className="inline-flex items-center gap-2 rounded-xl border p-1"
+          style={{ borderColor: 'var(--dx-border)' }}
+        >
+          <button
+            type="button"
+            onClick={() => onChange(clampQty(qty - (wholesale ? 10 : 1)))}
+            className="p-1.5 cursor-pointer"
+            aria-label="Kamaytirish"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <input
+            type="number"
+            min={minQty}
+            max={effectiveMax}
+            value={qty}
+            onChange={(e) => {
+              const parsed = Number(e.target.value);
+              onChange(Number.isFinite(parsed) && parsed > 0 ? Math.min(effectiveMax, parsed) : 0);
+            }}
+            className="w-16 text-center font-extrabold text-sm bg-transparent focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => onChange(clampQty(qty + (wholesale ? 10 : 1)))}
+            className="p-1.5 cursor-pointer"
+            aria-label="Oshirish"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      {wholesale && (
+        <div className="flex flex-wrap justify-end gap-1.5">
+          {[50, 100, 200].map((step) => (
+            <button
+              key={step}
+              type="button"
+              onClick={() => onChange(clampQty(qty + step))}
+              className="px-2.5 py-1 rounded-lg border text-[11px] font-bold cursor-pointer"
+              style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+            >
+              +{step} ta
+            </button>
+          ))}
         </div>
       )}
     </div>
-    <div
-      className="inline-flex items-center gap-3 rounded-xl border p-1"
-      style={{ borderColor: 'var(--dx-border)' }}
-    >
-      <button
-        type="button"
-        onClick={() => onChange(Math.max(MIN_ORDER_QUANTITY, qty - 1))}
-        className="p-1.5 cursor-pointer"
-        aria-label="Kamaytirish"
-      >
-        <Minus className="w-4 h-4" />
-      </button>
-      <span className="font-extrabold text-sm min-w-[20px] text-center">{qty}</span>
-      <button
-        type="button"
-        onClick={() => onChange(Math.min(stock ?? MAX_ORDER_QUANTITY, MAX_ORDER_QUANTITY, qty + 1))}
-        className="p-1.5 cursor-pointer"
-        aria-label="Oshirish"
-      >
-        <Plus className="w-4 h-4" />
-      </button>
-    </div>
-  </div>
-);
+  );
+};
 
 const FulfillmentFields: React.FC<{
   fulfillment: FulfillmentType;

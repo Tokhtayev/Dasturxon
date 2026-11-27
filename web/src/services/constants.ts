@@ -39,6 +39,8 @@ export const MAX_DISCOUNT_PERCENT = 90;
 
 export const MIN_ORDER_QUANTITY = 1;
 export const MAX_ORDER_QUANTITY = 99;
+export const MIN_WHOLESALE_QTY = 2;
+export const MAX_WHOLESALE_QUANTITY = 10_000;
 export const PREPAYMENT_PERCENT = 50;
 export const MAX_DELIVERY_ADDRESS_LENGTH = 200;
 

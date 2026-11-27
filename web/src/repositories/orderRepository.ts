@@ -15,16 +15,14 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../config/firebase';
 import {
-  MAX_DISCOUNT_PERCENT,
   MAX_FULL_NAME_LENGTH,
   MAX_PHONE_LENGTH,
-  PERCENT_DIVISOR,
   TERMINAL_ORDER_STATUSES,
 } from '../services/constants';
 import {
   applyStockDecrement,
   calculateOrderPrepayment,
-  calculateOrderTotal,
+  resolveOrderModePricing,
 } from '../services/orderLogic';
 import {
   sanitizeDeliveryAddress,
@@ -36,6 +34,7 @@ import type {
   CustomerOrder,
   FulfillmentType,
   OrderStatusKey,
+  OrderType,
   PaymentStatus,
   PrepaymentStatus,
   Product,
@@ -100,34 +99,49 @@ export function mapOrderDoc(id: string, data: Record<string, unknown>): Customer
         : undefined,
     advanceUploadedAtMs: data.advanceUploadedAt ? toMillis(data.advanceUploadedAt) : undefined,
     advanceVerifiedAtMs: data.advanceVerifiedAt ? toMillis(data.advanceVerifiedAt) : undefined,
+    orderType: data.orderType === 'wholesale' ? 'wholesale' : 'retail',
   };
 }
 
-function computeCheckoutPricing(pData: Record<string, unknown>, quantity: number) {
+function computeCheckoutPricing(
+  pData: Record<string, unknown>,
+  quantity: number,
+  orderType: OrderType
+) {
   const status = typeof pData.status === 'string' ? pData.status : 'sold_out';
   if (!['available', 'hot_ready'].includes(status)) {
     throw new Error('Mahsulot hozir mavjud emas.');
   }
   const currentStock = typeof pData.stock === 'number' ? pData.stock : null;
-  const price = typeof pData.price === 'number' ? pData.price : 0;
-  const discountPercent = typeof pData.discountPercent === 'number' ? pData.discountPercent : 0;
-  const discountEndsAt = pData.discountEndsAt instanceof Timestamp ? pData.discountEndsAt : null;
+  const pricing = resolveOrderModePricing({
+    product: {
+      price: typeof pData.price === 'number' ? pData.price : 0,
+      discountPercent: typeof pData.discountPercent === 'number' ? pData.discountPercent : 0,
+      discountEndsAtMs:
+        pData.discountEndsAt instanceof Timestamp ? pData.discountEndsAt.toMillis() : null,
+      wholesaleEnabled: pData.wholesaleEnabled === true,
+      wholesaleMinQty: typeof pData.wholesaleMinQty === 'number' ? pData.wholesaleMinQty : null,
+      wholesalePrice: typeof pData.wholesalePrice === 'number' ? pData.wholesalePrice : null,
+    },
+    quantity,
+    orderType,
+  });
 
   const { nextStock, nextStatus } = applyStockDecrement(
     currentStock,
     quantity,
-    status === 'hot_ready' ? 'hot_ready' : 'available'
+    status === 'hot_ready' ? 'hot_ready' : 'available',
+    pricing.maxQty
   );
-  const discountActive =
-    discountPercent > 0 &&
-    discountPercent <= MAX_DISCOUNT_PERCENT &&
-    (discountEndsAt === null || discountEndsAt.toMillis() > Date.now());
-  const unitPrice = discountActive
-    ? price - Math.floor((price * discountPercent) / PERCENT_DIVISOR)
-    : price;
-  const totalPrice = calculateOrderTotal(unitPrice, quantity);
-  const { prepaymentPercent, prepaymentAmount } = calculateOrderPrepayment(totalPrice);
-  return { nextStock, nextStatus, unitPrice, totalPrice, prepaymentPercent, prepaymentAmount };
+  const { prepaymentPercent, prepaymentAmount } = calculateOrderPrepayment(pricing.totalPrice);
+  return {
+    nextStock,
+    nextStatus,
+    unitPrice: pricing.unitPrice,
+    totalPrice: pricing.totalPrice,
+    prepaymentPercent,
+    prepaymentAmount,
+  };
 }
 
 export const orderRepository = {
@@ -187,6 +201,7 @@ export const orderRepository = {
     fulfillmentType: FulfillmentType;
     deliveryAddress: string;
     advanceReceiptUrl?: string;
+    orderType?: OrderType;
   }): Promise<string> {
     const db = getFirebaseDb();
     const productRef = doc(db, 'products', params.product.id);
@@ -194,6 +209,7 @@ export const orderRepository = {
     const orderRef = doc(collection(db, 'orders'));
     const itemRef = doc(collection(orderRef, 'items'));
     const safeAdvanceReceipt = sanitizeImageUrl(params.advanceReceiptUrl);
+    const orderType: OrderType = params.orderType === 'wholesale' ? 'wholesale' : 'retail';
 
     await runTransaction(db, async (tx) => {
       const prodSnap = await tx.get(productRef);
@@ -208,7 +224,7 @@ export const orderRepository = {
 
       const pData = prodSnap.data();
       const { nextStock, nextStatus, unitPrice, totalPrice, prepaymentPercent, prepaymentAmount } =
-        computeCheckoutPricing(pData, params.quantity);
+        computeCheckoutPricing(pData, params.quantity, orderType);
       const productName = typeof pData.name === 'string' ? pData.name : params.product.name;
 
       tx.set(orderRef, {
@@ -222,6 +238,7 @@ export const orderRepository = {
         quantity: params.quantity,
         unitPrice,
         totalPrice,
+        orderType,
         prepaymentPercent,
         prepaymentAmount,
         prepaymentStatus: safeAdvanceReceipt ? 'advance_submitted' : 'awaiting_advance',

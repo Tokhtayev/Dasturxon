@@ -100,8 +100,24 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
   >
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div>
-        <div className="text-xs font-bold" style={{ color: 'var(--dx-muted)' }}>
-          #{order.id.slice(0, 6).toUpperCase()} · {order.businessName}
+        <div
+          className="text-xs font-bold flex items-center gap-1.5"
+          style={{ color: 'var(--dx-muted)' }}
+        >
+          <span>
+            #{order.id.slice(0, 6).toUpperCase()} · {order.businessName}
+          </span>
+          {order.orderType === 'wholesale' && (
+            <span
+              className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md"
+              style={{
+                backgroundColor: 'var(--dx-secondary-container)',
+                color: 'var(--dx-on-secondary-container)',
+              }}
+            >
+              📦 OPTOM
+            </span>
+          )}
         </div>
         <div className="font-bold text-base mt-0.5">
           {order.productName} ({order.quantity} dona)

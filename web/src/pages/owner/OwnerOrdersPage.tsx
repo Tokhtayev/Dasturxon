@@ -363,8 +363,24 @@ const OwnerOrderCard: React.FC<{
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="text-xs font-bold" style={{ color: 'var(--dx-muted)' }}>
-            #{order.id.slice(0, 6).toUpperCase()} · {order.customerName || 'Xaridor'}
+          <div
+            className="text-xs font-bold flex items-center gap-1.5"
+            style={{ color: 'var(--dx-muted)' }}
+          >
+            <span>
+              #{order.id.slice(0, 6).toUpperCase()} · {order.customerName || 'Xaridor'}
+            </span>
+            {order.orderType === 'wholesale' && (
+              <span
+                className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md"
+                style={{
+                  backgroundColor: 'var(--dx-secondary-container)',
+                  color: 'var(--dx-on-secondary-container)',
+                }}
+              >
+                📦 OPTOM
+              </span>
+            )}
           </div>
           <div className="font-bold text-sm mt-0.5">
             {order.productName} ({order.quantity} ta)

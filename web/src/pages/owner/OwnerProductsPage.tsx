@@ -41,7 +41,12 @@ export const OwnerProductsPage: React.FC = () => {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [filterMode, setFilterMode] = useState<'all' | 'wholesale'>('all');
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const wholesaleCount = products.filter((p) => p.wholesaleEnabled).length;
+  const visibleProducts =
+    filterMode === 'wholesale' ? products.filter((p) => p.wholesaleEnabled) : products;
 
   const handleSave = async (params: ProductFormSaveParams) => {
     if (params.productId) {
@@ -94,20 +99,33 @@ export const OwnerProductsPage: React.FC = () => {
         </div>
       )}
 
-      {products.length === 0 ? (
+      <OwnerProductFilterTabs
+        filterMode={filterMode}
+        totalCount={products.length}
+        wholesaleCount={wholesaleCount}
+        onSelect={setFilterMode}
+      />
+
+      {visibleProducts.length === 0 ? (
         <div
           className="rounded-3xl p-10 text-center border"
           style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
         >
           <div className="text-3xl mb-2">📦</div>
-          <div className="font-bold text-sm">Hozircha mahsulotlar yo‘q</div>
+          <div className="font-bold text-sm">
+            {filterMode === 'wholesale'
+              ? 'Optom savdoga qo‘yilgan mahsulotlar yo‘q'
+              : 'Hozircha mahsulotlar yo‘q'}
+          </div>
           <p className="text-xs mt-1" style={{ color: 'var(--dx-muted)' }}>
-            Yangi mahsulot qo‘shish tugmasini bosing.
+            {filterMode === 'wholesale'
+              ? 'Mahsulot qo‘shish yoki tahrirlashda «Optom savdoni yoqish» belgisini qo‘ying.'
+              : 'Yangi mahsulot qo‘shish tugmasini bosing.'}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {products.map((product) => (
+          {visibleProducts.map((product) => (
             <OwnerProductCard
               key={product.id}
               product={product}
@@ -133,6 +151,35 @@ export const OwnerProductsPage: React.FC = () => {
     </div>
   );
 };
+
+const OwnerProductFilterTabs: React.FC<{
+  filterMode: 'all' | 'wholesale';
+  totalCount: number;
+  wholesaleCount: number;
+  onSelect: (mode: 'all' | 'wholesale') => void;
+}> = ({ filterMode, totalCount, wholesaleCount, onSelect }) => (
+  <div className="flex gap-2">
+    {(
+      [
+        ['all', `Barchasi (${totalCount})`],
+        ['wholesale', `📦 Optom (${wholesaleCount})`],
+      ] as const
+    ).map(([key, label]) => (
+      <button
+        key={key}
+        type="button"
+        onClick={() => onSelect(key)}
+        className="px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer"
+        style={{
+          backgroundColor: filterMode === key ? 'var(--dx-primary)' : 'var(--dx-surface)',
+          color: filterMode === key ? 'var(--dx-on-primary)' : 'var(--dx-text)',
+        }}
+      >
+        {label}
+      </button>
+    ))}
+  </div>
+);
 
 interface OwnerProductCardProps {
   product: Product;
@@ -198,6 +245,17 @@ const OwnerProductCard: React.FC<OwnerProductCardProps> = ({
         <span className="font-extrabold" style={{ color: 'var(--dx-primary)' }}>
           Sotish: {formatSoM(getEffectivePrice(product))}
         </span>
+        {product.wholesaleEnabled && product.wholesaleMinQty && product.wholesalePrice && (
+          <span
+            className="px-2 py-0.5 rounded-lg font-extrabold"
+            style={{
+              backgroundColor: 'var(--dx-secondary-container)',
+              color: 'var(--dx-on-secondary-container)',
+            }}
+          >
+            📦 Optom: {product.wholesaleMinQty}+ ta · {formatSoM(product.wholesalePrice)}
+          </span>
+        )}
         <span style={{ color: 'var(--dx-secondary)' }}>
           🔒 Tannarx: {formatSoM(product.costPrice)}
         </span>

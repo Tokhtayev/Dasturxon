@@ -1076,6 +1076,88 @@ test("46. Order 50% advance payment prevents self-approval and enforces >= 50% p
   }));
 });
 
+// 47. Wholesale product & bulk 200-unit order rules enforce wholesaleMinQty, wholesalePrice, and block under-min or non-wholesale >99
+test("47. Wholesale orders allow 200+ units at wholesalePrice while blocking below-min or fake wholesale pricing", async () => {
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+
+  // Owner creates wholesale bread product: 5000 retail, 2700 wholesale from min 200 units, stock 500
+  await assertSucceeds(setDoc(doc(dbOwner, "products/prod-optom-non"), validProduct({
+    name: "Optom Tandir Non",
+    price: 5000,
+    stock: 500,
+    wholesaleEnabled: true,
+    wholesaleMinQty: 200,
+    wholesalePrice: 2700,
+  })));
+
+  // Customer cannot order retail > 99 or under min wholesale qty (150 < 200)
+  await assertFails(setDoc(doc(dbCust, "orders/order-optom-under"), {
+    customerId: "customer-1",
+    businessId: "business-1",
+    productId: "prod-optom-non",
+    orderType: "wholesale",
+    quantity: 150,
+    unitPrice: 2700,
+    totalPrice: 405000,
+    prepaymentPercent: 50,
+    prepaymentAmount: 202500,
+    prepaymentStatus: "awaiting_advance",
+    status: "pending",
+    paymentStatus: "unpaid",
+    createdAt: Timestamp.now()
+  }));
+
+  // Customer cannot fake wholesalePrice (2000 != 2700)
+  await assertFails(setDoc(doc(dbCust, "orders/order-optom-tamper"), {
+    customerId: "customer-1",
+    businessId: "business-1",
+    productId: "prod-optom-non",
+    orderType: "wholesale",
+    quantity: 200,
+    unitPrice: 2000,
+    totalPrice: 400000,
+    prepaymentPercent: 50,
+    prepaymentAmount: 200000,
+    prepaymentStatus: "awaiting_advance",
+    status: "pending",
+    paymentStatus: "unpaid",
+    createdAt: Timestamp.now()
+  }));
+
+  // Valid atomic 200-unit wholesale order + item + stock decrement (500 -> 300) succeeds
+  const orderRef = doc(dbCust, "orders/order-optom-200");
+  await assertSucceeds(runTransaction(dbCust, async (tx) => {
+    tx.set(orderRef, {
+      customerId: "customer-1",
+      businessId: "business-1",
+      productId: "prod-optom-non",
+      orderType: "wholesale",
+      quantity: 200,
+      unitPrice: 2700,
+      totalPrice: 540000,
+      prepaymentPercent: 50,
+      prepaymentAmount: 270000,
+      prepaymentStatus: "awaiting_advance",
+      status: "pending",
+      paymentStatus: "unpaid",
+      createdAt: Timestamp.now()
+    });
+    tx.set(doc(dbCust, "orders/order-optom-200/items/line-1"), {
+      productId: "prod-optom-non",
+      name: "Optom Tandir Non",
+      qty: 200,
+      unitPrice: 2700
+    });
+    tx.update(doc(dbCust, "products/prod-optom-non"), {
+      stock: 300,
+      status: "available",
+      lastCheckoutOrderId: "order-optom-200",
+      updatedAt: Timestamp.now()
+    });
+  }));
+});
+
 
 
 

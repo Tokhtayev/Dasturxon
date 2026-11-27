@@ -4,7 +4,9 @@ import {
   calculateOrderPrepayment,
   calculateOrderTotal,
   computeRemainingStock,
+  getWholesaleSavingsPercent,
   isValidOrderTransition,
+  resolveOrderModePricing,
 } from '../src/services/orderLogic';
 
 describe('orderLogic', () => {
@@ -80,5 +82,28 @@ describe('orderLogic', () => {
       remainingAmount: 2500,
     });
     expect(() => calculateOrderPrepayment(0)).toThrow('0 dan katta');
+  });
+
+  it('resolveOrderModePricing computes wholesale bulk totals (200 x 2700 = 540000) and rejects below-min qty', () => {
+    const bread = {
+      price: 5000,
+      discountPercent: 0,
+      discountEndsAtMs: null,
+      wholesaleEnabled: true,
+      wholesaleMinQty: 200,
+      wholesalePrice: 2700,
+    };
+    expect(
+      resolveOrderModePricing({ product: bread, quantity: 200, orderType: 'wholesale' })
+    ).toEqual({
+      unitPrice: 2700,
+      totalPrice: 540000,
+      minQty: 200,
+      maxQty: 10000,
+    });
+    expect(() =>
+      resolveOrderModePricing({ product: bread, quantity: 100, orderType: 'wholesale' })
+    ).toThrow('kamida 200 dona');
+    expect(getWholesaleSavingsPercent(bread)).toBe(46);
   });
 });

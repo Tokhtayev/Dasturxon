@@ -57,6 +57,9 @@ export function mapProductDoc(id: string, data: Record<string, unknown>): Produc
     discountEndsAtMs: data.discountEndsAt ? toMillis(data.discountEndsAt) : null,
     imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
     updatedAtMs: toMillis(data.updatedAt),
+    wholesaleEnabled: data.wholesaleEnabled === true,
+    wholesaleMinQty: typeof data.wholesaleMinQty === 'number' ? data.wholesaleMinQty : null,
+    wholesalePrice: typeof data.wholesalePrice === 'number' ? data.wholesalePrice : null,
   };
 }
 
@@ -167,6 +170,9 @@ export const productRepository = {
     discountEndsAtMs: number | null;
     status: ProductStatus;
     published: boolean;
+    wholesaleEnabled?: boolean;
+    wholesaleMinQty?: number | null;
+    wholesalePrice?: number | null;
   }): Promise<string> {
     const check = validateProductForm({
       name: params.name,
@@ -174,11 +180,21 @@ export const productRepository = {
       costPriceText: String(params.costPrice),
       stockText: params.stock !== null ? String(params.stock) : '',
       discountText: String(params.discountPercent),
+      wholesaleEnabled: params.wholesaleEnabled,
+      wholesaleMinQtyText:
+        params.wholesaleMinQty !== undefined && params.wholesaleMinQty !== null
+          ? String(params.wholesaleMinQty)
+          : '',
+      wholesalePriceText:
+        params.wholesalePrice !== undefined && params.wholesalePrice !== null
+          ? String(params.wholesalePrice)
+          : '',
     });
     if (!check.valid) throw new Error(check.error);
 
     const safeImageUrl = sanitizeImageUrl(params.imageUrl);
     const db = getFirebaseDb();
+    const wholesaleActive = Boolean(params.wholesaleEnabled);
     const publicPayload: Record<string, unknown> = {
       businessId: params.business.id,
       businessName: params.business.name,
@@ -193,11 +209,16 @@ export const productRepository = {
       imageUrl: safeImageUrl,
       status: params.status,
       discountPercent: Math.round(params.discountPercent),
+      wholesaleEnabled: wholesaleActive,
       updatedAt: serverTimestamp(),
     };
     if (params.stock !== null) publicPayload.stock = Math.round(params.stock);
     if (params.discountEndsAtMs !== null) {
       publicPayload.discountEndsAt = Timestamp.fromMillis(params.discountEndsAtMs);
+    }
+    if (wholesaleActive && params.wholesaleMinQty && params.wholesalePrice) {
+      publicPayload.wholesaleMinQty = Math.round(params.wholesaleMinQty);
+      publicPayload.wholesalePrice = Math.round(params.wholesalePrice);
     }
 
     // costPrice is strictly omitted from public doc
@@ -224,6 +245,9 @@ export const productRepository = {
     discountEndsAtMs: number | null;
     status: ProductStatus;
     published: boolean;
+    wholesaleEnabled?: boolean;
+    wholesaleMinQty?: number | null;
+    wholesalePrice?: number | null;
   }): Promise<void> {
     const check = validateProductForm({
       name: params.name,
@@ -231,11 +255,21 @@ export const productRepository = {
       costPriceText: String(params.costPrice),
       stockText: params.stock !== null ? String(params.stock) : '',
       discountText: String(params.discountPercent),
+      wholesaleEnabled: params.wholesaleEnabled,
+      wholesaleMinQtyText:
+        params.wholesaleMinQty !== undefined && params.wholesaleMinQty !== null
+          ? String(params.wholesaleMinQty)
+          : '',
+      wholesalePriceText:
+        params.wholesalePrice !== undefined && params.wholesalePrice !== null
+          ? String(params.wholesalePrice)
+          : '',
     });
     if (!check.valid) throw new Error(check.error);
 
     const safeImageUrl = sanitizeImageUrl(params.imageUrl);
     const db = getFirebaseDb();
+    const wholesaleActive = Boolean(params.wholesaleEnabled);
     await updateDoc(doc(db, 'products', params.productId), {
       category: params.category,
       name: sanitizeUserText(params.name, MAX_PRODUCT_NAME_LENGTH),
@@ -249,6 +283,15 @@ export const productRepository = {
       discountEndsAt:
         params.discountEndsAtMs !== null
           ? Timestamp.fromMillis(params.discountEndsAtMs)
+          : deleteField(),
+      wholesaleEnabled: wholesaleActive,
+      wholesaleMinQty:
+        wholesaleActive && params.wholesaleMinQty
+          ? Math.round(params.wholesaleMinQty)
+          : deleteField(),
+      wholesalePrice:
+        wholesaleActive && params.wholesalePrice
+          ? Math.round(params.wholesalePrice)
           : deleteField(),
       updatedAt: serverTimestamp(),
     });

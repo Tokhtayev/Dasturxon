@@ -87,6 +87,17 @@ export const ProductFeedCard: React.FC<ProductFeedCardProps> = ({ product, onSel
               {product.description}
             </p>
           )}
+          {product.wholesaleEnabled && product.wholesaleMinQty && product.wholesalePrice && (
+            <div
+              className="inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-lg"
+              style={{
+                backgroundColor: 'var(--dx-secondary-container)',
+                color: 'var(--dx-on-secondary-container)',
+              }}
+            >
+              📦 Optom ({product.wholesaleMinQty}+): {formatSoM(product.wholesalePrice)}
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { orderRepository } from '../repositories/orderRepository';
 import { IN_PROGRESS_ORDER_STATUSES, TERMINAL_ORDER_STATUSES } from '../services/constants';
-import type { Business, CustomerOrder, FulfillmentType, Product } from '../types/domain';
+import type { Business, CustomerOrder, FulfillmentType, OrderType, Product } from '../types/domain';
 
 export function useCustomerOrders(customerId: string | undefined) {
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
@@ -47,6 +47,7 @@ export function useCustomerOrders(customerId: string | undefined) {
     fulfillmentType: FulfillmentType;
     deliveryAddress: string;
     advanceReceiptUrl?: string;
+    orderType?: OrderType;
   }) => {
     if (!customerId) throw new Error('Avval tizimga kiring.');
     return orderRepository.placeOrderTransaction({

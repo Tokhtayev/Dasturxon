@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-import { Clock, ShoppingBag, User } from 'lucide-react';
+import { Boxes, Clock, ShoppingBag, User } from 'lucide-react';
 import { AppShell } from '../../components/AppShell';
 
 interface CustomerLayoutProps {
@@ -16,6 +16,7 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ isDark, onToggle
       onToggleTheme={onToggleTheme}
       navItems={[
         { to: '/feed', label: 'Mahsulotlar', icon: <ShoppingBag className="w-4 h-4" /> },
+        { to: '/wholesale', label: 'Optom', icon: <Boxes className="w-4 h-4" /> },
         { to: '/orders', label: 'Buyurtmalarim', icon: <Clock className="w-4 h-4" /> },
         { to: '/profile', label: 'Profil', icon: <User className="w-4 h-4" /> },
       ]}

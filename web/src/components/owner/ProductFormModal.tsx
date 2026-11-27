@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Camera, ImagePlus, Trash2, X } from 'lucide-react';
 import { BYTES_PER_KILOBYTE, BUSINESS_TYPE_VISUALS } from '../../services/constants';
+import { formatSoM } from '../../services/analytics';
 import { getReadableErrorMessage } from '../../services/errors';
 import { compressImageToBase64 } from '../../services/imageCompression';
 import { validateProductForm } from '../../services/validators';
@@ -26,6 +27,9 @@ export interface ProductFormSaveParams {
   discountEndsAtMs: number | null;
   status: ProductStatus;
   published: boolean;
+  wholesaleEnabled?: boolean;
+  wholesaleMinQty?: number | null;
+  wholesalePrice?: number | null;
 }
 
 interface ProductFormModalProps {
@@ -46,6 +50,9 @@ interface FormFieldsState {
   discountText: string;
   status: ProductStatus;
   published: boolean;
+  wholesaleEnabled: boolean;
+  wholesaleMinQtyText: string;
+  wholesalePriceText: string;
 }
 
 function initialFormFields(
@@ -63,6 +70,13 @@ function initialFormFields(
     discountText: editing ? String(editing.discountPercent) : '0',
     status: editing?.status ?? 'hot_ready',
     published: editing?.published ?? true,
+    wholesaleEnabled: Boolean(editing?.wholesaleEnabled),
+    wholesaleMinQtyText:
+      editing?.wholesaleMinQty && editing.wholesaleMinQty > 0
+        ? String(editing.wholesaleMinQty)
+        : '200',
+    wholesalePriceText:
+      editing?.wholesalePrice && editing.wholesalePrice > 0 ? String(editing.wholesalePrice) : '',
   };
 }
 
@@ -80,7 +94,23 @@ function toSaveParams(fields: FormFieldsState, productId?: string): ProductFormS
     discountEndsAtMs: null,
     status: fields.status,
     published: fields.published,
+    wholesaleEnabled: fields.wholesaleEnabled,
+    wholesaleMinQty: fields.wholesaleEnabled ? Number(fields.wholesaleMinQtyText) : null,
+    wholesalePrice: fields.wholesaleEnabled ? Number(fields.wholesalePriceText) : null,
   };
+}
+
+function validateFieldsState(fields: FormFieldsState) {
+  return validateProductForm({
+    name: fields.name,
+    priceText: fields.priceText,
+    costPriceText: fields.costText,
+    stockText: fields.stockText,
+    discountText: fields.discountText,
+    wholesaleEnabled: fields.wholesaleEnabled,
+    wholesaleMinQtyText: fields.wholesaleMinQtyText,
+    wholesalePriceText: fields.wholesalePriceText,
+  });
 }
 
 export const ProductFormModal: React.FC<ProductFormModalProps> = ({
@@ -116,13 +146,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormErr(null);
-    const check = validateProductForm({
-      name: fields.name,
-      priceText: fields.priceText,
-      costPriceText: fields.costText,
-      stockText: fields.stockText,
-      discountText: fields.discountText,
-    });
+    const check = validateFieldsState(fields);
     if (!check.valid) return setFormErr(check.error ?? "Ma'lumotlarni tekshiring.");
 
     setSaving(true);
@@ -143,14 +167,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         className="w-full max-w-md rounded-3xl border p-6 space-y-3.5 max-h-[92vh] overflow-y-auto"
         style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
       >
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold">
-            {editing ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot'}
-          </h2>
-          <button type="button" onClick={onClose} aria-label="Yopish" className="cursor-pointer">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        <ProductFormHeader editing={editing} onClose={onClose} />
 
         <ProductPhotoPicker
           imageUrl={fields.imageUrl}
@@ -184,6 +201,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           onPublishedChange={(published) => patch({ published })}
         />
 
+        <ProductWholesaleSection
+          wholesaleEnabled={fields.wholesaleEnabled}
+          onToggle={(wholesaleEnabled) => patch({ wholesaleEnabled })}
+          minQtyText={fields.wholesaleMinQtyText}
+          onMinQtyChange={(wholesaleMinQtyText) => patch({ wholesaleMinQtyText })}
+          wholesalePriceText={fields.wholesalePriceText}
+          onWholesalePriceChange={(wholesalePriceText) => patch({ wholesalePriceText })}
+          costText={fields.costText}
+        />
+
         {formErr && (
           <div
             role="alert"
@@ -209,6 +236,20 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     </div>
   );
 };
+
+const ProductFormHeader: React.FC<{ editing: Product | null; onClose: () => void }> = ({
+  editing,
+  onClose,
+}) => (
+  <div className="flex items-center justify-between">
+    <h2 className="font-display text-lg font-bold">
+      {editing ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot'}
+    </h2>
+    <button type="button" onClick={onClose} aria-label="Yopish" className="cursor-pointer">
+      <X className="w-5 h-5" />
+    </button>
+  </div>
+);
 
 const ProductPhotoPicker: React.FC<{
   imageUrl: string;
@@ -452,3 +493,80 @@ const ProductTextFields: React.FC<{
     />
   </>
 );
+
+const ProductWholesaleSection: React.FC<{
+  wholesaleEnabled: boolean;
+  onToggle: (val: boolean) => void;
+  minQtyText: string;
+  onMinQtyChange: (val: string) => void;
+  wholesalePriceText: string;
+  onWholesalePriceChange: (val: string) => void;
+  costText: string;
+}> = ({
+  wholesaleEnabled,
+  onToggle,
+  minQtyText,
+  onMinQtyChange,
+  wholesalePriceText,
+  onWholesalePriceChange,
+  costText,
+}) => {
+  const minQty = Number(minQtyText);
+  const wPrice = Number(wholesalePriceText);
+  const cost = Number(costText);
+  const previewValid = Number.isInteger(minQty) && minQty >= 2 && wPrice > 0;
+
+  return (
+    <div
+      className="p-3.5 rounded-2xl border space-y-2.5"
+      style={{
+        backgroundColor: wholesaleEnabled ? 'var(--dx-secondary-container)' : 'var(--dx-bg)',
+        borderColor: wholesaleEnabled ? 'var(--dx-secondary)' : 'var(--dx-border)',
+      }}
+    >
+      <label className="inline-flex items-center gap-2 text-xs font-extrabold cursor-pointer">
+        <input
+          type="checkbox"
+          checked={wholesaleEnabled}
+          onChange={(e) => onToggle(e.target.checked)}
+        />
+        📦 Optom (ulgurji) savdoni yoqish
+      </label>
+
+      {wholesaleEnabled && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-bold block mb-1">Minimal soni (dona)</label>
+              <input
+                type="number"
+                value={minQtyText}
+                onChange={(e) => onMinQtyChange(e.target.value)}
+                placeholder="200"
+                className="w-full px-3 py-2 rounded-xl border text-sm"
+                style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold block mb-1">Optom narxi (1 dona)</label>
+              <input
+                type="number"
+                value={wholesalePriceText}
+                onChange={(e) => onWholesalePriceChange(e.target.value)}
+                placeholder="2700"
+                className="w-full px-3 py-2 rounded-xl border text-sm"
+                style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
+              />
+            </div>
+          </div>
+          {previewValid && (
+            <div className="text-[11px] font-bold" style={{ color: 'var(--dx-secondary)' }}>
+              Partiya: {minQty} dona × {formatSoM(wPrice)} = {formatSoM(minQty * wPrice)}
+              {cost > 0 ? ` · Foyda/dona: ${formatSoM(wPrice - cost)}` : ''}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};

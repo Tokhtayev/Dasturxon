@@ -156,7 +156,16 @@ service cloud.firestore {
         && (!('discountPercent' in request.resource.data) ||
             (request.resource.data.discountPercent is int &&
              request.resource.data.discountPercent >= 0 &&
-             request.resource.data.discountPercent <= 90));
+             request.resource.data.discountPercent <= 90))
+        && (!('wholesaleEnabled' in request.resource.data) ||
+            request.resource.data.wholesaleEnabled == false ||
+            (request.resource.data.wholesaleEnabled == true &&
+             request.resource.data.wholesaleMinQty is int &&
+             request.resource.data.wholesaleMinQty >= 2 &&
+             request.resource.data.wholesaleMinQty <= 10000 &&
+             request.resource.data.wholesalePrice is int &&
+             request.resource.data.wholesalePrice > 0 &&
+             request.resource.data.wholesalePrice < request.resource.data.price));
 
       // Update & Delete:
       // - Business owner or admin can update/delete products (businessId immutable, no costPrice, valid bounds).
@@ -167,7 +176,15 @@ service cloud.firestore {
          (!('imageUrl' in request.resource.data) || (request.resource.data.imageUrl is string && request.resource.data.imageUrl.size() <= 900000)) &&
          (!('price' in request.resource.data) || (request.resource.data.price is int && request.resource.data.price > 0)) &&
          (!('stock' in request.resource.data) || request.resource.data.stock == null || (request.resource.data.stock is int && request.resource.data.stock >= 0)) &&
-         (!('discountPercent' in request.resource.data) || (request.resource.data.discountPercent is int && request.resource.data.discountPercent >= 0 && request.resource.data.discountPercent <= 90))) ||
+         (!('discountPercent' in request.resource.data) || (request.resource.data.discountPercent is int && request.resource.data.discountPercent >= 0 && request.resource.data.discountPercent <= 90)) &&
+         (!('wholesaleEnabled' in request.resource.data) ||
+          request.resource.data.wholesaleEnabled == false ||
+          (request.resource.data.wholesaleEnabled == true &&
+           request.resource.data.wholesaleMinQty is int &&
+           request.resource.data.wholesaleMinQty >= 2 &&
+           request.resource.data.wholesaleMinQty <= 10000 &&
+           request.resource.data.wholesalePrice is int &&
+           request.resource.data.wholesalePrice > 0))) ||
         isAdmin() ||
         (
           isBusinessApproved(resource.data.businessId) &&
@@ -182,7 +199,17 @@ service cloud.firestore {
           getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.status in ['pending', 'new'] &&
           getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.quantity is int &&
           getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.quantity > 0 &&
-          getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.quantity <= 99 &&
+          (
+            (!('orderType' in getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data) ||
+             getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.orderType != 'wholesale')
+              ? getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.quantity <= 99
+              : ('wholesaleEnabled' in resource.data &&
+                 resource.data.wholesaleEnabled == true &&
+                 'wholesaleMinQty' in resource.data &&
+                 resource.data.wholesaleMinQty is int &&
+                 getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.quantity >= resource.data.wholesaleMinQty &&
+                 getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.quantity <= 10000)
+          ) &&
           request.resource.data.stock == resource.data.stock - getAfter(/databases/$(database)/documents/orders/$(request.resource.data.lastCheckoutOrderId)).data.quantity &&
           request.resource.data.stock >= 0 &&
           ((request.resource.data.stock == 0 && request.resource.data.status == 'sold_out') ||
@@ -217,13 +244,26 @@ service cloud.firestore {
       );
 
       // Create: Signed-in customer creates order for themselves with initial status 'pending' (or legacy 'new')
-      // for an approved business with bounded quantity (1..99) and at least 50% advance when prepayment fields are set
+      // for an approved business with bounded quantity (1..99 retail, wholesaleMinQty..10000 wholesale) and >= 50% advance
       allow create: if isSignedIn()
         && request.resource.data.customerId == request.auth.uid
         && request.resource.data.status in ['pending', 'new']
         && request.resource.data.quantity is int
         && request.resource.data.quantity > 0
-        && request.resource.data.quantity <= 99
+        && (
+          ((!('orderType' in request.resource.data) || request.resource.data.orderType == 'retail') &&
+           request.resource.data.quantity <= 99) ||
+          (request.resource.data.orderType == 'wholesale' &&
+           exists(/databases/$(database)/documents/products/$(request.resource.data.productId)) &&
+           get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.wholesaleEnabled == true &&
+           get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.wholesaleMinQty is int &&
+           request.resource.data.quantity >= get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.wholesaleMinQty &&
+           request.resource.data.quantity <= 10000 &&
+           get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.wholesalePrice is int &&
+           get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.wholesalePrice > 0 &&
+           (!('unitPrice' in request.resource.data) ||
+            request.resource.data.unitPrice == get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.wholesalePrice))
+        )
         && (!('totalPrice' in request.resource.data) || (request.resource.data.totalPrice is int && request.resource.data.totalPrice > 0))
         && (!('paymentStatus' in request.resource.data) || request.resource.data.paymentStatus in ['unpaid', 'pending'])
         && (!('receiptUrl' in request.resource.data) || request.resource.data.receiptUrl == '')
@@ -289,6 +329,12 @@ service cloud.firestore {
             : prod.price;
         }
 
+        function parentOrderData() {
+          return exists(/databases/$(database)/documents/orders/$(orderId))
+            ? get(/databases/$(database)/documents/orders/$(orderId)).data
+            : getAfter(/databases/$(database)/documents/orders/$(orderId)).data;
+        }
+
         allow read: if isSignedIn() && (
           get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid ||
           isBusinessOwner(get(/databases/$(database)/documents/orders/$(orderId)).data.businessId) ||
@@ -296,14 +342,21 @@ service cloud.firestore {
         );
 
         // Customer creates line item (standalone or inside checkout transaction):
-        // unitPrice must match product sellingPrice (or active discounted price)
-        allow create: if isSignedIn() && (
-          (exists(/databases/$(database)/documents/orders/$(orderId)) &&
-           get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid) ||
-          getAfter(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid
-        ) &&
-          request.resource.data.unitPrice == expectedLineItemPrice(get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data) &&
-          request.resource.data.qty > 0 && request.resource.data.qty <= 99;
+        // retail enforces expectedLineItemPrice & qty 1..99; wholesale enforces wholesalePrice & wholesaleMinQty..10000
+        allow create: if isSignedIn()
+          && parentOrderData().customerId == request.auth.uid
+          && request.resource.data.qty is int
+          && request.resource.data.qty > 0
+          && (
+            (('orderType' in parentOrderData() && parentOrderData().orderType == 'wholesale') &&
+             get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.wholesaleEnabled == true &&
+             request.resource.data.unitPrice == get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.wholesalePrice &&
+             request.resource.data.qty >= get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.wholesaleMinQty &&
+             request.resource.data.qty <= 10000) ||
+            ((!('orderType' in parentOrderData()) || parentOrderData().orderType != 'wholesale') &&
+             request.resource.data.unitPrice == expectedLineItemPrice(get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data) &&
+             request.resource.data.qty <= 99)
+          );
 
         // When completing, the owner writes unitCost per item snapshot
         allow update: if isSignedIn() && (

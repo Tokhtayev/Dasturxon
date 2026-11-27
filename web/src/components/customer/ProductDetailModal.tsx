@@ -68,6 +68,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <span className="text-xs font-bold">Zaxira: {product.stock} ta</span>
             )}
           </div>
+          {product.wholesaleEnabled && product.wholesaleMinQty && product.wholesalePrice && (
+            <div
+              className="p-2.5 rounded-xl border text-xs font-bold"
+              style={{
+                backgroundColor: 'var(--dx-secondary-container)',
+                borderColor: 'var(--dx-secondary)',
+                color: 'var(--dx-on-secondary-container)',
+              }}
+            >
+              📦 Optom ({product.wholesaleMinQty}+ dona): {formatSoM(product.wholesalePrice)} / dona
+            </div>
+          )}
           {product.description && (
             <p className="text-sm" style={{ color: 'var(--dx-muted)' }}>
               {product.description}

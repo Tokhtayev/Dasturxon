@@ -119,7 +119,12 @@ export interface Product {
   discountEndsAtMs: number | null;
   imageUrl: string;
   updatedAtMs: number;
+  wholesaleEnabled?: boolean;
+  wholesaleMinQty?: number | null;
+  wholesalePrice?: number | null;
 }
+
+export type OrderType = 'retail' | 'wholesale';
 
 export type OrderStatusKey =
   'pending' | 'accepted' | 'ready' | 'completed' | 'rejected' | 'cancelled';
@@ -165,6 +170,7 @@ export interface CustomerOrder {
   advanceReceiptUrl?: string;
   advanceUploadedAtMs?: number;
   advanceVerifiedAtMs?: number;
+  orderType?: OrderType;
 }
 
 export interface Expense {

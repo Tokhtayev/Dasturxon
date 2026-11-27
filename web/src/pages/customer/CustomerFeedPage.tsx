@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Boxes } from 'lucide-react';
+import { FeedFilterControls } from '../../components/customer/FeedFilterControls';
 import { OrderCheckoutModal } from '../../components/customer/OrderCheckoutModal';
 import { ProductDetailModal } from '../../components/customer/ProductDetailModal';
 import { ProductFeedCard } from '../../components/customer/ProductFeedCard';
@@ -8,12 +9,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useCustomerFeed } from '../../hooks/useCustomerFeed';
 import { useCustomerOrders } from '../../hooks/useCustomerOrders';
 import { isValidContactPhone } from '../../services/validators';
-import {
-  BUSINESS_TYPES,
-  type BusinessTypeKey,
-  type FulfillmentType,
-  type Product,
-} from '../../types/domain';
+import type { FulfillmentType, OrderType, Product } from '../../types/domain';
 
 export const CustomerFeedPage: React.FC = () => {
   const navigate = useNavigate();
@@ -43,6 +39,7 @@ export const CustomerFeedPage: React.FC = () => {
     deliveryAddress: string;
     contactPhone: string;
     advanceReceiptUrl?: string;
+    orderType?: OrderType;
   }) => {
     if (!checkoutProduct) return;
     const business = businessById.get(checkoutProduct.businessId);
@@ -58,6 +55,7 @@ export const CustomerFeedPage: React.FC = () => {
       fulfillmentType: params.fulfillmentType,
       deliveryAddress: params.deliveryAddress,
       advanceReceiptUrl: params.advanceReceiptUrl,
+      orderType: params.orderType,
     });
     if (
       profile &&
@@ -73,11 +71,24 @@ export const CustomerFeedPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl sm:text-3xl font-extrabold">Mahalla Bozori</h1>
-        <p className="text-xs sm:text-sm mt-0.5" style={{ color: 'var(--dx-muted)' }}>
-          Tasdiqlangan mahalliy bizneslar: {businesses.length} ta · Jonli mahsulotlar
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl sm:text-3xl font-extrabold">Mahalla Bozori</h1>
+          <p className="text-xs sm:text-sm mt-0.5" style={{ color: 'var(--dx-muted)' }}>
+            Tasdiqlangan mahalliy bizneslar: {businesses.length} ta · Jonli mahsulotlar
+          </p>
+        </div>
+        <Link
+          to="/wholesale"
+          className="px-3.5 py-2 rounded-xl border text-xs font-extrabold inline-flex items-center gap-1.5"
+          style={{
+            backgroundColor: 'var(--dx-secondary-container)',
+            borderColor: 'var(--dx-secondary)',
+            color: 'var(--dx-on-secondary-container)',
+          }}
+        >
+          <Boxes className="w-4 h-4" /> Optom bozor →
+        </Link>
       </div>
 
       <FeedFilterControls
@@ -129,13 +140,6 @@ export const CustomerFeedPage: React.FC = () => {
   );
 };
 
-interface FeedFilterControlsProps {
-  searchQuery: string;
-  onSearchChange: (val: string) => void;
-  categoryFilter: 'all' | BusinessTypeKey;
-  onCategoryChange: (val: 'all' | BusinessTypeKey) => void;
-}
-
 const FeedSkeletons: React.FC = () => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
     {[1, 2, 3].map((k) => (
@@ -171,70 +175,3 @@ const FeedProductGrid: React.FC<{
       ))}
     </div>
   );
-
-const FeedFilterControls: React.FC<FeedFilterControlsProps> = ({
-  searchQuery,
-  onSearchChange,
-  categoryFilter,
-  onCategoryChange,
-}) => (
-  <div className="space-y-3">
-    <div className="relative">
-      <Search
-        className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2"
-        style={{ color: 'var(--dx-muted)' }}
-      />
-      <input
-        type="text"
-        value={searchQuery}
-        onChange={(e) => onSearchChange(e.target.value)}
-        placeholder="Mahsulot yoki do‘kon qidirish…"
-        className="w-full pl-10 pr-10 py-3 rounded-2xl border text-sm focus:outline-none"
-        style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
-      />
-      {searchQuery && (
-        <button
-          type="button"
-          onClick={() => onSearchChange('')}
-          aria-label="Qidiruvni tozalash"
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 cursor-pointer"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      )}
-    </div>
-
-    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-      <button
-        type="button"
-        onClick={() => onCategoryChange('all')}
-        className="px-3.5 py-1.5 rounded-xl border text-xs font-bold whitespace-nowrap cursor-pointer"
-        style={{
-          backgroundColor: categoryFilter === 'all' ? 'var(--dx-primary)' : 'var(--dx-surface)',
-          color: categoryFilter === 'all' ? 'var(--dx-on-primary)' : 'var(--dx-text)',
-          borderColor: categoryFilter === 'all' ? 'var(--dx-primary)' : 'var(--dx-border)',
-        }}
-      >
-        Barchasi
-      </button>
-      {BUSINESS_TYPES.map((bt) => {
-        const active = categoryFilter === bt.storedValue;
-        return (
-          <button
-            key={bt.storedValue}
-            type="button"
-            onClick={() => onCategoryChange(bt.storedValue)}
-            className="px-3.5 py-1.5 rounded-xl border text-xs font-bold whitespace-nowrap cursor-pointer"
-            style={{
-              backgroundColor: active ? 'var(--dx-primary)' : 'var(--dx-surface)',
-              color: active ? 'var(--dx-on-primary)' : 'var(--dx-text)',
-              borderColor: active ? 'var(--dx-primary)' : 'var(--dx-border)',
-            }}
-          >
-            {bt.icon} {bt.labelUz}
-          </button>
-        );
-      })}
-    </div>
-  </div>
-);

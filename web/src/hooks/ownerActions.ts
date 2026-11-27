@@ -76,6 +76,9 @@ export function buildOwnerActions({ ownerId, business, costMap, setCostMap }: Ow
       discountEndsAtMs: number | null;
       status: ProductStatus;
       published: boolean;
+      wholesaleEnabled?: boolean;
+      wholesaleMinQty?: number | null;
+      wholesalePrice?: number | null;
     }) => {
       if (!business) throw new Error('Avval biznes profilini yarating.');
       const id = await productRepository.create({ business, ...params });
@@ -95,6 +98,9 @@ export function buildOwnerActions({ ownerId, business, costMap, setCostMap }: Ow
       discountEndsAtMs: number | null;
       status: ProductStatus;
       published: boolean;
+      wholesaleEnabled?: boolean;
+      wholesaleMinQty?: number | null;
+      wholesalePrice?: number | null;
     }) => {
       await productRepository.update(params);
       setCostMap((prev) => new Map(prev).set(params.productId, params.costPrice));

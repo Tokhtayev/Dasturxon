@@ -18,6 +18,7 @@ import {
   MAX_STOCK_COUNT,
   MAX_TYPE_NOTE_LENGTH,
   MAX_WEBHOOK_URL_LENGTH,
+  MAX_WHOLESALE_QUANTITY,
   MIN_BUSINESS_ADDRESS_LENGTH,
   MIN_BUSINESS_NAME_LENGTH,
   MIN_EXPENSE_TITLE_LENGTH,
@@ -28,6 +29,7 @@ import {
   MIN_REJECTION_REASON_LENGTH,
   MIN_SUMMARY_LENGTH,
   MIN_TYPE_NOTE_LENGTH,
+  MIN_WHOLESALE_QTY,
   NICKNAME_FALLBACK_UID_LEN,
   NICKNAME_UID_SUFFIX_LEN,
 } from './constants.ts';
@@ -168,6 +170,9 @@ export function validateProductForm(params: {
   costPriceText: string;
   stockText: string;
   discountText: string;
+  wholesaleEnabled?: boolean;
+  wholesaleMinQtyText?: string;
+  wholesalePriceText?: string;
 }): ValidationResult {
   if (!sanitizeUserText(params.name, MAX_PRODUCT_NAME_LENGTH)) {
     return { valid: false, error: 'Mahsulot nomini kiriting.' };
@@ -191,6 +196,26 @@ export function validateProductForm(params: {
   const discount = params.discountText.trim() ? Number(params.discountText) : 0;
   if (!Number.isInteger(discount) || discount < 0 || discount > MAX_DISCOUNT_PERCENT) {
     return { valid: false, error: "Chegirma 0 dan 90 foizgacha bo'lishi kerak." };
+  }
+  if (params.wholesaleEnabled) {
+    const minQty = Number(params.wholesaleMinQtyText ?? '');
+    if (
+      !Number.isInteger(minQty) ||
+      minQty < MIN_WHOLESALE_QTY ||
+      minQty > MAX_WHOLESALE_QUANTITY
+    ) {
+      return {
+        valid: false,
+        error: `Minimal optom miqdori ${MIN_WHOLESALE_QTY} dan ${MAX_WHOLESALE_QUANTITY} gacha butun son bo'lsin.`,
+      };
+    }
+    const wPrice = Number(params.wholesalePriceText ?? '');
+    if (!Number.isInteger(wPrice) || wPrice <= 0 || wPrice >= price) {
+      return {
+        valid: false,
+        error: "Optom narxi 0 dan katta va oddiy sotish narxidan arzonroq bo'lishi kerak.",
+      };
+    }
   }
   return { valid: true };
 }
