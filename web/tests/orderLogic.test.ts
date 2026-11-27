@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyStockDecrement,
+  calculateOrderPrepayment,
   calculateOrderTotal,
   computeRemainingStock,
   isValidOrderTransition,
@@ -65,5 +66,19 @@ describe('orderLogic', () => {
     expect(isValidOrderTransition('owner', 'pending', 'rejected')).toBe(true);
     expect(isValidOrderTransition('owner', 'completed', 'cancelled')).toBe(false);
     expect(isValidOrderTransition('owner', 'cancelled', 'accepted')).toBe(false);
+  });
+
+  it('calculateOrderPrepayment computes exact 50% advance and remaining balance without rounding loss', () => {
+    expect(calculateOrderPrepayment(15000)).toEqual({
+      prepaymentPercent: 50,
+      prepaymentAmount: 7500,
+      remainingAmount: 7500,
+    });
+    expect(calculateOrderPrepayment(5001)).toEqual({
+      prepaymentPercent: 50,
+      prepaymentAmount: 2501,
+      remainingAmount: 2500,
+    });
+    expect(() => calculateOrderPrepayment(0)).toThrow('0 dan katta');
   });
 });

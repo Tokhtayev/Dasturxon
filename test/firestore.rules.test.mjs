@@ -1000,6 +1000,82 @@ test("45. Only Admin can write validated Google Apps Script URL in appSettings/n
   assert.equal(readBack.data().emailWebhookUrl, validUrl);
 });
 
+// 46. 50% advance prepayment enforcement: customer cannot underpay or self-verify advance_paid; can upload advance receipt; owner verifies
+test("46. Order 50% advance payment prevents self-approval and enforces >= 50% prepaymentAmount", async () => {
+  const dbCust = testEnv.authenticatedContext("customer-1").firestore();
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  const advOrderId = "order-advance-50";
+  const sampleCheck = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB";
+
+  // Reject under-50% prepaymentAmount
+  await assertFails(setDoc(doc(dbCust, `orders/${advOrderId}`), {
+    customerId: "customer-1",
+    businessId: "business-1",
+    productId: "product-approved",
+    quantity: 2,
+    totalPrice: 16000,
+    prepaymentPercent: 50,
+    prepaymentAmount: 4000,
+    prepaymentStatus: "awaiting_advance",
+    status: "pending",
+    paymentStatus: "unpaid",
+    createdAt: Timestamp.now()
+  }));
+
+  // Reject customer self-approving advance_paid at create
+  await assertFails(setDoc(doc(dbCust, `orders/${advOrderId}`), {
+    customerId: "customer-1",
+    businessId: "business-1",
+    productId: "product-approved",
+    quantity: 2,
+    totalPrice: 16000,
+    prepaymentPercent: 50,
+    prepaymentAmount: 8000,
+    prepaymentStatus: "advance_paid",
+    status: "pending",
+    paymentStatus: "unpaid",
+    createdAt: Timestamp.now()
+  }));
+
+  // Valid order with 50% prepayment awaiting_advance succeeds
+  await assertSucceeds(setDoc(doc(dbCust, `orders/${advOrderId}`), {
+    customerId: "customer-1",
+    businessId: "business-1",
+    productId: "product-approved",
+    quantity: 2,
+    totalPrice: 16000,
+    prepaymentPercent: 50,
+    prepaymentAmount: 8000,
+    prepaymentStatus: "awaiting_advance",
+    status: "pending",
+    paymentStatus: "unpaid",
+    createdAt: Timestamp.now()
+  }));
+
+  // Customer cannot mark advance_paid on update
+  await assertFails(updateDoc(doc(dbCust, `orders/${advOrderId}`), {
+    prepaymentStatus: "advance_paid",
+    advanceReceiptUrl: sampleCheck
+  }));
+
+  // Customer uploads 50% advance receipt (advance_submitted)
+  await assertSucceeds(updateDoc(doc(dbCust, `orders/${advOrderId}`), {
+    prepaymentStatus: "advance_submitted",
+    advanceReceiptUrl: sampleCheck,
+    advanceUploadedAt: Timestamp.now(),
+    updatedAt: Timestamp.now()
+  }));
+
+  // Owner cannot tamper with prepaymentAmount, but CAN verify advance_paid
+  await assertFails(updateDoc(doc(dbOwner, `orders/${advOrderId}`), {
+    prepaymentAmount: 1000
+  }));
+  await assertSucceeds(updateDoc(doc(dbOwner, `orders/${advOrderId}`), {
+    prepaymentStatus: "advance_paid",
+    updatedAt: Timestamp.now()
+  }));
+});
+
 
 
 

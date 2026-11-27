@@ -125,6 +125,7 @@ export type OrderStatusKey =
   'pending' | 'accepted' | 'ready' | 'completed' | 'rejected' | 'cancelled';
 
 export type PaymentStatus = 'unpaid' | 'paid';
+export type PrepaymentStatus = 'awaiting_advance' | 'advance_submitted' | 'advance_paid';
 export type FulfillmentType = 'pickup' | 'delivery';
 
 export interface OrderLineItem {
@@ -158,6 +159,12 @@ export interface CustomerOrder {
   paidAtMs?: number;
   receiptUrl?: string;
   receiptUploadedAtMs?: number;
+  prepaymentPercent?: number;
+  prepaymentAmount?: number;
+  prepaymentStatus?: PrepaymentStatus;
+  advanceReceiptUrl?: string;
+  advanceUploadedAtMs?: number;
+  advanceVerifiedAtMs?: number;
 }
 
 export interface Expense {

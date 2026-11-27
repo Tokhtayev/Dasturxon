@@ -1,5 +1,11 @@
 import type { OrderStatusKey, ProductStatus } from '../types/domain';
-import { MAX_ORDER_QUANTITY, MAX_PRICE_SOM, MIN_ORDER_QUANTITY } from './constants.ts';
+import {
+  MAX_ORDER_QUANTITY,
+  MAX_PRICE_SOM,
+  MIN_ORDER_QUANTITY,
+  PERCENT_DIVISOR,
+  PREPAYMENT_PERCENT,
+} from './constants.ts';
 
 /**
  * Computes remaining stock after an order using explicit boundary checks.
@@ -49,6 +55,27 @@ export function calculateOrderTotal(unitPrice: number, quantity: number): number
     throw new Error("Buyurtma miqdori 1 dan 99 gacha bo'lishi kerak.");
   }
   return Math.round(unitPrice) * quantity;
+}
+
+/**
+ * Splits an order total into upfront advance (50%, rounded up) and remaining pickup/delivery balance.
+ * Enforces prepaymentAmount + remainingAmount === totalPrice and prepaymentAmount * 2 >= totalPrice.
+ */
+export function calculateOrderPrepayment(totalPrice: number): {
+  prepaymentPercent: number;
+  prepaymentAmount: number;
+  remainingAmount: number;
+} {
+  if (!Number.isFinite(totalPrice) || totalPrice <= 0) {
+    throw new Error("Buyurtma summasi 0 dan katta bo'lishi kerak.");
+  }
+  const roundedTotal = Math.round(totalPrice);
+  const prepaymentAmount = Math.ceil((roundedTotal * PREPAYMENT_PERCENT) / PERCENT_DIVISOR);
+  return {
+    prepaymentPercent: PREPAYMENT_PERCENT,
+    prepaymentAmount,
+    remainingAmount: roundedTotal - prepaymentAmount,
+  };
 }
 
 const OWNER_TRANSITIONS: Record<OrderStatusKey, readonly OrderStatusKey[]> = {

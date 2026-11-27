@@ -21,7 +21,11 @@ import {
   PERCENT_DIVISOR,
   TERMINAL_ORDER_STATUSES,
 } from '../services/constants';
-import { applyStockDecrement, calculateOrderTotal } from '../services/orderLogic';
+import {
+  applyStockDecrement,
+  calculateOrderPrepayment,
+  calculateOrderTotal,
+} from '../services/orderLogic';
 import {
   sanitizeDeliveryAddress,
   sanitizeImageUrl,
@@ -33,6 +37,7 @@ import type {
   FulfillmentType,
   OrderStatusKey,
   PaymentStatus,
+  PrepaymentStatus,
   Product,
 } from '../types/domain';
 
@@ -80,7 +85,49 @@ export function mapOrderDoc(id: string, data: Record<string, unknown>): Customer
     receiptUrl:
       typeof data.receiptUrl === 'string' && data.receiptUrl.trim() ? data.receiptUrl : undefined,
     receiptUploadedAtMs: data.receiptUploadedAt ? toMillis(data.receiptUploadedAt) : undefined,
+    prepaymentPercent:
+      typeof data.prepaymentPercent === 'number' ? data.prepaymentPercent : undefined,
+    prepaymentAmount: typeof data.prepaymentAmount === 'number' ? data.prepaymentAmount : undefined,
+    prepaymentStatus:
+      data.prepaymentStatus === 'advance_paid' ||
+      data.prepaymentStatus === 'advance_submitted' ||
+      data.prepaymentStatus === 'awaiting_advance'
+        ? data.prepaymentStatus
+        : undefined,
+    advanceReceiptUrl:
+      typeof data.advanceReceiptUrl === 'string' && data.advanceReceiptUrl.trim()
+        ? data.advanceReceiptUrl
+        : undefined,
+    advanceUploadedAtMs: data.advanceUploadedAt ? toMillis(data.advanceUploadedAt) : undefined,
+    advanceVerifiedAtMs: data.advanceVerifiedAt ? toMillis(data.advanceVerifiedAt) : undefined,
   };
+}
+
+function computeCheckoutPricing(pData: Record<string, unknown>, quantity: number) {
+  const status = typeof pData.status === 'string' ? pData.status : 'sold_out';
+  if (!['available', 'hot_ready'].includes(status)) {
+    throw new Error('Mahsulot hozir mavjud emas.');
+  }
+  const currentStock = typeof pData.stock === 'number' ? pData.stock : null;
+  const price = typeof pData.price === 'number' ? pData.price : 0;
+  const discountPercent = typeof pData.discountPercent === 'number' ? pData.discountPercent : 0;
+  const discountEndsAt = pData.discountEndsAt instanceof Timestamp ? pData.discountEndsAt : null;
+
+  const { nextStock, nextStatus } = applyStockDecrement(
+    currentStock,
+    quantity,
+    status === 'hot_ready' ? 'hot_ready' : 'available'
+  );
+  const discountActive =
+    discountPercent > 0 &&
+    discountPercent <= MAX_DISCOUNT_PERCENT &&
+    (discountEndsAt === null || discountEndsAt.toMillis() > Date.now());
+  const unitPrice = discountActive
+    ? price - Math.floor((price * discountPercent) / PERCENT_DIVISOR)
+    : price;
+  const totalPrice = calculateOrderTotal(unitPrice, quantity);
+  const { prepaymentPercent, prepaymentAmount } = calculateOrderPrepayment(totalPrice);
+  return { nextStock, nextStatus, unitPrice, totalPrice, prepaymentPercent, prepaymentAmount };
 }
 
 export const orderRepository = {
@@ -139,12 +186,14 @@ export const orderRepository = {
     pickupTimeMs: number;
     fulfillmentType: FulfillmentType;
     deliveryAddress: string;
+    advanceReceiptUrl?: string;
   }): Promise<string> {
     const db = getFirebaseDb();
     const productRef = doc(db, 'products', params.product.id);
     const businessRef = doc(db, 'businesses', params.business.id);
     const orderRef = doc(collection(db, 'orders'));
     const itemRef = doc(collection(orderRef, 'items'));
+    const safeAdvanceReceipt = sanitizeImageUrl(params.advanceReceiptUrl);
 
     await runTransaction(db, async (tx) => {
       const prodSnap = await tx.get(productRef);
@@ -158,30 +207,8 @@ export const orderRepository = {
       }
 
       const pData = prodSnap.data();
-      const status = typeof pData.status === 'string' ? pData.status : 'sold_out';
-      const currentStock = typeof pData.stock === 'number' ? pData.stock : null;
-      const price = typeof pData.price === 'number' ? pData.price : 0;
-      const discountPercent = typeof pData.discountPercent === 'number' ? pData.discountPercent : 0;
-      const discountEndsAt =
-        pData.discountEndsAt instanceof Timestamp ? pData.discountEndsAt : null;
-
-      if (!['available', 'hot_ready'].includes(status)) {
-        throw new Error('Mahsulot hozir mavjud emas.');
-      }
-      const { nextStock, nextStatus } = applyStockDecrement(
-        currentStock,
-        params.quantity,
-        status === 'hot_ready' ? 'hot_ready' : 'available'
-      );
-
-      const discountActive =
-        discountPercent > 0 &&
-        discountPercent <= MAX_DISCOUNT_PERCENT &&
-        (discountEndsAt === null || discountEndsAt.toMillis() > Date.now());
-      const unitPrice = discountActive
-        ? price - Math.floor((price * discountPercent) / PERCENT_DIVISOR)
-        : price;
-      const totalPrice = calculateOrderTotal(unitPrice, params.quantity);
+      const { nextStock, nextStatus, unitPrice, totalPrice, prepaymentPercent, prepaymentAmount } =
+        computeCheckoutPricing(pData, params.quantity);
       const productName = typeof pData.name === 'string' ? pData.name : params.product.name;
 
       tx.set(orderRef, {
@@ -195,6 +222,12 @@ export const orderRepository = {
         quantity: params.quantity,
         unitPrice,
         totalPrice,
+        prepaymentPercent,
+        prepaymentAmount,
+        prepaymentStatus: safeAdvanceReceipt ? 'advance_submitted' : 'awaiting_advance',
+        ...(safeAdvanceReceipt
+          ? { advanceReceiptUrl: safeAdvanceReceipt, advanceUploadedAt: serverTimestamp() }
+          : {}),
         status: 'pending',
         paymentStatus: 'unpaid',
         fulfillmentType: params.fulfillmentType,
@@ -302,6 +335,43 @@ export const orderRepository = {
         await batch.commit();
       }
     }
+  },
+
+  async submitAdvanceReceipt(orderId: string, receiptUrl: string): Promise<void> {
+    const safeUrl = sanitizeImageUrl(receiptUrl);
+    if (!safeUrl) {
+      throw new Error('50% avans to‘lov chekini tanlang.');
+    }
+    const db = getFirebaseDb();
+    await updateDoc(doc(db, 'orders', orderId), {
+      prepaymentStatus: 'advance_submitted',
+      advanceReceiptUrl: safeUrl,
+      advanceUploadedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  },
+
+  async setPrepaymentStatus(
+    orderId: string,
+    prepaymentStatus: PrepaymentStatus,
+    receiptUrl?: string
+  ): Promise<void> {
+    const db = getFirebaseDb();
+    const payload: Record<string, unknown> = {
+      prepaymentStatus,
+      updatedAt: serverTimestamp(),
+    };
+    if (prepaymentStatus === 'advance_paid') {
+      payload.advanceVerifiedAt = serverTimestamp();
+    } else {
+      payload.advanceVerifiedAt = deleteField();
+    }
+    if (receiptUrl !== undefined) {
+      const safeUrl = sanitizeImageUrl(receiptUrl);
+      payload.advanceReceiptUrl = safeUrl;
+      payload.advanceUploadedAt = safeUrl ? serverTimestamp() : deleteField();
+    }
+    await updateDoc(doc(db, 'orders', orderId), payload);
   },
 
   async setPaymentStatus(

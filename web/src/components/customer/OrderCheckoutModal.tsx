@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Minus, Plus, ShoppingBag, Truck, X } from 'lucide-react';
+import { Check, Minus, PhoneCall, Plus, ShieldCheck, ShoppingBag, Truck, X } from 'lucide-react';
 import { formatSoM, getEffectivePrice } from '../../services/analytics';
 import {
   MAX_ORDER_QUANTITY,
@@ -8,8 +8,15 @@ import {
   MS_PER_MINUTE,
 } from '../../services/constants';
 import { getReadableErrorMessage } from '../../services/errors';
-import { isValidContactPhone } from '../../services/validators';
+import { compressImageToBase64 } from '../../services/imageCompression';
+import { calculateOrderPrepayment } from '../../services/orderLogic';
+import {
+  buildTelHref,
+  formatContactPhoneDisplay,
+  isValidContactPhone,
+} from '../../services/validators';
 import type { FulfillmentType, Product } from '../../types/domain';
+import { ReceiptPhotoPicker } from '../ReceiptPhotoPicker';
 
 type PickupPreset = '30m' | '1h' | '2h';
 
@@ -29,7 +36,29 @@ interface OrderCheckoutModalProps {
     fulfillmentType: FulfillmentType;
     deliveryAddress: string;
     contactPhone: string;
+    advanceReceiptUrl?: string;
   }) => Promise<void>;
+}
+
+function validateCheckoutInput(params: {
+  outOfStock: boolean;
+  stock: number | null;
+  qty: number;
+  fulfillment: FulfillmentType;
+  deliveryAddress: string;
+  contactPhone: string;
+}): string | null {
+  if (params.outOfStock) return 'Ushbu mahsulot tugagan.';
+  if (params.stock !== null && params.qty > params.stock) {
+    return `Zaxira yetarli emas (${params.stock} ta mavjud).`;
+  }
+  if (params.fulfillment === 'delivery' && !params.deliveryAddress.trim()) {
+    return 'Yetkazib berish uchun manzilni kiriting.';
+  }
+  if (!isValidContactPhone(params.contactPhone)) {
+    return "Bog'lanish uchun telefon raqamingizni kiriting (+998 90 123 45 67).";
+  }
+  return null;
 }
 
 export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
@@ -43,28 +72,41 @@ export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [contactPhone, setContactPhone] = useState(defaultPhone || '+998 ');
   const [pickupPreset, setPickupPreset] = useState<PickupPreset>('1h');
+  const [advanceReceiptUrl, setAdvanceReceiptUrl] = useState('');
+  const [compressing, setCompressing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
+  const totalPrice = getEffectivePrice(product) * qty;
+  const { prepaymentAmount, remainingAmount } = calculateOrderPrepayment(totalPrice);
   const outOfStock =
     product.status === 'sold_out' || (product.stock !== null && product.stock <= 0);
 
+  const handlePickAdvanceFile = async (file: File | undefined) => {
+    if (!file) return;
+    setCheckoutError(null);
+    setCompressing(true);
+    try {
+      setAdvanceReceiptUrl(await compressImageToBase64(file));
+    } catch (err) {
+      setCheckoutError(getReadableErrorMessage(err, 'Chek rasmini qayta ishlab bo‘lmadi.'));
+    } finally {
+      setCompressing(false);
+    }
+  };
+
   const handleConfirm = async () => {
     setCheckoutError(null);
-    if (outOfStock) {
-      setCheckoutError('Ushbu mahsulot tugagan.');
-      return;
-    }
-    if (product.stock !== null && qty > product.stock) {
-      setCheckoutError(`Zaxira yetarli emas (${product.stock} ta mavjud).`);
-      return;
-    }
-    if (fulfillment === 'delivery' && !deliveryAddress.trim()) {
-      setCheckoutError('Yetkazib berish uchun manzilni kiriting.');
-      return;
-    }
-    if (!isValidContactPhone(contactPhone)) {
-      setCheckoutError("Bog'lanish uchun telefon raqamingizni kiriting (+998 90 123 45 67).");
+    const validationErr = validateCheckoutInput({
+      outOfStock,
+      stock: product.stock,
+      qty,
+      fulfillment,
+      deliveryAddress,
+      contactPhone,
+    });
+    if (validationErr) {
+      setCheckoutError(validationErr);
       return;
     }
 
@@ -77,6 +119,7 @@ export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
         fulfillmentType: fulfillment,
         deliveryAddress: deliveryAddress.trim(),
         contactPhone: contactPhone.trim(),
+        advanceReceiptUrl: advanceReceiptUrl || undefined,
       });
     } catch (err) {
       setCheckoutError(getReadableErrorMessage(err, 'Buyurtma yaratilmadi.'));
@@ -91,18 +134,7 @@ export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
         className="w-full max-w-md rounded-t-3xl sm:rounded-3xl border shadow-2xl p-5 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto"
         style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
       >
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-xl font-bold">Buyurtma berish</h2>
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={onClose}
-            aria-label="Yopish"
-            className="p-1 cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        <CheckoutModalHeader submitting={submitting} onClose={onClose} />
 
         <CheckoutProductHeader product={product} />
         <QuantitySelector qty={qty} stock={product.stock} onChange={setQty} />
@@ -117,6 +149,18 @@ export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
           onPresetChange={setPickupPreset}
         />
 
+        <CheckoutPrepaymentSection
+          totalPrice={totalPrice}
+          prepaymentAmount={prepaymentAmount}
+          remainingAmount={remainingAmount}
+          businessPhone={product.businessPhone}
+          receiptUrl={advanceReceiptUrl}
+          busy={compressing || submitting}
+          compressing={compressing}
+          onPickFile={(f) => void handlePickAdvanceFile(f)}
+          onClear={() => setAdvanceReceiptUrl('')}
+        />
+
         {checkoutError && (
           <div
             className="p-3 rounded-xl text-xs font-bold"
@@ -129,29 +173,130 @@ export const OrderCheckoutModal: React.FC<OrderCheckoutModalProps> = ({
           </div>
         )}
 
-        <div
-          className="pt-3 border-t flex items-center justify-between"
-          style={{ borderColor: 'var(--dx-border)' }}
-        >
-          <div>
-            <div className="text-xs" style={{ color: 'var(--dx-muted)' }}>
-              Jami (joyida to‘lov)
-            </div>
-            <div className="text-xl font-extrabold" style={{ color: 'var(--dx-primary)' }}>
-              {formatSoM(getEffectivePrice(product) * qty)}
-            </div>
-          </div>
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={() => void handleConfirm()}
-            className="px-5 py-3 rounded-2xl text-sm font-bold inline-flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-            style={{ backgroundColor: 'var(--dx-primary)', color: 'var(--dx-on-primary)' }}
-          >
-            <Check className="w-4 h-4" /> {submitting ? 'Yuborilmoqda…' : 'Tasdiqlash'}
-          </button>
+        <CheckoutFooter
+          totalPrice={totalPrice}
+          prepaymentAmount={prepaymentAmount}
+          remainingAmount={remainingAmount}
+          submitting={submitting}
+          busy={submitting || compressing}
+          onConfirm={() => void handleConfirm()}
+        />
+      </div>
+    </div>
+  );
+};
+
+const CheckoutModalHeader: React.FC<{ submitting: boolean; onClose: () => void }> = ({
+  submitting,
+  onClose,
+}) => (
+  <div className="flex items-center justify-between">
+    <h2 className="font-display text-xl font-bold">Buyurtma berish</h2>
+    <button
+      type="button"
+      disabled={submitting}
+      onClick={onClose}
+      aria-label="Yopish"
+      className="p-1 cursor-pointer"
+    >
+      <X className="w-5 h-5" />
+    </button>
+  </div>
+);
+
+const CheckoutFooter: React.FC<{
+  totalPrice: number;
+  prepaymentAmount: number;
+  remainingAmount: number;
+  submitting: boolean;
+  busy: boolean;
+  onConfirm: () => void;
+}> = ({ totalPrice, prepaymentAmount, remainingAmount, submitting, busy, onConfirm }) => (
+  <div
+    className="pt-3 border-t flex items-center justify-between gap-2"
+    style={{ borderColor: 'var(--dx-border)' }}
+  >
+    <div>
+      <div className="text-[11px]" style={{ color: 'var(--dx-muted)' }}>
+        Jami: {formatSoM(totalPrice)} · Qolgan: {formatSoM(remainingAmount)}
+      </div>
+      <div className="text-lg font-extrabold" style={{ color: 'var(--dx-primary)' }}>
+        Avans (50%): {formatSoM(prepaymentAmount)}
+      </div>
+    </div>
+    <button
+      type="button"
+      disabled={busy}
+      onClick={onConfirm}
+      className="px-5 py-3 rounded-2xl text-sm font-bold inline-flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shrink-0"
+      style={{ backgroundColor: 'var(--dx-primary)', color: 'var(--dx-on-primary)' }}
+    >
+      <Check className="w-4 h-4" /> {submitting ? 'Yuborilmoqda…' : 'Buyurtma berish'}
+    </button>
+  </div>
+);
+
+const CheckoutPrepaymentSection: React.FC<{
+  totalPrice: number;
+  prepaymentAmount: number;
+  remainingAmount: number;
+  businessPhone?: string;
+  receiptUrl: string;
+  busy: boolean;
+  compressing: boolean;
+  onPickFile: (file: File | undefined) => void;
+  onClear: () => void;
+}> = ({
+  totalPrice,
+  prepaymentAmount,
+  remainingAmount,
+  businessPhone,
+  receiptUrl,
+  busy,
+  compressing,
+  onPickFile,
+  onClear,
+}) => {
+  const cleanPhone = formatContactPhoneDisplay(businessPhone);
+  return (
+    <div
+      className="rounded-2xl p-3.5 border space-y-2.5"
+      style={{
+        backgroundColor: 'var(--dx-secondary-container)',
+        borderColor: 'var(--dx-secondary)',
+      }}
+    >
+      <div className="flex items-start gap-2">
+        <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--dx-secondary)' }} />
+        <div className="text-xs space-y-0.5">
+          <div className="font-extrabold">50% oldindan to‘lov (avans)</div>
+          <p className="text-[11px] leading-snug" style={{ color: 'var(--dx-muted)' }}>
+            Buyurtma bekor bo‘lib ketmasligi uchun <strong>{formatSoM(prepaymentAmount)}</strong>{' '}
+            (50%) oldindan to‘lanadi, qolgan <strong>{formatSoM(remainingAmount)}</strong> olishda
+            to‘lanadi (Jami: {formatSoM(totalPrice)}).
+          </p>
         </div>
       </div>
+      {cleanPhone && (
+        <div className="flex items-center justify-between text-[11px] gap-2">
+          <span style={{ color: 'var(--dx-muted)' }}>Karta/Payme ma’lumoti uchun qo‘ng‘iroq:</span>
+          <a
+            href={buildTelHref(cleanPhone)}
+            className="font-bold underline inline-flex items-center gap-1 shrink-0"
+            style={{ color: 'var(--dx-secondary)' }}
+          >
+            <PhoneCall className="w-3 h-3" /> {cleanPhone}
+          </a>
+        </div>
+      )}
+      <ReceiptPhotoPicker
+        receiptUrl={receiptUrl}
+        emptyHint="50% avans chekini hozir yuklashingiz yoki buyurtmadan keyin «Buyurtmalarim»da biriktirishingiz mumkin."
+        busy={busy}
+        compressing={compressing}
+        onPickFile={onPickFile}
+        onClear={onClear}
+      />
     </div>
   );
 };

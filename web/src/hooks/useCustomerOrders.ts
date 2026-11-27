@@ -46,12 +46,17 @@ export function useCustomerOrders(customerId: string | undefined) {
     pickupTimeMs: number;
     fulfillmentType: FulfillmentType;
     deliveryAddress: string;
+    advanceReceiptUrl?: string;
   }) => {
     if (!customerId) throw new Error('Avval tizimga kiring.');
     return orderRepository.placeOrderTransaction({
       customerId,
       ...params,
     });
+  };
+
+  const submitAdvanceReceipt = async (orderId: string, receiptUrl: string) => {
+    return orderRepository.submitAdvanceReceipt(orderId, receiptUrl);
   };
 
   const cancelOrder = async (orderId: string) => {
@@ -65,6 +70,7 @@ export function useCustomerOrders(customerId: string | undefined) {
     loading,
     error,
     placeOrder,
+    submitAdvanceReceipt,
     cancelOrder,
   };
 }

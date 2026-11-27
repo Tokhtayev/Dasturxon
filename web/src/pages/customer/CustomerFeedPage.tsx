@@ -42,6 +42,7 @@ export const CustomerFeedPage: React.FC = () => {
     fulfillmentType: FulfillmentType;
     deliveryAddress: string;
     contactPhone: string;
+    advanceReceiptUrl?: string;
   }) => {
     if (!checkoutProduct) return;
     const business = businessById.get(checkoutProduct.businessId);
@@ -56,6 +57,7 @@ export const CustomerFeedPage: React.FC = () => {
       pickupTimeMs: params.pickupTimeMs,
       fulfillmentType: params.fulfillmentType,
       deliveryAddress: params.deliveryAddress,
+      advanceReceiptUrl: params.advanceReceiptUrl,
     });
     if (
       profile &&

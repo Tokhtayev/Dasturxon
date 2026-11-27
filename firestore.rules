@@ -217,7 +217,7 @@ service cloud.firestore {
       );
 
       // Create: Signed-in customer creates order for themselves with initial status 'pending' (or legacy 'new')
-      // for an approved business with bounded quantity (1..99)
+      // for an approved business with bounded quantity (1..99) and at least 50% advance when prepayment fields are set
       allow create: if isSignedIn()
         && request.resource.data.customerId == request.auth.uid
         && request.resource.data.status in ['pending', 'new']
@@ -227,26 +227,50 @@ service cloud.firestore {
         && (!('totalPrice' in request.resource.data) || (request.resource.data.totalPrice is int && request.resource.data.totalPrice > 0))
         && (!('paymentStatus' in request.resource.data) || request.resource.data.paymentStatus in ['unpaid', 'pending'])
         && (!('receiptUrl' in request.resource.data) || request.resource.data.receiptUrl == '')
+        && (!('prepaymentPercent' in request.resource.data) || request.resource.data.prepaymentPercent == 50)
+        && (!('prepaymentStatus' in request.resource.data) || request.resource.data.prepaymentStatus in ['awaiting_advance', 'advance_submitted'])
+        && (!('prepaymentAmount' in request.resource.data) ||
+            (request.resource.data.prepaymentAmount is int &&
+             request.resource.data.prepaymentAmount > 0 &&
+             (!('totalPrice' in request.resource.data) ||
+              (request.resource.data.prepaymentAmount * 2 >= request.resource.data.totalPrice &&
+               request.resource.data.prepaymentAmount <= request.resource.data.totalPrice))))
+        && (!('advanceReceiptUrl' in request.resource.data) ||
+            (request.resource.data.advanceReceiptUrl is string &&
+             request.resource.data.advanceReceiptUrl.size() <= 900000 &&
+             (request.resource.data.advanceReceiptUrl == '' || request.resource.data.prepaymentStatus == 'advance_submitted')))
         && isBusinessApproved(request.resource.data.businessId);
 
       // Update:
-      // - Customer can ONLY change status pending/new -> cancelled (cannot alter paymentStatus, totalPrice, quantity, receiptUrl)
-      // - Business owner can update order status, paymentStatus, and payment receipt (receiptUrl <= 900KB only when paid)
+      // - Customer can ONLY cancel pending order OR attach 50% advance receipt (cannot self-approve advance_paid or paid)
+      // - Business owner can verify advance payment (advance_paid), update order status, paymentStatus, and payment receipt
       // - Admin can update any order
       allow update: if isSignedIn() && (
         (resource.data.customerId == request.auth.uid &&
          (resource.data.status in ['pending', 'new']) &&
          request.resource.data.status == 'cancelled' &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+        (resource.data.customerId == request.auth.uid &&
+         (resource.data.status in ['pending', 'new', 'accepted']) &&
+         (!('prepaymentStatus' in resource.data) || resource.data.prepaymentStatus in ['awaiting_advance', 'advance_submitted']) &&
+         request.resource.data.prepaymentStatus == 'advance_submitted' &&
+         request.resource.data.advanceReceiptUrl is string &&
+         request.resource.data.advanceReceiptUrl.size() > 0 &&
+         request.resource.data.advanceReceiptUrl.size() <= 900000 &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['prepaymentStatus', 'advanceReceiptUrl', 'advanceUploadedAt', 'updatedAt'])) ||
         (isBusinessOwner(resource.data.businessId) &&
          request.resource.data.customerId == resource.data.customerId &&
          request.resource.data.businessId == resource.data.businessId &&
          (!('totalPrice' in resource.data) || request.resource.data.totalPrice == resource.data.totalPrice) &&
          (!('quantity' in resource.data) || request.resource.data.quantity == resource.data.quantity) &&
+         (!('prepaymentAmount' in resource.data) || request.resource.data.prepaymentAmount == resource.data.prepaymentAmount) &&
          (!('receiptUrl' in request.resource.data) ||
           (request.resource.data.receiptUrl is string &&
            request.resource.data.receiptUrl.size() <= 900000 &&
-           (request.resource.data.receiptUrl == '' || request.resource.data.paymentStatus == 'paid')))) ||
+           (request.resource.data.receiptUrl == '' || request.resource.data.paymentStatus == 'paid'))) &&
+         (!('advanceReceiptUrl' in request.resource.data) ||
+          (request.resource.data.advanceReceiptUrl is string &&
+           request.resource.data.advanceReceiptUrl.size() <= 900000))) ||
         isAdmin()
       );
 

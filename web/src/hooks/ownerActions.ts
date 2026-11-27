@@ -9,6 +9,7 @@ import type {
   LegalFormKey,
   OrderStatusKey,
   PaymentStatus,
+  PrepaymentStatus,
   ProductStatus,
 } from '../types/domain';
 
@@ -125,6 +126,9 @@ export function buildOwnerActions({ ownerId, business, costMap, setCostMap }: Ow
       status: PaymentStatus,
       options?: { receiptUrl?: string; preservePaidAt?: boolean }
     ) => orderRepository.setPaymentStatus(orderId, status, options),
+
+    setPrepaymentStatus: (orderId: string, status: PrepaymentStatus, receiptUrl?: string) =>
+      orderRepository.setPrepaymentStatus(orderId, status, receiptUrl),
 
     addExpense: async (params: { title: string; amount: number; category: string }) => {
       if (!business) throw new Error('Biznes topilmadi.');

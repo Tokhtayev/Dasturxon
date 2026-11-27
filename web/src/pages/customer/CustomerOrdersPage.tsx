@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { ReceiptPreviewModal } from '../../components/ReceiptPreviewModal';
+import { AdvancePaymentModal } from '../../components/customer/AdvancePaymentModal';
 import { CustomerOrderCard } from '../../components/customer/CustomerOrderCard';
 import { useAuth } from '../../hooks/useAuth';
+import { useCustomerFeed } from '../../hooks/useCustomerFeed';
 import { useCustomerOrders } from '../../hooks/useCustomerOrders';
 import { getReadableErrorMessage } from '../../services/errors';
 import type { CustomerOrder } from '../../types/domain';
@@ -9,10 +11,16 @@ import type { CustomerOrder } from '../../types/domain';
 export const CustomerOrdersPage: React.FC = () => {
   const { session } = useAuth();
   const uid = session.status === 'ready' ? session.profile.uid : undefined;
-  const { activeOrders, historyOrders, loading, error, cancelOrder } = useCustomerOrders(uid);
+  const { businessById } = useCustomerFeed(Boolean(uid));
+  const { activeOrders, historyOrders, loading, error, submitAdvanceReceipt, cancelOrder } =
+    useCustomerOrders(uid);
   const [segment, setSegment] = useState<'active' | 'history'>('active');
   const [actionError, setActionError] = useState<string | null>(null);
-  const [previewOrder, setPreviewOrder] = useState<CustomerOrder | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<{
+    order: CustomerOrder;
+    kind: 'full' | 'advance';
+  } | null>(null);
+  const [advanceModalOrder, setAdvanceModalOrder] = useState<CustomerOrder | null>(null);
 
   const list = segment === 'active' ? activeOrders : historyOrders;
 
@@ -86,14 +94,39 @@ export const CustomerOrdersPage: React.FC = () => {
               key={order.id}
               order={order}
               onCancel={(id) => void handleCancel(id)}
-              onViewReceipt={(target) => setPreviewOrder(target)}
+              onViewReceipt={(target, kind) => setPreviewTarget({ order: target, kind })}
+              onUploadAdvance={(target) => setAdvanceModalOrder(target)}
             />
           ))}
         </div>
       )}
 
-      {previewOrder && (
-        <ReceiptPreviewModal order={previewOrder} onClose={() => setPreviewOrder(null)} />
+      {advanceModalOrder && (
+        <AdvancePaymentModal
+          order={advanceModalOrder}
+          businessPhone={businessById.get(advanceModalOrder.businessId)?.phone}
+          onClose={() => setAdvanceModalOrder(null)}
+          onSubmitReceipt={(url) => submitAdvanceReceipt(advanceModalOrder.id, url)}
+        />
+      )}
+
+      {previewTarget && (
+        <ReceiptPreviewModal
+          order={previewTarget.order}
+          kind={previewTarget.kind}
+          onClose={() => setPreviewTarget(null)}
+          onReplaceReceipt={
+            previewTarget.kind === 'advance' &&
+            ['pending', 'accepted'].includes(previewTarget.order.status) &&
+            previewTarget.order.prepaymentStatus !== 'advance_paid'
+              ? () => {
+                  const target = previewTarget.order;
+                  setPreviewTarget(null);
+                  setAdvanceModalOrder(target);
+                }
+              : undefined
+          }
+        />
       )}
     </div>
   );

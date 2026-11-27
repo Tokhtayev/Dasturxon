@@ -7,8 +7,9 @@ import { PaymentReceiptModal } from '../../components/owner/PaymentReceiptModal'
 import { formatSoM } from '../../services/analytics';
 import { TERMINAL_ORDER_STATUSES } from '../../services/constants';
 import { getReadableErrorMessage } from '../../services/errors';
+import { calculateOrderPrepayment } from '../../services/orderLogic';
 import { formatContactPhoneDisplay } from '../../services/validators';
-import type { CustomerOrder, OrderStatusKey } from '../../types/domain';
+import type { CustomerOrder, OrderStatusKey, PrepaymentStatus } from '../../types/domain';
 import type { OwnerContextType } from './OwnerLayout';
 
 const NEXT_ORDER_STEP: Partial<Record<OrderStatusKey, { next: OrderStatusKey; label: string }>> = {
@@ -18,7 +19,7 @@ const NEXT_ORDER_STEP: Partial<Record<OrderStatusKey, { next: OrderStatusKey; la
 };
 
 export const OwnerOrdersPage: React.FC = () => {
-  const { orders, advanceOrder, cancelOrder, setPaymentStatus } =
+  const { orders, advanceOrder, cancelOrder, setPaymentStatus, setPrepaymentStatus } =
     useOutletContext<OwnerContextType>();
   const [segment, setSegment] = useState<'new' | 'progress' | 'history'>('new');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -26,7 +27,10 @@ export const OwnerOrdersPage: React.FC = () => {
     order: CustomerOrder;
     mode: 'confirm_payment' | 'edit_receipt';
   } | null>(null);
-  const [previewOrder, setPreviewOrder] = useState<CustomerOrder | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<{
+    order: CustomerOrder;
+    kind: 'full' | 'advance';
+  } | null>(null);
 
   const newOrders = orders.filter((o) => o.status === 'pending');
   const progressOrders = orders.filter((o) => o.status === 'accepted' || o.status === 'ready');
@@ -59,28 +63,13 @@ export const OwnerOrdersPage: React.FC = () => {
         </div>
       )}
 
-      <div className="flex gap-2 border-b pb-3" style={{ borderColor: 'var(--dx-border)' }}>
-        {(
-          [
-            ['new', `Yangi (${newOrders.length})`],
-            ['progress', `Jarayonda (${progressOrders.length})`],
-            ['history', `Tarix (${historyOrders.length})`],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setSegment(key)}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer"
-            style={{
-              backgroundColor: segment === key ? 'var(--dx-primary)' : 'var(--dx-surface)',
-              color: segment === key ? 'var(--dx-on-primary)' : 'var(--dx-text)',
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <OwnerOrderTabs
+        segment={segment}
+        newCount={newOrders.length}
+        progressCount={progressOrders.length}
+        historyCount={historyOrders.length}
+        onSelect={setSegment}
+      />
 
       {list.length === 0 ? (
         <div
@@ -101,8 +90,9 @@ export const OwnerOrdersPage: React.FC = () => {
               onOpenUploadReceipt={(target) =>
                 setReceiptModal({ order: target, mode: 'edit_receipt' })
               }
-              onPreviewReceipt={(target) => setPreviewOrder(target)}
+              onPreviewReceipt={(target, kind) => setPreviewTarget({ order: target, kind })}
               onMarkUnpaid={(id) => void runAction(() => setPaymentStatus(id, 'unpaid'))}
+              onSetPrepayment={(id, next) => void runAction(() => setPrepaymentStatus(id, next))}
               onAdvance={(id, prodId, next) => void runAction(() => advanceOrder(id, prodId, next))}
               onCancel={(id) => void runAction(() => cancelOrder(id))}
             />
@@ -124,27 +114,63 @@ export const OwnerOrdersPage: React.FC = () => {
         />
       )}
 
-      {previewOrder && (
+      {previewTarget && (
         <ReceiptPreviewModal
-          order={previewOrder}
-          onClose={() => setPreviewOrder(null)}
-          onReplaceReceipt={() => {
-            const target = previewOrder;
-            setPreviewOrder(null);
-            setReceiptModal({ order: target, mode: 'edit_receipt' });
-          }}
+          order={previewTarget.order}
+          kind={previewTarget.kind}
+          onClose={() => setPreviewTarget(null)}
+          onReplaceReceipt={
+            previewTarget.kind === 'full'
+              ? () => {
+                  const target = previewTarget.order;
+                  setPreviewTarget(null);
+                  setReceiptModal({ order: target, mode: 'edit_receipt' });
+                }
+              : undefined
+          }
         />
       )}
     </div>
   );
 };
 
+const OwnerOrderTabs: React.FC<{
+  segment: 'new' | 'progress' | 'history';
+  newCount: number;
+  progressCount: number;
+  historyCount: number;
+  onSelect: (seg: 'new' | 'progress' | 'history') => void;
+}> = ({ segment, newCount, progressCount, historyCount, onSelect }) => (
+  <div className="flex gap-2 border-b pb-3" style={{ borderColor: 'var(--dx-border)' }}>
+    {(
+      [
+        ['new', `Yangi (${newCount})`],
+        ['progress', `Jarayonda (${progressCount})`],
+        ['history', `Tarix (${historyCount})`],
+      ] as const
+    ).map(([key, label]) => (
+      <button
+        key={key}
+        type="button"
+        onClick={() => onSelect(key)}
+        className="px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer"
+        style={{
+          backgroundColor: segment === key ? 'var(--dx-primary)' : 'var(--dx-surface)',
+          color: segment === key ? 'var(--dx-on-primary)' : 'var(--dx-text)',
+        }}
+      >
+        {label}
+      </button>
+    ))}
+  </div>
+);
+
 const OwnerOrderPaymentActions: React.FC<{
   order: CustomerOrder;
   isTerminal: boolean;
   onOpenConfirmPayment: (order: CustomerOrder) => void;
   onOpenUploadReceipt: (order: CustomerOrder) => void;
-  onPreviewReceipt: (order: CustomerOrder) => void;
+  onPreviewReceipt: (order: CustomerOrder, kind: 'full' | 'advance') => void;
   onMarkUnpaid: (orderId: string) => void;
 }> = ({
   order,
@@ -170,7 +196,9 @@ const OwnerOrderPaymentActions: React.FC<{
             color: 'var(--dx-text)',
           }}
         >
-          To‘lovni tasdiqlash
+          {order.prepaymentStatus === 'advance_paid'
+            ? 'Qolgan 50% / To‘liq to‘lov'
+            : 'To‘lovni tasdiqlash'}
         </button>
       )}
 
@@ -206,7 +234,7 @@ const OwnerOrderPaymentActions: React.FC<{
       {order.paymentStatus === 'paid' && order.receiptUrl && (
         <button
           type="button"
-          onClick={() => onPreviewReceipt(order)}
+          onClick={() => onPreviewReceipt(order, 'full')}
           className="px-2.5 py-1 rounded-xl border font-bold inline-flex items-center gap-1 cursor-pointer"
           style={{
             backgroundColor: 'var(--dx-bg)',
@@ -236,12 +264,82 @@ const OwnerOrderPaymentActions: React.FC<{
   );
 };
 
+const OwnerAdvanceBox: React.FC<{
+  order: CustomerOrder;
+  isTerminal: boolean;
+  onPreviewAdvance: () => void;
+  onSetPrepayment: (status: PrepaymentStatus) => void;
+}> = ({ order, isTerminal, onPreviewAdvance, onSetPrepayment }) => {
+  if (order.paymentStatus === 'paid' || (isTerminal && !order.advanceReceiptUrl)) return null;
+  const adv = order.prepaymentAmount ?? calculateOrderPrepayment(order.totalPrice).prepaymentAmount;
+  const rem = Math.max(0, order.totalPrice - adv);
+  const prepStatus = order.prepaymentStatus ?? 'awaiting_advance';
+
+  return (
+    <div
+      className="p-2.5 rounded-xl border text-xs flex flex-wrap items-center justify-between gap-2"
+      style={{
+        backgroundColor:
+          prepStatus === 'advance_paid'
+            ? 'var(--dx-tertiary-container)'
+            : 'var(--dx-secondary-container)',
+        borderColor: 'var(--dx-border)',
+      }}
+    >
+      <div className="space-y-0.5">
+        <div className="font-bold">
+          {prepStatus === 'advance_paid'
+            ? `✅ 50% Avans olindi (${formatSoM(adv)}) · Qolgan: ${formatSoM(rem)}`
+            : prepStatus === 'advance_submitted'
+              ? `📩 50% Avans cheki yuborildi (${formatSoM(adv)})`
+              : `⚠️ 50% Avans kutilmoqda (${formatSoM(adv)}) · Qolgan: ${formatSoM(rem)}`}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {order.advanceReceiptUrl && (
+          <button
+            type="button"
+            onClick={onPreviewAdvance}
+            className="px-2.5 py-1 rounded-xl border text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+            style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+          >
+            <ReceiptText className="w-3 h-3" /> Avans cheki
+          </button>
+        )}
+        {!isTerminal && prepStatus !== 'advance_paid' && (
+          <button
+            type="button"
+            onClick={() => onSetPrepayment('advance_paid')}
+            className="px-2.5 py-1 rounded-xl text-[11px] font-bold cursor-pointer"
+            style={{ backgroundColor: 'var(--dx-primary)', color: 'var(--dx-on-primary)' }}
+          >
+            50% Avansni tasdiqlash
+          </button>
+        )}
+        {!isTerminal && prepStatus === 'advance_paid' && (
+          <button
+            type="button"
+            onClick={() =>
+              onSetPrepayment(order.advanceReceiptUrl ? 'advance_submitted' : 'awaiting_advance')
+            }
+            className="px-2 py-1 rounded-xl border text-[11px] font-bold cursor-pointer"
+            style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
+          >
+            Bekor qilish
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const OwnerOrderCard: React.FC<{
   order: CustomerOrder;
   onOpenConfirmPayment: (order: CustomerOrder) => void;
   onOpenUploadReceipt: (order: CustomerOrder) => void;
-  onPreviewReceipt: (order: CustomerOrder) => void;
+  onPreviewReceipt: (order: CustomerOrder, kind: 'full' | 'advance') => void;
   onMarkUnpaid: (orderId: string) => void;
+  onSetPrepayment: (orderId: string, status: PrepaymentStatus) => void;
   onAdvance: (orderId: string, productId: string, next: OrderStatusKey) => void;
   onCancel: (orderId: string) => void;
 }> = ({
@@ -250,6 +348,7 @@ const OwnerOrderCard: React.FC<{
   onOpenUploadReceipt,
   onPreviewReceipt,
   onMarkUnpaid,
+  onSetPrepayment,
   onAdvance,
   onCancel,
 }) => {
@@ -289,6 +388,13 @@ const OwnerOrderCard: React.FC<{
         </div>
         <StatusChip status={order.status} />
       </div>
+
+      <OwnerAdvanceBox
+        order={order}
+        isTerminal={isTerminal}
+        onPreviewAdvance={() => onPreviewReceipt(order, 'advance')}
+        onSetPrepayment={(next) => onSetPrepayment(order.id, next)}
+      />
 
       <div
         className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t text-xs"

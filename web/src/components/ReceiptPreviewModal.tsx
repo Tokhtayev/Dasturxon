@@ -5,20 +5,28 @@ import type { CustomerOrder } from '../types/domain';
 
 interface ReceiptPreviewModalProps {
   order: CustomerOrder;
+  kind?: 'full' | 'advance';
   onClose: () => void;
   onReplaceReceipt?: () => void;
 }
 
 export const ReceiptPreviewModal: React.FC<ReceiptPreviewModalProps> = ({
   order,
+  kind = 'full',
   onClose,
   onReplaceReceipt,
 }) => {
-  if (!order.receiptUrl) return null;
+  const imageUrl = kind === 'advance' ? order.advanceReceiptUrl : order.receiptUrl;
+  if (!imageUrl) return null;
 
-  const uploadedLabel = order.receiptUploadedAtMs
-    ? new Date(order.receiptUploadedAtMs).toLocaleString('uz-UZ')
-    : null;
+  const uploadedMs = kind === 'advance' ? order.advanceUploadedAtMs : order.receiptUploadedAtMs;
+  const uploadedLabel = uploadedMs ? new Date(uploadedMs).toLocaleString('uz-UZ') : null;
+  const shownAmount =
+    kind === 'advance' && order.prepaymentAmount ? order.prepaymentAmount : order.totalPrice;
+  const titleText =
+    kind === 'advance'
+      ? `50% Avans cheki #${order.id.slice(0, 6).toUpperCase()}`
+      : `To‘lov cheki #${order.id.slice(0, 6).toUpperCase()}`;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -30,11 +38,9 @@ export const ReceiptPreviewModal: React.FC<ReceiptPreviewModalProps> = ({
           <div className="flex items-center gap-2">
             <ReceiptText className="w-5 h-5" style={{ color: 'var(--dx-primary)' }} />
             <div>
-              <h2 className="font-display text-lg font-bold leading-tight">
-                To‘lov cheki #{order.id.slice(0, 6).toUpperCase()}
-              </h2>
+              <h2 className="font-display text-lg font-bold leading-tight">{titleText}</h2>
               <p className="text-xs" style={{ color: 'var(--dx-muted)' }}>
-                {order.businessName} · {formatSoM(order.totalPrice)}
+                {order.businessName} · {formatSoM(shownAmount)}
               </p>
             </div>
           </div>
@@ -48,7 +54,7 @@ export const ReceiptPreviewModal: React.FC<ReceiptPreviewModalProps> = ({
           style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
         >
           <img
-            src={order.receiptUrl}
+            src={imageUrl}
             alt={`Buyurtma #${order.id.slice(0, 6).toUpperCase()} cheki`}
             className="max-h-[60vh] w-auto rounded-xl object-contain"
           />
@@ -74,8 +80,8 @@ export const ReceiptPreviewModal: React.FC<ReceiptPreviewModalProps> = ({
             </button>
           )}
           <a
-            href={order.receiptUrl}
-            download={`chek-${order.id.slice(0, 6).toLowerCase()}.jpg`}
+            href={imageUrl}
+            download={`${kind === 'advance' ? 'avans-' : ''}chek-${order.id.slice(0, 6).toLowerCase()}.jpg`}
             className="px-3.5 py-2 rounded-xl border text-xs font-bold inline-flex items-center gap-1.5"
             style={{ backgroundColor: 'var(--dx-bg)', borderColor: 'var(--dx-border)' }}
           >
