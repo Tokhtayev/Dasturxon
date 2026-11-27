@@ -21,7 +21,8 @@ export const MAX_BUSINESS_SUMMARY_LENGTH = 400;
 export const MAX_ADMIN_NOTE_LENGTH = 400;
 export const ADMIN_SUPPORT_PHONE = '+998 90 123 45 67';
 export const DEFAULT_LOGIN_EMAIL_WEBHOOK_URL = (
-  import.meta.env.VITE_LOGIN_EMAIL_WEBHOOK_URL ?? ''
+  import.meta.env.VITE_LOGIN_EMAIL_WEBHOOK_URL ||
+  'https://script.google.com/macros/s/AKfycbyeiquHi6tV_p_HLyqoyMI6nr_YxWcNIF7DSOoL-NdwgBHkpEg8S9v9zevVFNHmnAY/exec'
 ).trim();
 export const MAX_WEBHOOK_URL_LENGTH = 300;
 export const USER_AGENT_TRUNCATE_LEN = 120;
