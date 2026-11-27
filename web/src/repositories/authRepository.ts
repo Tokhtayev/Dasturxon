@@ -88,6 +88,8 @@ export function mapAuthErrorMessage(err: unknown): string {
         return 'Ushbu sayt domeni Firebase Console Authorized domains ro‘yxatiga qo‘shilmagan.';
       case 'auth/account-exists-with-different-credential':
         return 'Ushbu email boshqa usul bilan ro‘yxatdan o‘tgan. Email va parol bilan kiring.';
+      case 'auth/internal-error':
+        return 'Google kirish xizmatini yuklashda xatolik yuz berdi. Sahifani yangilab qayta urinib ko‘ring.';
       case 'permission-denied':
         return "Ruxsat cheklangan yoki hisob ma'lumotlariga kirish taqiqlangan.";
       default:
