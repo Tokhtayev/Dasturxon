@@ -1,6 +1,7 @@
 import {
   MAX_BUSINESS_ADDRESS_LENGTH,
   MAX_BUSINESS_NAME_LENGTH,
+  MAX_BUSINESS_SUMMARY_LENGTH,
   MAX_DELIVERY_ADDRESS_LENGTH,
   MAX_DISCOUNT_PERCENT,
   MAX_EMAIL_LENGTH,
@@ -22,6 +23,7 @@ import {
   MIN_PASSWORD_LENGTH,
   MIN_PHONE_LENGTH,
   MIN_REJECTION_REASON_LENGTH,
+  MIN_SUMMARY_LENGTH,
   MIN_TYPE_NOTE_LENGTH,
 } from './constants.ts';
 
@@ -230,6 +232,51 @@ export function isValidContactPhone(raw: string | undefined): boolean {
 export function formatContactPhoneDisplay(raw: string | undefined): string {
   const clean = sanitizeUserText(raw ?? '', MAX_PHONE_LENGTH);
   return isValidContactPhone(clean) ? clean : '';
+}
+
+/** Builds a safe tel: URI from a phone number string. */
+export function buildTelHref(phone: string): string {
+  const normalized = phone.replace(/[^\d+]/g, '');
+  return normalized ? `tel:${normalized}` : '#';
+}
+
+/** Builds a prefilled sms: URI to start an SMS conversation cleanly. */
+export function buildSmsHref(phone: string, body?: string): string {
+  const normalized = phone.replace(/[^\d+]/g, '');
+  if (!normalized) return '#';
+  return body ? `sms:${normalized}?body=${encodeURIComponent(body)}` : `sms:${normalized}`;
+}
+
+export function validateOwnerInquiry(params: {
+  ownerName: string;
+  phone: string;
+  legalForm: string;
+  activitySummary: string;
+  productsSummary: string;
+}): ValidationResult {
+  const cleanName = sanitizeUserText(params.ownerName, MAX_FULL_NAME_LENGTH);
+  if (cleanName.length < MIN_FULL_NAME_LENGTH) {
+    return { valid: false, error: 'Ismingizni kiriting (kamida 2 belgi).' };
+  }
+  if (!isValidContactPhone(params.phone)) {
+    return { valid: false, error: 'Aloqa uchun to‘g‘ri telefon raqamini kiriting.' };
+  }
+  if (params.legalForm !== 'mchj' && params.legalForm !== 'yatt') {
+    return { valid: false, error: 'Tashkiliy shaklni tanlang: MChJ yoki YaTT.' };
+  }
+  if (
+    sanitizeUserText(params.activitySummary, MAX_BUSINESS_SUMMARY_LENGTH).length <
+    MIN_SUMMARY_LENGTH
+  ) {
+    return { valid: false, error: 'Faoliyatingiz haqida qisqacha ma’lumot yozing.' };
+  }
+  if (
+    sanitizeUserText(params.productsSummary, MAX_BUSINESS_SUMMARY_LENGTH).length <
+    MIN_SUMMARY_LENGTH
+  ) {
+    return { valid: false, error: 'Mahsulotlaringiz haqida qisqacha ma’lumot yozing.' };
+  }
+  return { valid: true };
 }
 
 /** Validates and normalizes an optional data:image/* or https:// image URL within Firestore size caps. */

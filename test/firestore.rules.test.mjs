@@ -888,6 +888,81 @@ test("41. Order payment receiptUrl requires paid status, enforces 900KB cap, and
   }));
 });
 
+// 42. Owner inquiries allow applicant creation without exposing reads publicly; Admin reads & replies
+test("42. Owner inquiries block unauthorized reads/tampering while letting Admin verify MChJ/YaTT details", async () => {
+  const dbAnon = testEnv.unauthenticatedContext().firestore();
+  const dbOther = testEnv.authenticatedContext("customer-2").firestore();
+  const dbAdmin = testEnv.authenticatedContext("admin-1").firestore();
+
+  const inqId = "inq-new-1";
+  // Applicant cannot pre-populate adminReply or non-waiting status
+  await assertFails(setDoc(doc(dbAnon, `ownerInquiries/${inqId}`), {
+    ownerName: "Azizbek",
+    phone: "+998901234567",
+    legalForm: "yatt",
+    status: "replied",
+    adminReply: "Fake",
+    createdAt: Timestamp.now()
+  }));
+
+  // Valid waiting inquiry succeeds even before signup
+  await assertSucceeds(setDoc(doc(dbAnon, `ownerInquiries/${inqId}`), {
+    ownerName: "Azizbek",
+    phone: "+998901234567",
+    legalForm: "mchj",
+    activitySummary: "Nonvoyxona faoliyati",
+    productsSummary: "Tandir non, Patir",
+    status: "waiting",
+    createdAt: Timestamp.now()
+  }));
+
+  // Unauthenticated user and other customer cannot read inquiries (prevents phone/PII leak)
+  await assertFails(getDoc(doc(dbAnon, `ownerInquiries/${inqId}`)));
+  await assertFails(getDoc(doc(dbOther, `ownerInquiries/${inqId}`)));
+  await assertFails(updateDoc(doc(dbOther, `ownerInquiries/${inqId}`), { adminReply: "Hack" }));
+
+  // Admin can read, edit legalForm/businessType/summaries, and reply
+  const adminSnap = await getDoc(doc(dbAdmin, `ownerInquiries/${inqId}`));
+  assert.equal(adminSnap.data().ownerName, "Azizbek");
+  await assertSucceeds(updateDoc(doc(dbAdmin, `ownerInquiries/${inqId}`), {
+    legalForm: "mchj",
+    businessType: "bakery",
+    address: "Yunusobod 5A",
+    adminReply: "Tasdiqlandi, do‘kon tizimga kiritildi",
+    status: "registered"
+  }));
+});
+
+// 43. Admin can create & approve a business directly on behalf of an owner with MChJ/YaTT metadata
+test("43. Admin can onboard and approve a business for an owner while non-admins cannot", async () => {
+  const dbOwner = testEnv.authenticatedContext("owner-1").firestore();
+  const dbAdmin = testEnv.authenticatedContext("admin-1").firestore();
+
+  await assertFails(setDoc(doc(dbOwner, "businesses/biz-for-other"), {
+    ownerId: "owner-2",
+    name: "Hijacked Shop",
+    type: "bakery",
+    legalForm: "yatt",
+    address: "Yunusobod",
+    phone: "+998901112233",
+    status: "approved",
+    createdAt: Timestamp.now()
+  }));
+
+  await assertSucceeds(setDoc(doc(dbAdmin, "businesses/biz-admin-onboard"), {
+    ownerId: "owner-2",
+    name: "Bog‘ishamol MChJ",
+    type: "kitchen",
+    legalForm: "mchj",
+    address: "Bog‘ishamol 131",
+    phone: "+998901112233",
+    activitySummary: "Milliy taomlar oshxonasi",
+    productsSummary: "Choyxona palov, Manti",
+    status: "approved",
+    createdAt: Timestamp.now()
+  }));
+});
+
 
 
 

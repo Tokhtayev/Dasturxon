@@ -13,8 +13,10 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../config/firebase';
 import {
+  MAX_ADMIN_NOTE_LENGTH,
   MAX_BUSINESS_ADDRESS_LENGTH,
   MAX_BUSINESS_NAME_LENGTH,
+  MAX_BUSINESS_SUMMARY_LENGTH,
   MAX_PHONE_LENGTH,
   MAX_REJECTION_REASON_LENGTH,
   MAX_TYPE_NOTE_LENGTH,
@@ -24,7 +26,7 @@ import {
   validateBusinessForm,
   validateRejectionReason,
 } from '../services/validators';
-import type { Business, BusinessStatus, BusinessTypeKey } from '../types/domain';
+import type { Business, BusinessStatus, BusinessTypeKey, LegalFormKey } from '../types/domain';
 
 function toMillis(value: unknown): number {
   if (value instanceof Timestamp) return value.toMillis();
@@ -32,18 +34,23 @@ function toMillis(value: unknown): number {
   return 0;
 }
 
+const VALID_TYPES: BusinessTypeKey[] = [
+  'bakery',
+  'confectionery',
+  'pastry',
+  'teahouse',
+  'kitchen',
+  'cafe',
+  'other',
+];
+
+function sanitizeSummary(raw: string | undefined, max = MAX_BUSINESS_SUMMARY_LENGTH): string {
+  return sanitizeUserText(raw ?? '', max);
+}
+
 export function mapBusinessDoc(id: string, data: Record<string, unknown>): Business {
   const rawType = typeof data.type === 'string' ? data.type : 'other';
-  const validTypes: BusinessTypeKey[] = [
-    'bakery',
-    'confectionery',
-    'pastry',
-    'teahouse',
-    'kitchen',
-    'cafe',
-    'other',
-  ];
-  const type = validTypes.includes(rawType as BusinessTypeKey)
+  const type = VALID_TYPES.includes(rawType as BusinessTypeKey)
     ? (rawType as BusinessTypeKey)
     : 'other';
 
@@ -53,15 +60,22 @@ export function mapBusinessDoc(id: string, data: Record<string, unknown>): Busin
     ? (rawStatus as BusinessStatus)
     : 'pending';
 
+  const legalForm: LegalFormKey | undefined =
+    data.legalForm === 'mchj' || data.legalForm === 'yatt' ? data.legalForm : undefined;
+
   return {
     id,
     ownerId: typeof data.ownerId === 'string' ? data.ownerId : '',
     name: typeof data.name === 'string' ? data.name : '',
     type,
+    legalForm,
     address: typeof data.address === 'string' ? data.address : '',
     phone: typeof data.phone === 'string' ? data.phone : '',
     status,
     typeNote: typeof data.typeNote === 'string' ? data.typeNote : undefined,
+    activitySummary: typeof data.activitySummary === 'string' ? data.activitySummary : undefined,
+    productsSummary: typeof data.productsSummary === 'string' ? data.productsSummary : undefined,
+    adminNote: typeof data.adminNote === 'string' ? data.adminNote : undefined,
     rejectionReason: typeof data.rejectionReason === 'string' ? data.rejectionReason : undefined,
     createdAtMs: toMillis(data.createdAt),
     updatedAtMs: toMillis(data.updatedAt),
@@ -121,6 +135,9 @@ export const businessRepository = {
     address: string;
     phone: string;
     typeNote?: string;
+    legalForm?: LegalFormKey;
+    activitySummary?: string;
+    productsSummary?: string;
   }): Promise<string> {
     const cleanNote = sanitizeUserText(params.typeNote ?? '', MAX_TYPE_NOTE_LENGTH);
     const check = validateBusinessForm({ ...params, typeNote: cleanNote });
@@ -137,6 +154,11 @@ export const businessRepository = {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
+    if (params.legalForm) payload.legalForm = params.legalForm;
+    const act = sanitizeSummary(params.activitySummary);
+    const prods = sanitizeSummary(params.productsSummary);
+    if (act) payload.activitySummary = act;
+    if (prods) payload.productsSummary = prods;
     if (params.type === 'other' && cleanNote) {
       payload.typeNote = cleanNote;
     }
@@ -151,20 +173,33 @@ export const businessRepository = {
     address: string;
     phone: string;
     typeNote?: string;
+    legalForm?: LegalFormKey;
+    activitySummary?: string;
+    productsSummary?: string;
   }): Promise<void> {
     const cleanNote = sanitizeUserText(params.typeNote ?? '', MAX_TYPE_NOTE_LENGTH);
     const check = validateBusinessForm({ ...params, typeNote: cleanNote });
     if (!check.valid) throw new Error(check.error);
 
     const db = getFirebaseDb();
-    await updateDoc(doc(db, 'businesses', params.businessId), {
+    const updates: Record<string, unknown> = {
       name: sanitizeUserText(params.name, MAX_BUSINESS_NAME_LENGTH),
       type: params.type,
       address: sanitizeUserText(params.address, MAX_BUSINESS_ADDRESS_LENGTH),
       phone: sanitizeUserText(params.phone, MAX_PHONE_LENGTH),
       typeNote: params.type === 'other' && cleanNote ? cleanNote : deleteField(),
       updatedAt: serverTimestamp(),
-    });
+    };
+    if (params.legalForm) updates.legalForm = params.legalForm;
+    if (params.activitySummary !== undefined) {
+      const act = sanitizeSummary(params.activitySummary);
+      updates.activitySummary = act || deleteField();
+    }
+    if (params.productsSummary !== undefined) {
+      const prods = sanitizeSummary(params.productsSummary);
+      updates.productsSummary = prods || deleteField();
+    }
+    await updateDoc(doc(db, 'businesses', params.businessId), updates);
   },
 
   async resubmit(params: {
@@ -174,13 +209,16 @@ export const businessRepository = {
     address: string;
     phone: string;
     typeNote?: string;
+    legalForm?: LegalFormKey;
+    activitySummary?: string;
+    productsSummary?: string;
   }): Promise<void> {
     const cleanNote = sanitizeUserText(params.typeNote ?? '', MAX_TYPE_NOTE_LENGTH);
     const check = validateBusinessForm({ ...params, typeNote: cleanNote });
     if (!check.valid) throw new Error(check.error);
 
     const db = getFirebaseDb();
-    await updateDoc(doc(db, 'businesses', params.businessId), {
+    const updates: Record<string, unknown> = {
       name: sanitizeUserText(params.name, MAX_BUSINESS_NAME_LENGTH),
       type: params.type,
       address: sanitizeUserText(params.address, MAX_BUSINESS_ADDRESS_LENGTH),
@@ -189,7 +227,95 @@ export const businessRepository = {
       rejectionReason: deleteField(),
       typeNote: params.type === 'other' && cleanNote ? cleanNote : deleteField(),
       updatedAt: serverTimestamp(),
-    });
+    };
+    if (params.legalForm) updates.legalForm = params.legalForm;
+    if (params.activitySummary !== undefined) {
+      const act = sanitizeSummary(params.activitySummary);
+      updates.activitySummary = act || deleteField();
+    }
+    if (params.productsSummary !== undefined) {
+      const prods = sanitizeSummary(params.productsSummary);
+      updates.productsSummary = prods || deleteField();
+    }
+    await updateDoc(doc(db, 'businesses', params.businessId), updates);
+  },
+
+  async adminSaveAndVerify(params: {
+    businessId: string;
+    name: string;
+    legalForm: LegalFormKey;
+    type: BusinessTypeKey;
+    typeNote?: string;
+    address: string;
+    phone: string;
+    activitySummary: string;
+    productsSummary: string;
+    adminNote?: string;
+    approveNow?: boolean;
+  }): Promise<void> {
+    const cleanNote = sanitizeUserText(params.typeNote ?? '', MAX_TYPE_NOTE_LENGTH);
+    const check = validateBusinessForm({ ...params, typeNote: cleanNote });
+    if (!check.valid) throw new Error(check.error);
+
+    const act = sanitizeSummary(params.activitySummary);
+    const prods = sanitizeSummary(params.productsSummary);
+    const note = sanitizeSummary(params.adminNote, MAX_ADMIN_NOTE_LENGTH);
+    const payload: Record<string, unknown> = {
+      name: sanitizeUserText(params.name, MAX_BUSINESS_NAME_LENGTH),
+      legalForm: params.legalForm,
+      type: params.type,
+      address: sanitizeUserText(params.address, MAX_BUSINESS_ADDRESS_LENGTH),
+      phone: sanitizeUserText(params.phone, MAX_PHONE_LENGTH),
+      typeNote: params.type === 'other' && cleanNote ? cleanNote : deleteField(),
+      activitySummary: act || deleteField(),
+      productsSummary: prods || deleteField(),
+      adminNote: note || deleteField(),
+      updatedAt: serverTimestamp(),
+    };
+    if (params.approveNow) {
+      payload.status = 'approved';
+      payload.rejectionReason = deleteField();
+    }
+    await updateDoc(doc(getFirebaseDb(), 'businesses', params.businessId), payload);
+  },
+
+  async adminCreateForOwner(params: {
+    ownerId: string;
+    name: string;
+    legalForm: LegalFormKey;
+    type: BusinessTypeKey;
+    typeNote?: string;
+    address: string;
+    phone: string;
+    activitySummary: string;
+    productsSummary: string;
+    adminNote?: string;
+    approveNow?: boolean;
+  }): Promise<string> {
+    const cleanNote = sanitizeUserText(params.typeNote ?? '', MAX_TYPE_NOTE_LENGTH);
+    const check = validateBusinessForm({ ...params, typeNote: cleanNote });
+    if (!check.valid) throw new Error(check.error);
+
+    const act = sanitizeSummary(params.activitySummary);
+    const prods = sanitizeSummary(params.productsSummary);
+    const note = sanitizeSummary(params.adminNote, MAX_ADMIN_NOTE_LENGTH);
+    const payload: Record<string, unknown> = {
+      ownerId: params.ownerId,
+      name: sanitizeUserText(params.name, MAX_BUSINESS_NAME_LENGTH),
+      legalForm: params.legalForm,
+      type: params.type,
+      address: sanitizeUserText(params.address, MAX_BUSINESS_ADDRESS_LENGTH),
+      phone: sanitizeUserText(params.phone, MAX_PHONE_LENGTH),
+      status: params.approveNow ? 'approved' : 'pending',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    if (params.type === 'other' && cleanNote) payload.typeNote = cleanNote;
+    if (act) payload.activitySummary = act;
+    if (prods) payload.productsSummary = prods;
+    if (note) payload.adminNote = note;
+    const ref = await addDoc(collection(getFirebaseDb(), 'businesses'), payload);
+    return ref.id;
   },
 
   async setStatus(

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { businessRepository } from '../repositories/businessRepository';
 import { expenseRepository } from '../repositories/expenseRepository';
+import { inquiryRepository } from '../repositories/inquiryRepository';
 import { orderRepository } from '../repositories/orderRepository';
 import { productRepository } from '../repositories/productRepository';
 import { calculateAnalytics, type AnalyticsPeriod } from '../services/analytics';
-import type { Business, CustomerOrder, Expense, Product } from '../types/domain';
+import type { Business, CustomerOrder, Expense, OwnerInquiry, Product } from '../types/domain';
 import { buildOwnerActions } from './ownerActions';
 
 function useBusinessStreams(businessId: string | undefined, onError: (msg: string) => void) {
@@ -103,13 +104,14 @@ function useBusinessStreams(businessId: string | undefined, onError: (msg: strin
 
 export function useOwnerDashboard(ownerId: string | undefined) {
   const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [inquiries, setInquiries] = useState<OwnerInquiry[]>([]);
   const [loadedOwnerId, setLoadedOwnerId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>('week');
 
   useEffect(() => {
     if (!ownerId) return;
-    return businessRepository.observeForOwner(
+    const unsubBiz = businessRepository.observeForOwner(
       ownerId,
       (list) => {
         setBusinesses(list);
@@ -121,9 +123,19 @@ export function useOwnerDashboard(ownerId: string | undefined) {
         setLoadedOwnerId(ownerId);
       }
     );
+    const unsubInq = inquiryRepository.observeForOwner(
+      ownerId,
+      (list) => setInquiries(list),
+      () => {}
+    );
+    return () => {
+      unsubBiz();
+      unsubInq();
+    };
   }, [ownerId]);
 
   const ownerBusinesses = useMemo(() => (ownerId ? businesses : []), [ownerId, businesses]);
+  const ownerInquiries = useMemo(() => (ownerId ? inquiries : []), [ownerId, inquiries]);
   const businessesLoaded = !ownerId || loadedOwnerId === ownerId;
   const business = useMemo(
     () =>
@@ -177,6 +189,7 @@ export function useOwnerDashboard(ownerId: string | undefined) {
 
   return {
     business,
+    inquiries: ownerInquiries,
     businessesLoaded,
     products,
     orders: scopedOrders,

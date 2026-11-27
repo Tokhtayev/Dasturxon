@@ -97,14 +97,18 @@ service cloud.firestore {
         isAdmin()
       );
 
-      // Create: Verified owner (role == 'owner' or 'admin') can create their business with 'pending' status
-      allow create: if isSignedIn()
-        && getUserData().role in ['owner', 'admin']
-        && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.status == 'pending'
+      // Create: Verified owner (role == 'owner' or 'admin') can create their business with 'pending' status,
+      // or Admin can create and verify a business directly for an owner after consultation
+      allow create: if isSignedIn() && (
+        (getUserData().role in ['owner', 'admin'] &&
+         request.resource.data.ownerId == request.auth.uid &&
+         request.resource.data.status == 'pending') ||
+        (isAdmin() && request.resource.data.status in ['pending', 'approved'])
+      )
         && request.resource.data.name is string
         && request.resource.data.name.size() >= 2
-        && request.resource.data.name.size() <= 100;
+        && request.resource.data.name.size() <= 100
+        && (!('legalForm' in request.resource.data) || request.resource.data.legalForm in ['mchj', 'yatt']);
 
       // Update: Owner can update business info, CANNOT transfer ownerId or self-approve.
       // Rejected businesses may be resubmitted back to 'pending'.
@@ -327,6 +331,29 @@ service cloud.firestore {
       // Read: signed-in users can read business views
       allow read: if isSignedIn();
 
+      allow update, delete: if isAdmin();
+    }
+
+    // ------------------------------------------------------------------------
+    // Owner Onboarding Inquiries: /ownerInquiries/{inquiryId}
+    // ------------------------------------------------------------------------
+    match /ownerInquiries/{inquiryId} {
+      // Create: Business applicants can submit pre-registration or pending-gate inquiries to Admin
+      allow create: if request.resource.data.status == 'waiting'
+        && request.resource.data.legalForm in ['mchj', 'yatt']
+        && request.resource.data.ownerName is string
+        && request.resource.data.ownerName.size() >= 2
+        && request.resource.data.ownerName.size() <= 100
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() >= 7
+        && request.resource.data.phone.size() <= 30
+        && (!('adminReply' in request.resource.data) || request.resource.data.adminReply == '')
+        && (!('ownerUid' in request.resource.data) || (isSignedIn() && request.resource.data.ownerUid == request.auth.uid));
+
+      // Read: Admin reads all inquiries; signed-in owner reads only their own inquiries (no anonymous PII leak)
+      allow read: if isAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      // Update & Delete: Admin records legalForm (MChJ/YaTT), businessType, address, activity/products summary, and replies
       allow update, delete: if isAdmin();
     }
   }

@@ -6,6 +6,7 @@ import { productRepository } from '../repositories/productRepository';
 import type {
   Business,
   BusinessTypeKey,
+  LegalFormKey,
   OrderStatusKey,
   PaymentStatus,
   ProductStatus,
@@ -26,6 +27,9 @@ export function buildOwnerActions({ ownerId, business, costMap, setCostMap }: Ow
       address: string;
       phone: string;
       typeNote?: string;
+      legalForm?: LegalFormKey;
+      activitySummary?: string;
+      productsSummary?: string;
     }) => {
       if (!ownerId) throw new Error('Tizimga kiring.');
       await businessRepository.create({ ownerId, ...params });
@@ -37,6 +41,9 @@ export function buildOwnerActions({ ownerId, business, costMap, setCostMap }: Ow
       address: string;
       phone: string;
       typeNote?: string;
+      legalForm?: LegalFormKey;
+      activitySummary?: string;
+      productsSummary?: string;
     }) => {
       if (!business) return;
       await businessRepository.updateDetails({ businessId: business.id, ...params });
@@ -48,6 +55,9 @@ export function buildOwnerActions({ ownerId, business, costMap, setCostMap }: Ow
       address: string;
       phone: string;
       typeNote?: string;
+      legalForm?: LegalFormKey;
+      activitySummary?: string;
+      productsSummary?: string;
     }) => {
       if (!business) return;
       await businessRepository.resubmit({ businessId: business.id, ...params });

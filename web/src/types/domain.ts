@@ -39,17 +39,47 @@ export const BUSINESS_TYPES: BusinessTypeMeta[] = [
 ];
 
 export type BusinessStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+export type LegalFormKey = 'mchj' | 'yatt';
+
+export const LEGAL_FORMS: { storedValue: LegalFormKey; labelUz: string; hint: string }[] = [
+  { storedValue: 'mchj', labelUz: 'MChJ', hint: 'Mas’uliyati cheklangan jamiyat' },
+  { storedValue: 'yatt', labelUz: 'YaTT', hint: 'Yakka tartibdagi tadbirkor' },
+];
 
 export interface Business {
   id: string;
   ownerId: string;
   name: string;
   type: BusinessTypeKey;
+  legalForm?: LegalFormKey;
   address: string;
   phone: string;
   status: BusinessStatus;
   typeNote?: string;
+  activitySummary?: string;
+  productsSummary?: string;
+  adminNote?: string;
   rejectionReason?: string;
+  createdAtMs: number;
+  updatedAtMs: number;
+}
+
+export type InquiryStatus = 'waiting' | 'replied' | 'registered';
+
+export interface OwnerInquiry {
+  id: string;
+  ownerName: string;
+  phone: string;
+  email?: string;
+  ownerUid?: string;
+  legalForm: LegalFormKey;
+  businessType?: BusinessTypeKey;
+  businessName?: string;
+  address?: string;
+  activitySummary: string;
+  productsSummary: string;
+  status: InquiryStatus;
+  adminReply?: string;
   createdAtMs: number;
   updatedAtMs: number;
 }

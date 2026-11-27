@@ -67,6 +67,8 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({ isDark, onToggleTheme 
       ) : !isApproved ? (
         <OwnerBusinessGate
           business={ownerState.business}
+          inquiries={ownerState.inquiries}
+          ownerProfile={session.status === 'ready' ? session.profile : null}
           onCreateBusiness={ownerState.createBusiness}
           onResubmitBusiness={ownerState.resubmitBusiness}
         />

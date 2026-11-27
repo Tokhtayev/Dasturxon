@@ -1,9 +1,27 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Lock, Mail, ShoppingBag, Store } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  MessageSquareText,
+  PhoneCall,
+  Send,
+  ShoppingBag,
+  Store,
+} from 'lucide-react';
+import { AdminContactModal } from '../components/AdminContactModal';
 import { DxLogo } from '../components/DxLogo';
 import { useAuth } from '../hooks/useAuth';
+import { ADMIN_SUPPORT_PHONE } from '../services/constants';
 import { getReadableErrorMessage } from '../services/errors';
-import { isValidEmail, validateSignUpForm } from '../services/validators';
+import {
+  buildSmsHref,
+  buildTelHref,
+  isValidContactPhone,
+  isValidEmail,
+  validateSignUpForm,
+} from '../services/validators';
 import type { RegisterableRole } from '../types/domain';
 
 type AuthTab = 'login' | 'register';
@@ -130,6 +148,57 @@ const LoginTabPanel: React.FC = () => {
   );
 };
 
+const OwnerAdminHelpBox: React.FC<{ onOpenInquiry: () => void }> = ({ onOpenInquiry }) => {
+  const smsBody =
+    "Assalomu alaykum! Dasturxon platformasida biznes egasi sifatida ro'yxatdan o'tmoqchiman (MChJ / YaTT). Ma'lumot berishga tayyorman.";
+  return (
+    <div
+      className="rounded-2xl p-3.5 border space-y-2.5"
+      style={{
+        backgroundColor: 'var(--dx-secondary-container)',
+        borderColor: 'var(--dx-secondary)',
+      }}
+    >
+      <div>
+        <div
+          className="text-xs font-extrabold"
+          style={{ color: 'var(--dx-on-secondary-container)' }}
+        >
+          Administrator bilan bog‘lanish (Biznes ulash)
+        </div>
+        <p className="text-[11px] leading-snug mt-0.5" style={{ color: 'var(--dx-muted)' }}>
+          Admin sizdan <strong>MChJ yoki YaTT</strong>, biznes turi, manzil va mahsulotlaringizni
+          so‘rab tizimga kiritadi:
+        </p>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        <a
+          href={buildTelHref(ADMIN_SUPPORT_PHONE)}
+          className="px-2 py-1.5 rounded-xl border text-[11px] font-bold inline-flex items-center justify-center gap-1"
+          style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
+        >
+          <PhoneCall className="w-3 h-3" style={{ color: 'var(--dx-primary)' }} /> Tel qilish
+        </a>
+        <a
+          href={buildSmsHref(ADMIN_SUPPORT_PHONE, smsBody)}
+          className="px-2 py-1.5 rounded-xl border text-[11px] font-bold inline-flex items-center justify-center gap-1"
+          style={{ backgroundColor: 'var(--dx-surface)', borderColor: 'var(--dx-border)' }}
+        >
+          <MessageSquareText className="w-3 h-3" style={{ color: 'var(--dx-secondary)' }} /> SMS
+        </a>
+        <button
+          type="button"
+          onClick={onOpenInquiry}
+          className="px-2 py-1.5 rounded-xl text-[11px] font-bold inline-flex items-center justify-center gap-1 cursor-pointer"
+          style={{ backgroundColor: 'var(--dx-primary)', color: 'var(--dx-on-primary)' }}
+        >
+          <Send className="w-3 h-3" /> So‘rov
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const RegisterTabPanel: React.FC = () => {
   const { signUp, firebaseReady } = useAuth();
   const [role, setRole] = useState<RegisterableRole>('customer');
@@ -142,12 +211,16 @@ const RegisterTabPanel: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     const check = validateSignUpForm({ fullName, nickname, email, password, confirmPassword });
     if (!check.valid) return setError(check.error ?? "Ma'lumotlarni tekshiring.");
+    if (role === 'owner' && !isValidContactPhone(phone)) {
+      return setError("Biznes egasi uchun admin bog'lanadigan telefon raqami majburiy.");
+    }
     if (!firebaseReady) return setError('Firebase Web SDK sozlanmagan (.env faylini tekshiring).');
 
     setSubmitting(true);
@@ -161,52 +234,67 @@ const RegisterTabPanel: React.FC = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3.5">
-      <RoleSelector role={role} onChange={setRole} />
-      <p className="text-[11px] text-center" style={{ color: 'var(--dx-muted)' }}>
-        Admin roli faqat Firebase Console orqali tayinlanadi
-      </p>
-      <ProfileFields
-        fullName={fullName}
-        onFullNameChange={setFullName}
-        nickname={nickname}
-        onNicknameChange={setNickname}
-        phone={phone}
-        onPhoneChange={setPhone}
-        email={email}
-        onEmailChange={setEmail}
-      />
-      <PasswordFields
-        password={password}
-        onPasswordChange={setPassword}
-        confirmPassword={confirmPassword}
-        onConfirmChange={setConfirmPassword}
-        showPassword={showPassword}
-        onToggleShow={() => setShowPassword((v) => !v)}
-      />
+    <>
+      <form onSubmit={handleSubmit} className="space-y-3.5">
+        <RoleSelector role={role} onChange={setRole} />
+        {role === 'owner' ? (
+          <OwnerAdminHelpBox onOpenInquiry={() => setContactModalOpen(true)} />
+        ) : (
+          <p className="text-[11px] text-center" style={{ color: 'var(--dx-muted)' }}>
+            Admin roli faqat Firebase Console orqali tayinlanadi
+          </p>
+        )}
+        <ProfileFields
+          fullName={fullName}
+          onFullNameChange={setFullName}
+          nickname={nickname}
+          onNicknameChange={setNickname}
+          phone={phone}
+          onPhoneChange={setPhone}
+          phoneRequired={role === 'owner'}
+          email={email}
+          onEmailChange={setEmail}
+        />
+        <PasswordFields
+          password={password}
+          onPasswordChange={setPassword}
+          confirmPassword={confirmPassword}
+          onConfirmChange={setConfirmPassword}
+          showPassword={showPassword}
+          onToggleShow={() => setShowPassword((v) => !v)}
+        />
 
-      {error && (
-        <div
-          role="alert"
-          className="p-3 rounded-2xl text-xs font-bold"
-          style={{
-            backgroundColor: 'var(--dx-error-container)',
-            color: 'var(--dx-on-error-container)',
-          }}
+        {error && (
+          <div
+            role="alert"
+            className="p-3 rounded-2xl text-xs font-bold"
+            style={{
+              backgroundColor: 'var(--dx-error-container)',
+              color: 'var(--dx-on-error-container)',
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full py-3.5 rounded-2xl text-sm font-bold disabled:opacity-50 cursor-pointer"
+          style={{ backgroundColor: 'var(--dx-primary)', color: 'var(--dx-on-primary)' }}
         >
-          {error}
-        </div>
+          {submitting ? 'Yaratilmoqda…' : "Ro'yxatdan o'tish"}
+        </button>
+      </form>
+      {contactModalOpen && (
+        <AdminContactModal
+          defaultName={fullName}
+          defaultPhone={phone}
+          defaultEmail={email}
+          onClose={() => setContactModalOpen(false)}
+        />
       )}
-
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full py-3.5 rounded-2xl text-sm font-bold disabled:opacity-50 cursor-pointer"
-        style={{ backgroundColor: 'var(--dx-primary)', color: 'var(--dx-on-primary)' }}
-      >
-        {submitting ? 'Yaratilmoqda…' : "Ro'yxatdan o'tish"}
-      </button>
-    </form>
+    </>
   );
 };
 
@@ -382,6 +470,7 @@ const ProfileFields: React.FC<{
   onNicknameChange: (v: string) => void;
   phone: string;
   onPhoneChange: (v: string) => void;
+  phoneRequired: boolean;
   email: string;
   onEmailChange: (v: string) => void;
 }> = ({
@@ -391,6 +480,7 @@ const ProfileFields: React.FC<{
   onNicknameChange,
   phone,
   onPhoneChange,
+  phoneRequired,
   email,
   onEmailChange,
 }) => (
@@ -426,7 +516,7 @@ const ProfileFields: React.FC<{
       </div>
       <div className="space-y-1">
         <label htmlFor="reg-phone" className="text-xs font-bold block">
-          Telefon (ixtiyoriy)
+          {phoneRequired ? 'Telefon (majburiy)' : 'Telefon (ixtiyoriy)'}
         </label>
         <input
           id="reg-phone"

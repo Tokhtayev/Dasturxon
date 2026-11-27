@@ -1,31 +1,48 @@
 import { useEffect, useMemo, useState } from 'react';
 import { businessRepository } from '../repositories/businessRepository';
+import { inquiryRepository } from '../repositories/inquiryRepository';
 import { MIN_REJECTION_REASON_LENGTH } from '../services/constants';
-import type { Business } from '../types/domain';
+import type { Business, OwnerInquiry } from '../types/domain';
 
 export function useAdminBusinesses(enabled: boolean) {
   const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [inquiries, setInquiries] = useState<OwnerInquiry[]>([]);
+  const [loadedBiz, setLoadedBiz] = useState(false);
+  const [loadedInq, setLoadedInq] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
-    const unsub = businessRepository.observeAll(
+    const unsubBiz = businessRepository.observeAll(
       (list) => {
         setBusinesses(list);
-        setLoaded(true);
+        setLoadedBiz(true);
         setError(null);
       },
       (err) => {
         setError(err.message);
-        setLoaded(true);
+        setLoadedBiz(true);
       }
     );
-    return unsub;
+    const unsubInq = inquiryRepository.observeAllForAdmin(
+      (list) => {
+        setInquiries(list);
+        setLoadedInq(true);
+      },
+      (err) => {
+        setError(err.message);
+        setLoadedInq(true);
+      }
+    );
+    return () => {
+      unsubBiz();
+      unsubInq();
+    };
   }, [enabled]);
 
   const visibleBusinesses = useMemo(() => (enabled ? businesses : []), [enabled, businesses]);
-  const loading = enabled && !loaded;
+  const visibleInquiries = useMemo(() => (enabled ? inquiries : []), [enabled, inquiries]);
+  const loading = enabled && (!loadedBiz || !loadedInq);
 
   const pendingBusinesses = useMemo(
     () => visibleBusinesses.filter((b) => b.status === 'pending'),
@@ -38,6 +55,10 @@ export function useAdminBusinesses(enabled: boolean) {
   const rejectedBusinesses = useMemo(
     () => visibleBusinesses.filter((b) => b.status === 'rejected'),
     [visibleBusinesses]
+  );
+  const waitingInquiries = useMemo(
+    () => visibleInquiries.filter((i) => i.status === 'waiting'),
+    [visibleInquiries]
   );
 
   const approveBusiness = async (businessId: string) => {
@@ -56,9 +77,14 @@ export function useAdminBusinesses(enabled: boolean) {
     pendingBusinesses,
     approvedBusinesses,
     rejectedBusinesses,
+    inquiries: visibleInquiries,
+    waitingInquiries,
     loading,
     error,
     approveBusiness,
     rejectBusiness,
+    saveBusinessDetails: businessRepository.adminSaveAndVerify,
+    createBusinessForOwner: businessRepository.adminCreateForOwner,
+    updateInquiry: inquiryRepository.adminUpdateInquiry,
   };
 }

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { MAX_IMAGE_DATA_URL_LENGTH } from '../src/services/constants';
 import { getReadableErrorMessage, redactSensitiveTokens } from '../src/services/errors';
 import {
+  buildSmsHref,
+  buildTelHref,
   escapeHtml,
   formatContactPhoneDisplay,
   isStrongPassword,
@@ -13,6 +15,7 @@ import {
   sanitizeUserText,
   validateBusinessForm,
   validateExpenseInput,
+  validateOwnerInquiry,
   validateProductForm,
   validateRejectionReason,
   validateSignUpForm,
@@ -216,5 +219,37 @@ describe('validators & text sanitization', () => {
     expect(isValidContactPhone('+998 90 123 45 67')).toBe(true);
     expect(formatContactPhoneDisplay('+998')).toBe('');
     expect(formatContactPhoneDisplay('+998 90 123 45 67')).toBe('+998 90 123 45 67');
+  });
+
+  it('buildTelHref, buildSmsHref, and validateOwnerInquiry handle MChJ/YaTT inquiries and links', () => {
+    expect(buildTelHref('+998 90 123 45 67')).toBe('tel:+998901234567');
+    expect(buildSmsHref('+998 90 123 45 67', 'Salom')).toBe('sms:+998901234567?body=Salom');
+    expect(
+      validateOwnerInquiry({
+        ownerName: 'Azizbek',
+        phone: '+998 90 123 45 67',
+        legalForm: 'mchj',
+        activitySummary: 'Issiq tandir non va patir pishirish',
+        productsSummary: 'Tandir non, Sariyog patir, Somsa',
+      }).valid
+    ).toBe(true);
+    expect(
+      validateOwnerInquiry({
+        ownerName: 'Azizbek',
+        phone: '+998',
+        legalForm: 'yatt',
+        activitySummary: 'Issiq non pishirish',
+        productsSummary: 'Tandir non',
+      }).valid
+    ).toBe(false);
+    expect(
+      validateOwnerInquiry({
+        ownerName: 'Azizbek',
+        phone: '+998 90 123 45 67',
+        legalForm: 'other',
+        activitySummary: 'Issiq non pishirish',
+        productsSummary: 'Tandir non',
+      }).valid
+    ).toBe(false);
   });
 });
